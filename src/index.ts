@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from '@commander-js/extra-typings';
-import { registerHelloCommand } from './commands/hello.ts';
+import { registerHelloCommand } from '~/commands/hello.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 const program = new Command()
