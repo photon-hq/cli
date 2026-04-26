@@ -12,10 +12,13 @@
     "dev": "bun run --watch src/index.ts",
     "build": "bun build ./src/index.ts --outfile dist/dashboard.js --target bun --minify",
     "compile": "bun build ./src/index.ts --compile --outfile dist/dashboard",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sync:api": "bun run scripts/sync-api-types.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@elysiajs/eden": "1.4.9",
+    "@types/bun": "latest",
+    "elysia": "1.4.28"
   },
   "peerDependencies": {
     "typescript": "^5"
