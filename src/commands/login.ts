@@ -160,6 +160,16 @@ async function pollForToken(opts: PollOpts): Promise<string> {
 
     // Poll errors are normal flow control for device authorization.
     const errorCode = extractErrorCode(resp.error);
+    const status = extractErrorStatus(resp.error);
+
+    // HTTP 429 is rate limiting from the server (not a device-flow code) —
+    // RFC 8628 says treat like slow_down: back off and keep polling.
+    if (status === 429) {
+      interval += 10;
+      opts.onSlowDown(interval);
+      continue;
+    }
+
     switch (errorCode) {
       case "authorization_pending":
         continue;
@@ -182,6 +192,14 @@ function extractErrorCode(error: unknown): string | undefined {
   if (error && typeof error === "object" && "error" in error) {
     const code = (error as { error: unknown }).error;
     return typeof code === "string" ? code : undefined;
+  }
+  return undefined;
+}
+
+function extractErrorStatus(error: unknown): number | undefined {
+  if (error && typeof error === "object" && "status" in error) {
+    const s = (error as { status: unknown }).status;
+    return typeof s === "number" ? s : undefined;
   }
   return undefined;
 }
