@@ -3,14 +3,26 @@ import type { PublicApp } from "~/types/api";
 import { resolveEnv } from "~/lib/config.ts";
 import { loadCredentials } from "~/lib/credentials.ts";
 import type { Credentials } from "~/lib/credentials.ts";
+import { debugHttp, isDebug } from "~/lib/debug.ts";
 import type { ResolvedEnv } from "~/lib/env.ts";
 import { NotAuthenticatedError } from "~/lib/errors.ts";
 
 export interface ApiOptions {
   /** Override the active environment by name. */
   envName?: string;
-  /** Bypass env resolution entirely with a raw URL. Skips credential loading. */
+  /**
+   * Bypass env resolution entirely with a raw URL. When set, no
+   * credential lookup happens — useful for ping / health checks
+   * against an arbitrary host.
+   */
   url?: string;
+  /**
+   * Override stored credentials with an explicit token. If provided,
+   * this wins over $PHOTON_TOKEN, $DASHBOARD_TOKEN, and stored creds.
+   * If omitted, getApi() falls back to $PHOTON_TOKEN and then
+   * $DASHBOARD_TOKEN (legacy alias) before loading stored credentials.
+   */
+  token?: string;
   /** Throw NotAuthenticatedError if no credentials are stored for this env. */
   requireAuth?: boolean;
 }
@@ -23,30 +35,95 @@ export interface ApiContext {
 
 /**
  * Build an Eden treaty client targeting the resolved environment, with
- * Bearer auth injected if credentials are stored for that env.
+ * Bearer auth injected if available (via `--token` flag, `PHOTON_TOKEN`
+ * env, or stored credentials in that order).
  *
- * Use `requireAuth: true` for commands that must be logged in — the helper
- * throws NotAuthenticatedError before any network call.
+ * Use `requireAuth: true` for commands that must be logged in — the
+ * helper throws NotAuthenticatedError before any network call.
  */
 export async function getApi(opts: ApiOptions = {}): Promise<ApiContext> {
   const env: ResolvedEnv = opts.url
     ? { name: "custom", url: opts.url, builtin: false }
     : await resolveEnv(opts.envName);
 
-  const creds = opts.url ? null : await loadCredentials(env.name);
+  // Token resolution priority:
+  //   --token flag > $PHOTON_TOKEN > $DASHBOARD_TOKEN (legacy) > stored creds
+  const explicitToken =
+    opts.token ?? process.env.PHOTON_TOKEN ?? process.env.DASHBOARD_TOKEN;
 
-  if (opts.requireAuth && !creds) {
+  const creds = opts.url || explicitToken
+    ? null
+    : await loadCredentials(env.name);
+
+  if (opts.requireAuth && !creds && !explicitToken) {
     throw new NotAuthenticatedError(env.name);
   }
 
+  const accessToken = explicitToken ?? creds?.accessToken;
   const headers: Record<string, string> = {};
-  if (creds) {
-    headers.Authorization = `Bearer ${creds.accessToken}`;
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  // Only wrap fetch when --debug is enabled. The wrapper has measurable
+  // per-request overhead (performance.now() + try/catch + URL/Request
+  // unwrapping), and the vast majority of CLI invocations don't need it.
+  const fetcher = isDebug() ? buildTracedFetch() : fetch;
+
   return {
-    api: treaty<PublicApp>(env.url, { headers }),
+    api: treaty<PublicApp>(env.url, {
+      headers,
+      fetcher,
+    }),
     env,
     creds,
   };
+}
+
+/**
+ * Build a fetch wrapper that logs each request via debugHttp.
+ *
+ * Method derivation: prefer init.method, then a Request input's own
+ * method, then default to GET. Without the Request fallback,
+ * `new Request("url", { method: "POST" })` would be misreported as GET.
+ */
+function buildTracedFetch(): typeof fetch {
+  return Object.assign(
+    async (
+      input: Parameters<typeof fetch>[0],
+      init?: Parameters<typeof fetch>[1]
+    ) => {
+      const start = performance.now();
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      const method = (
+        init?.method ??
+        (input instanceof Request ? input.method : undefined) ??
+        "GET"
+      ).toUpperCase();
+      try {
+        const response = await fetch(input, init);
+        debugHttp({
+          method,
+          url,
+          status: response.status,
+          durationMs: Math.round(performance.now() - start),
+        });
+        return response;
+      } catch (err) {
+        debugHttp({
+          method,
+          url,
+          status: 0,
+          durationMs: Math.round(performance.now() - start),
+        });
+        throw err;
+      }
+    },
+    { preconnect: fetch.preconnect.bind(fetch) }
+  ) as typeof fetch;
 }

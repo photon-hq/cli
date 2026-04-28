@@ -1,9 +1,6 @@
 import type { Command } from "@commander-js/extra-typings";
 import { getApi } from "~/lib/api.ts";
-import {
-  NotAuthenticatedError,
-  SessionExpiredError,
-} from "~/lib/errors.ts";
+import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 import type { Project } from "~/lib/types.ts";
 
@@ -18,9 +15,14 @@ export function registerProjectsCommand(program: Command): void {
     .alias("ls")
     .description("list your projects")
     .option("-e, --env <name>", "environment (defaults to current)")
+    .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
-      const { api, env } = await mustGetApi(opts.env);
+      const { api, env } = await getApi({
+        envName: opts.env,
+        token: opts.token,
+        requireAuth: true,
+      });
       const { data, error } = await api.api.projects.get();
       if (error) {
         if (error.status === 401) throw new SessionExpiredError(env.name);
@@ -56,9 +58,14 @@ export function registerProjectsCommand(program: Command): void {
     .alias("get")
     .description("show details for one project")
     .option("-e, --env <name>", "environment (defaults to current)")
+    .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (id, opts) => {
-      const { api, env } = await mustGetApi(opts.env);
+      const { api, env } = await getApi({
+        envName: opts.env,
+        token: opts.token,
+        requireAuth: true,
+      });
       const { data, error } = await api.api.projects({ id }).get();
       if (error) {
         if (error.status === 401) throw new SessionExpiredError(env.name);
@@ -88,15 +95,6 @@ export function registerProjectsCommand(program: Command): void {
         ["updatedAt", new Date(p.updatedAt).toLocaleString()],
       ]);
     });
-}
-
-async function mustGetApi(envName?: string): Promise<Awaited<ReturnType<typeof getApi>>> {
-  try {
-    return await getApi({ envName, requireAuth: true });
-  } catch (err) {
-    if (err instanceof NotAuthenticatedError) die(err.message);
-    throw err;
-  }
 }
 
 function formatStatus(s: string): string {
