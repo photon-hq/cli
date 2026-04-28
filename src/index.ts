@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from '@commander-js/extra-typings';
 import { registerEnvCommand } from '~/commands/env.ts';
+import { registerLinkCommands } from '~/commands/link.ts';
 import { registerLoginCommand } from '~/commands/login.ts';
 import { registerLogoutCommand } from '~/commands/logout.ts';
 import { registerPingCommand } from '~/commands/ping.ts';
@@ -38,6 +39,7 @@ registerLogoutCommand(program);
 registerWhoamiCommand(program);
 registerProfileCommand(program);
 registerProjectsCommand(program);
+registerLinkCommands(program);
 
 program.parseAsync(process.argv).catch(handleTopLevelError);
 
