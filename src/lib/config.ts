@@ -54,12 +54,17 @@ export function listEnvs(config: DashboardConfig): ResolvedEnv[] {
 /**
  * Resolve which environment to use for a command.
  *
- * Priority: explicit override > $DASHBOARD_ENV > config.currentEnv > DEFAULT.
+ * Priority: explicit override > $PHOTON_ENV > $DASHBOARD_ENV (legacy alias)
+ *   > config.currentEnv > DEFAULT.
  */
 export async function resolveEnv(override?: string): Promise<ResolvedEnv> {
   const config = await loadConfig();
   const name =
-    override ?? process.env.DASHBOARD_ENV ?? config.currentEnv ?? DEFAULT_ENV;
+    override ??
+    process.env.PHOTON_ENV ??
+    process.env.DASHBOARD_ENV ??
+    config.currentEnv ??
+    DEFAULT_ENV;
 
   if (isBuiltin(name)) {
     return { name, url: BUILTIN_ENVS[name], builtin: true };

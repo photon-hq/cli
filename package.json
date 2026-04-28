@@ -1,17 +1,18 @@
 {
   "name": "dashboard-cli",
   "version": "0.0.1",
-  "description": "Dashboard CLI",
+  "description": "Photon CLI — typed terminal UI for the Photon Dashboard. Binary: `photon` (alias `pho`).",
   "type": "module",
   "private": true,
   "bin": {
-    "dashboard": "./src/index.ts"
+    "photon": "./src/index.ts",
+    "pho": "./src/index.ts"
   },
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build ./src/index.ts --outfile dist/dashboard.js --target bun --minify",
-    "compile": "bun build ./src/index.ts --compile --outfile dist/dashboard",
+    "build": "bun build ./src/index.ts --outfile dist/photon.js --target bun --minify",
+    "compile": "bun build ./src/index.ts --compile --outfile dist/photon",
     "typecheck": "tsc --noEmit",
     "sync:api": "bun run scripts/sync-api-types.ts"
   },

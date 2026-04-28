@@ -39,7 +39,7 @@ export function registerProfileCommand(program: Command): void {
       if (!profile) {
         console.log(c.dim("No developer or organization profile yet."));
         console.log(
-          c.hint("Set one up at the dashboard web app or via the API.")
+          c.hint("Set one up at the Photon Dashboard web app or via the API.")
         );
         return;
       }
