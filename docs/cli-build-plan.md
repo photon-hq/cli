@@ -462,10 +462,10 @@ The biggest sub-surface. Group as `photon spectrum <noun> <verb>`. Every command
 
 #### 2.11.a `spectrum users`
 
-```
-dashboard spectrum users list                           # GET /api/projects/:id/spectrum/users
-dashboard spectrum users add [opts]                     # POST .../spectrum/users
-dashboard spectrum users remove <user-id> [-y]          # DELETE .../spectrum/users/:userId
+```bash
+photon spectrum users list                           # GET /api/projects/:id/spectrum/users
+photon spectrum users add [opts]                     # POST .../spectrum/users
+photon spectrum users remove <user-id> [-y]          # DELETE .../spectrum/users/:userId
 ```
 
 **Add flags** (need to confirm against `apps/api/src/plugins/projects.ts` line 426 area for the actual body schema): `--phone`, `--email`, `--first-name`, `--last-name`, `--invite` (boolean: send onboarding email?).
@@ -474,9 +474,9 @@ dashboard spectrum users remove <user-id> [-y]          # DELETE .../spectrum/us
 
 #### 2.11.b `spectrum platforms`
 
-```
-dashboard spectrum platforms list                       # GET .../platforms
-dashboard spectrum platforms add [opts]                 # POST .../platforms
+```bash
+photon spectrum platforms list                       # GET .../platforms
+photon spectrum platforms add [opts]                 # POST .../platforms
 ```
 
 **Open question**: server doesn't currently expose DELETE for platforms (only POST). Either advocate for adding it server-side, or document the limitation in the help text.
@@ -485,45 +485,47 @@ dashboard spectrum platforms add [opts]                 # POST .../platforms
 
 #### 2.11.c `spectrum lines`
 
-```
-dashboard spectrum lines list                           # GET .../lines
-dashboard spectrum lines add [opts]                     # POST .../lines
-dashboard spectrum lines remove <line-id> [-y]          # DELETE .../lines/:lineId
+```bash
+photon spectrum lines list                           # GET .../lines
+photon spectrum lines add [opts]                     # POST .../lines
+photon spectrum lines remove <line-id> [-y]          # DELETE .../lines/:lineId
 ```
 
 **Effort**: 1.5 h.
 
 #### 2.11.d `spectrum profile`
 
-```
-dashboard spectrum profile show                         # GET .../spectrum/profile
-dashboard spectrum profile update [opts]                # PATCH .../spectrum/profile
+```bash
+photon spectrum profile show                         # GET .../spectrum/profile
+photon spectrum profile update [opts]                # PATCH .../spectrum/profile
 ```
 
 **Effort**: 1 h.
 
 #### 2.11.e `spectrum avatar upload <file>`
 
-```
-dashboard spectrum avatar upload <file>                 # GET .../spectrum/avatar-upload-url, then PUT to S3
+```bash
+photon spectrum avatar upload <file>                 # GET .../spectrum/avatar-upload-url, then PUT to S3
 ```
 
 **Behavior**:
-- `GET .../avatar-upload-url` returns `{url, fields, key, ...}` (presigned).
-- CLI then `PUT` to that URL with the file body. Need to use `Bun.file(path)` and standard fetch.
+- `GET .../avatar-upload-url` — **inspect actual response shape at start of Phase 7** before implementing. The contract dictates the upload mechanism:
+  - If response has `{url, fields, key, ...}` → S3 multipart POST with form fields.
+  - If response is a single signed URL only → simple PUT with file body + content-type.
+  - Either way, follow up with the API to commit the avatar reference if needed (check the existing web-app code in `apps/web/src/app/dashboard/[projectId]/spectrum/` for the canonical client behavior).
 - Print `✓ Uploaded`. Optionally print the resulting public URL if returned.
 
-**Effort**: 1.5 h (presigned upload is fiddly; need to inspect actual response shape first).
+**Effort**: 1.5 h (presigned upload is fiddly; the actual contract shape determines whether we PUT or POST-multipart).
 
 **Total Spectrum subgroup**: ~7 h (large surface area).
 
 ### 2.12 Billing: `plans / show / checkout / manage`
 
-```
-dashboard billing plans                                 # GET /api/billing/plans
-dashboard billing show [-p <id>]                        # GET /api/projects/:id/subscription
-dashboard billing checkout [-p <id>] [--plan <id>] [--qty N] [--no-browser]   # POST /api/billing/checkout
-dashboard billing manage [-p <id>] [--no-browser]       # POST /api/projects/:id/subscription/manage
+```bash
+photon billing plans                                 # GET /api/billing/plans
+photon billing show [-p <id>]                        # GET /api/projects/:id/subscription
+photon billing checkout [-p <id>] [--plan <id>] [--qty N] [--no-browser]   # POST /api/billing/checkout
+photon billing manage [-p <id>] [--no-browser]       # POST /api/projects/:id/subscription/manage
 ```
 
 **Special handling for `show`**: until architecture-review S3 is fixed, the API may return tier `"unknown"` for paying users. **Print a warning** below the result: `(server may return "unknown" while subscription syncs — see architecture-review S3.)`. Drop the warning once S3 lands.
@@ -541,16 +543,17 @@ dashboard billing manage [-p <id>] [--no-browser]       # POST /api/projects/:id
 
 **Goal**: dump active configuration for support / debugging. **Never** print secrets.
 
-```
-dashboard config show
+```bash
+photon config show
 ```
 
 Output (text):
-```
+
+```text
 Current env:        staging (https://staging-app.photon.codes)
 Linked project:     my-app (id=abc123)
 Logged in envs:     production, staging
-Config dir:         ~/.config/photon-dashboard
+Config dir:         ~/.config/photon
 ```
 
 `--json` for scripts.
@@ -559,8 +562,8 @@ Config dir:         ~/.config/photon-dashboard
 
 ### 2.14 `photon api <path>` — power user escape hatch (v2)
 
-```
-dashboard api <path> [-X METHOD] [-d <body>] [-F field=value]
+```bash
+photon api <path> [-X METHOD] [-d <body>] [-F field=value]
 ```
 
 Authenticated raw request. Useful when a command isn't yet implemented or for one-off scripts. Defer to v2.
@@ -613,7 +616,7 @@ Authenticated raw request. Useful when a command isn't yet implemented or for on
 ### Phase 11 (deferred)
 - §2.14 `dashboard api`
 - `dashboard alias set` (gh-style)
-- `dashboard logs` (needs server-side log streaming first)
+- `photon logs` (needs server-side log streaming first)
 - `photon auth tokens create` (needs better-auth `apiKey` plugin server-side)
 - Telemetry (only with strong reason)
 
@@ -750,7 +753,7 @@ Manual + automated. Until we have a CI test harness, manual is the pragmatic cho
 To keep v1 shippable:
 
 - **No** server-side changes (besides the one-time `bearer()` plugin add, already done in dashboard#58)
-- **No** `dashboard logs` (needs a streaming endpoint server-side)
+- **No** `photon logs` (needs a streaming endpoint server-side)
 - **No** template gallery beyond what dashboard exposes via projects
 - **No** observability surface (`/dashboard/[id]/observability` is out)
 - **No** debug page (`/dashboard/[id]/debug` is internal)

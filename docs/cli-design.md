@@ -63,17 +63,17 @@ After `photon-hq/dashboard@a440152` (post-bearer-plugin merge):
 
 | Web page | User intent | CLI equivalent |
 |---|---|---|
-| `/(auth)/sign-up` | First-time signup with email+password+OTP+phone | `photon signup` (interactive) — but device-flow login skips this; new users must visit web once |
+| `/(auth)/sign-up` | First-time signup with email+password+OTP+phone | **web only** — first-time users visit `/(auth)/sign-up` once; device-flow login takes over after |
 | `/(auth)/sign-in` | Returning login | `photon login` (already shipped — device flow) |
-| `/onboarding` | Choose developer-vs-organization profile | `photon onboard` (interactive prompts) |
+| `/onboarding` | Choose developer-vs-organization profile | `photon profile init` (interactive prompts) |
 | `/dashboard` (root) | List projects | `photon projects ls` ✅ |
 | `/dashboard/new` | Create project (name, location, spectrum, template) | `photon projects create` |
 | `/dashboard/[id]` | Project home / overview | `photon projects show <id>` ✅ |
 | `/dashboard/[id]/settings` | Rename, danger zone, subscription overview | `photon projects update`, `photon projects delete` |
 | `/dashboard/[id]/spectrum` | Manage Spectrum users / lines / platforms | `photon spectrum users/lines/platforms <subcmd>` |
 | `/dashboard/[id]/billing` | View subscription + manage | `photon billing show / checkout / manage` (the latter two open browser) |
-| `/dashboard/[id]/template` | Template gallery | `dashboard template ls / use` (low priority) |
-| `/dashboard/[id]/observability` | Logs / traces | `dashboard logs` (out of scope v1; needs more API) |
+| `/dashboard/[id]/template` | Template gallery | `photon template ls / use` (low priority) |
+| `/dashboard/[id]/observability` | Logs / traces | `photon logs` (out of scope v1; needs more API) |
 | `/dashboard/[id]/debug` | Debug info | likely out of scope; admin-ish |
 | `/device` + `/device/approve` | Device approve flow | already integrated server-side |
 
@@ -164,7 +164,7 @@ Resolution order:
 1. `--project <id>` flag (highest)
 2. `PHOTON_PROJECT_ID` env var
 3. `~/.config/photon/links/<active-env>.json`
-4. (none → error: `No project linked for env "<env>". Run `photon link <id>` or pass `--project <id>`.`)
+4. (none → error: *No project linked for env `"<env>"`. Run `photon link <id>` or pass `--project <id>`.*)
 
 ### 2.5 Interactive vs non-interactive
 
@@ -192,8 +192,8 @@ Our analogues:
 `vercel api <path>` and `gh api <path>` let power users hit the API directly with auth handled. Not v1, but worth noting — when something isn't covered by a typed command, the escape hatch saves the day.
 
 ```sh
-dashboard api /api/projects/abc/spectrum/users
-dashboard api /api/projects -X POST -F name=test
+photon api /api/projects/abc/spectrum/users
+photon api /api/projects -X POST -F name=test
 ```
 
 ---
@@ -206,9 +206,9 @@ Reading order: top to bottom roughly mirrors a new user's discovery path.
 
 | Command | Status | Notes |
 |---|---|---|
-| `dashboard login [--env] [--no-browser]` | ✅ | RFC 8628 device flow. Per-env credentials. |
-| `dashboard logout [--env]` | ✅ | server signOut + clear local. |
-| `dashboard whoami [--env]` | ✅ | validates session via `/api/profile`. |
+| `photon login [--env] [--no-browser]` | ✅ | RFC 8628 device flow. Per-env credentials. |
+| `photon logout [--env]` | ✅ | server signOut + clear local. |
+| `photon whoami [--env]` | ✅ | validates session via `/api/profile`. |
 | `photon auth status` | TODO | shows status across all envs (which are logged in, when). |
 | `photon auth refresh` | future | token refresh — not supported by better-auth device-auth today; track upstream. |
 
@@ -251,7 +251,7 @@ After this lands, `--project <id>` becomes optional on every command below.
 | `photon projects delete [<id>] [--yes]` (`rm`) | TODO | requires `--yes` in non-TTY; confirmation prompt in TTY. |
 | `photon projects regenerate-secret [<id>]` | TODO | rotates `projectSecret`. Destructive — same `--yes` rule. |
 | `photon projects open [<id>]` | TODO | opens project page in browser. |
-| `photon projects link [<id>]` | TODO alias of `photon link`. |
+| `photon projects link [<id>]` | TODO | alias of `photon link` for discoverability. |
 | `photon projects check-phone <number>` | TODO | calls `/check-availability`. |
 
 ### 3.6 Spectrum (sub-resource of project)
@@ -285,7 +285,7 @@ The CLI groups Spectrum by sub-noun (user/platform/line) since each has its own 
 
 | Command | Status | Notes |
 |---|---|---|
-| `dashboard ping [--env] [--url]` | ✅ | `/api/health`. |
+| `photon ping [--env] [--url]` | ✅ | `/api/health`. |
 | `photon api <path> [-X METHOD] [-d body] [-F field=val]` | TODO (v2) | raw authed call. |
 | `photon --version` | ✅ | |
 | `photon help [<cmd>]` | ✅ via commander | |
@@ -305,7 +305,7 @@ The CLI groups Spectrum by sub-noun (user/platform/line) since each has its own 
 | `--json` | — | output JSON instead of formatted text (per-command, opt-in) |
 | `--yes`, `-y` | — | skip confirmation prompts (required in non-TTY for destructive ops) |
 | `--no-browser` | — | don't auto-open browser (login, billing, projects open) |
-| `--no-color` | `NO_COLOR=1` | disable colors (NO_COLOR standard) |
+| `--no-color` | `NO_COLOR=1` (preferred), `PHOTON_NO_COLOR=1` | disable colors. Honors the [NO_COLOR standard](https://no-color.org); the namespaced var is a fallback. |
 | `--debug` | `PHOTON_DEBUG=1` | verbose output incl. HTTP request/response |
 | `-v, --version` | — | print version + exit |
 | `-h, --help` | — | per-command help |
@@ -324,7 +324,7 @@ The CLI groups Spectrum by sub-noun (user/platform/line) since each has its own 
 - For collection commands (`ls`): plain TSV-style fallback (or recommend `--json`)
 - For mutation commands: refuse without explicit flags (e.g., `--yes`)
 
-**`--json`**:
+**`--json`** (planned target — current commands print human text via `die()`; switching the error path to JSON when `--json` is set is part of Phase 8 polish):
 - Output is exactly the API response body (or array of items). No wrapping.
 - Errors: `{ "error": { "message": "...", "status": 401 } }` instead of friendly text. Exit 1.
 
@@ -332,7 +332,7 @@ The CLI groups Spectrum by sub-noun (user/platform/line) since each has its own 
 
 Inspired by Rust's compiler messages and `gh`:
 
-```
+```text
 ✗ Project not found: abc123
 
   Hint: list available projects with `photon projects ls`
@@ -345,14 +345,16 @@ Each error has:
 - Optional context (dim) — env, linked project, etc.
 
 For 401:
-```
+
+```text
 ✗ Session expired for staging.
 
   Run: photon login --env staging
 ```
 
 For network failures:
-```
+
+```text
 ✗ Could not reach https://api.photon.codes — Unable to connect.
 
   Hint: check your connection or pass --env to use a different one.
@@ -362,10 +364,10 @@ For network failures:
 
 Adopt `update-notifier`. On every command after fetch (cached for 24h), if a new version is available print:
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
 │  Update available  0.1.0  →  0.2.0              │
-│  Run: bun install -g @photon/cli                │
+│  Run: bun install -g <package-name>             │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -501,7 +503,7 @@ Estimated: ~2 hours.
 1. `photon api <path>` raw passthrough
 2. `dashboard alias set` user-defined shortcuts (gh-style)
 3. Telemetry (only if we have a real reason)
-4. `dashboard logs` (needs server-side log streaming API first)
+4. `photon logs` (needs server-side log streaming API first)
 5. Auto-update flow
 
 ---
@@ -528,4 +530,4 @@ blockers for Phase 5. See [`cli-build-plan.md` §8](./cli-build-plan.md#8-open-q
 - [NO_COLOR standard](https://no-color.org)
 - [RFC 8628 — Device Authorization Grant](https://datatracker.ietf.org/doc/html/rfc8628)
 - [Better Auth — Device Authorization plugin](https://better-auth.com/docs/plugins/device-authorization)
-- [photon-hq/dashboard architecture review](../../../Photon-Codes/dashboard/docs/architecture-review.md) — S1/S2/S3 + 9 majors
+- [photon-hq/dashboard architecture review](https://github.com/photon-hq/dashboard/blob/main/docs/architecture-review.md) — S1/S2/S3 + 9 majors
