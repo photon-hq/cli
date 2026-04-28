@@ -27,9 +27,11 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
 
-    // Path aliases — `~/*` resolves to `src/*`
+    // Path aliases — `~/*` resolves to `src/*`, plus a sibling
+    // `~/types/*` for the vendored API type bundle.
     "baseUrl": ".",
     "paths": {
+      "~/types/*": ["types/*"],
       "~/*": ["src/*"]
     }
   }
