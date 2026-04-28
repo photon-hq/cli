@@ -1,6 +1,6 @@
 import type { Command } from "@commander-js/extra-typings";
 import { getApi } from "~/lib/api.ts";
-import { NotAuthenticatedError, SessionExpiredError } from "~/lib/errors.ts";
+import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError } from "~/lib/output.ts";
 
 export function registerWhoamiCommand(program: Command): void {
@@ -8,44 +8,44 @@ export function registerWhoamiCommand(program: Command): void {
     .command("whoami")
     .description("show the user authenticated for an environment")
     .option("-e, --env <name>", "environment (defaults to current)")
+    .option("-t, --token <token>", "API token (overrides stored creds)")
     .action(async (opts) => {
-      try {
-        const { api, env, creds } = await getApi({
-          envName: opts.env,
-          requireAuth: true,
-        });
+      const { api, env, creds } = await getApi({
+        envName: opts.env,
+        token: opts.token,
+        requireAuth: true,
+      });
 
-        // Validate the token is still good by hitting an authenticated endpoint.
-        const { data, error, status } = await api.api.profile.get();
-        if (status === 401) {
-          throw new SessionExpiredError(env.name);
-        }
-        if (error) {
-          die(`Failed to fetch profile: ${formatApiError(error)}`);
-        }
+      // Validate the token is still good by hitting an authenticated endpoint.
+      const { data, error, status } = await api.api.profile.get();
+      if (status === 401) {
+        throw new SessionExpiredError(env.name);
+      }
+      if (error) {
+        die(`Failed to fetch profile: ${formatApiError(error)}`);
+      }
 
-        // creds is non-null here because requireAuth was true.
-        const user = creds!.user;
-        console.log(c.bold(user.name) + c.dim(` <${user.email}>`));
-        console.log(c.dim(`environment: ${env.name} (${env.url})`));
-        console.log(
-          c.dim(
-            `signed in: ${new Date(creds!.issuedAt).toLocaleString()}`
-          )
-        );
-
-        // Show any extra info the profile endpoint returned (developer / org).
+      // creds may be null when --token / PHOTON_TOKEN was used. Use the
+      // token-bearing path: print env + a note that we have no cached identity.
+      if (!creds) {
+        console.log(c.dim(`authenticated via token on env ${env.name} (${env.url})`));
         if (data && typeof data === "object") {
           const summary = summarizeProfile(data);
-          if (summary) {
-            console.log(c.dim(`profile: ${summary}`));
-          }
+          if (summary) console.log(c.dim(`profile: ${summary}`));
         }
-      } catch (err) {
-        if (err instanceof NotAuthenticatedError || err instanceof SessionExpiredError) {
-          die(err.message);
-        }
-        throw err;
+        return;
+      }
+
+      const user = creds.user;
+      console.log(c.bold(user.name) + c.dim(` <${user.email}>`));
+      console.log(c.dim(`environment: ${env.name} (${env.url})`));
+      console.log(
+        c.dim(`signed in: ${new Date(creds.issuedAt).toLocaleString()}`)
+      );
+
+      if (data && typeof data === "object") {
+        const summary = summarizeProfile(data);
+        if (summary) console.log(c.dim(`profile: ${summary}`));
       }
     });
 }

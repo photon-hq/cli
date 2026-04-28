@@ -62,8 +62,29 @@ export function formatApiError(error: unknown): string {
   return String(error);
 }
 
-/** Print and exit 1. */
-export function die(message: string): never {
+export interface DieOptions {
+  /** "What to try next" — printed dim under the error line. */
+  hint?: string;
+  /** Free-form context — env, project id, URL, etc. — printed dim. */
+  context?: string;
+  /** Override exit code. Defaults to 1. */
+  code?: number;
+}
+
+/**
+ * Print a formatted error and exit non-zero.
+ *
+ * Output format:
+ *   ✗ <message>
+ *     Hint: <hint>          (if provided)
+ *     <context>             (if provided)
+ *
+ * Inspired by Rust's compiler messages — terse first line, optional
+ * actionable hint, optional context block.
+ */
+export function die(message: string, opts: DieOptions = {}): never {
   console.error(c.error(message));
-  process.exit(1);
+  if (opts.hint) console.error(c.hint(`  Hint: ${opts.hint}`));
+  if (opts.context) console.error(c.dim(`  ${opts.context}`));
+  process.exit(opts.code ?? 1);
 }

@@ -1,9 +1,6 @@
 import type { Command } from "@commander-js/extra-typings";
 import { getApi } from "~/lib/api.ts";
-import {
-  NotAuthenticatedError,
-  SessionExpiredError,
-} from "~/lib/errors.ts";
+import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson } from "~/lib/output.ts";
 import type { ProfileResponse } from "~/lib/types.ts";
 
@@ -16,9 +13,14 @@ export function registerProfileCommand(program: Command): void {
     .command("show", { isDefault: true })
     .description("show your profile")
     .option("-e, --env <name>", "environment (defaults to current)")
+    .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
-      const { api, creds, env } = await mustGetApi(opts.env);
+      const { api, creds, env } = await getApi({
+        envName: opts.env,
+        token: opts.token,
+        requireAuth: true,
+      });
       const { data, error } = await api.api.profile.get();
       if (error) {
         if (error.status === 401) throw new SessionExpiredError(env.name);
@@ -28,12 +30,16 @@ export function registerProfileCommand(program: Command): void {
       const profile = data as ProfileResponse;
 
       if (opts.json) {
-        printJson({ user: creds!.user, profile });
+        printJson({ user: creds?.user ?? null, profile });
         return;
       }
 
-      const user = creds!.user;
-      console.log(c.bold(user.name) + c.dim(` <${user.email}>`));
+      // creds may be null when --token / PHOTON_TOKEN was used.
+      if (creds) {
+        console.log(c.bold(creds.user.name) + c.dim(` <${creds.user.email}>`));
+      } else {
+        console.log(c.dim(`token-authenticated on env ${env.name}`));
+      }
       console.log();
 
       if (!profile) {
@@ -54,15 +60,6 @@ export function registerProfileCommand(program: Command): void {
         console.log(`  ${c.dim(k.padEnd(width))}  ${formatValue(v)}`);
       }
     });
-}
-
-async function mustGetApi(envName?: string): Promise<Awaited<ReturnType<typeof getApi>>> {
-  try {
-    return await getApi({ envName, requireAuth: true });
-  } catch (err) {
-    if (err instanceof NotAuthenticatedError) die(err.message);
-    throw err;
-  }
 }
 
 function formatValue(v: unknown): string {
