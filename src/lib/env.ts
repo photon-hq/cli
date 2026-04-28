@@ -1,9 +1,10 @@
+import { existsSync, renameSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 /**
  * Built-in environments. Hardcoded — users cannot override these names,
- * but they can add custom environments via `dashboard env add`.
+ * but they can add custom environments via `photon env add`.
  */
 export const BUILTIN_ENVS = {
   production: "https://app.photon.codes",
@@ -28,7 +29,7 @@ export function isBuiltin(name: string): name is BuiltinEnvName {
 /**
  * Validate that an env name is safe to use as a filesystem path component.
  *
- * Env names come from CLI args (`--env`), env vars (`DASHBOARD_ENV`), and
+ * Env names come from CLI args (`--env`), env vars (`PHOTON_ENV`), and
  * config.json (`customEnvs` keys). Without validation, a name like
  * `../../foo` could read/write/delete files outside the credentials dir
  * via `credentialsPath(envName)`.
@@ -48,19 +49,42 @@ export function assertSafeEnvName(name: string): void {
 }
 
 /**
- * `~/.config/photon-dashboard/` (XDG) by default.
- * Overrides: $DASHBOARD_CONFIG_DIR, then $XDG_CONFIG_HOME/photon-dashboard.
+ * `~/.config/photon/` (XDG) by default.
+ * Overrides (in priority order):
+ *   1. $PHOTON_CONFIG_DIR
+ *   2. $DASHBOARD_CONFIG_DIR (legacy alias from when bin was `dashboard`)
+ *   3. $XDG_CONFIG_HOME/photon
+ *   4. ~/.config/photon
+ *
+ * Migration: if `~/.config/photon-dashboard/` exists from a prior install
+ * and the new path doesn't, rename it. Lossless and one-shot.
  */
 export function configDir(): string {
-  const override = process.env.DASHBOARD_CONFIG_DIR;
+  const override =
+    process.env.PHOTON_CONFIG_DIR ?? process.env.DASHBOARD_CONFIG_DIR;
   if (override) {
     return override;
   }
   const xdg = process.env.XDG_CONFIG_HOME;
-  if (xdg) {
-    return path.join(xdg, "photon-dashboard");
+  const newDir = xdg
+    ? path.join(xdg, "photon")
+    : path.join(os.homedir(), ".config", "photon");
+  const oldDir = xdg
+    ? path.join(xdg, "photon-dashboard")
+    : path.join(os.homedir(), ".config", "photon-dashboard");
+
+  // Migration is best-effort. If the rename fails (perms, race, partial),
+  // keep using the legacy path so existing creds + config aren't silently
+  // stranded — the user would otherwise look mysteriously logged out.
+  let resolvedDir = newDir;
+  if (!existsSync(newDir) && existsSync(oldDir)) {
+    try {
+      renameSync(oldDir, newDir);
+    } catch {
+      resolvedDir = oldDir;
+    }
   }
-  return path.join(os.homedir(), ".config", "photon-dashboard");
+  return resolvedDir;
 }
 
 export const configPath = (): string => path.join(configDir(), "config.json");

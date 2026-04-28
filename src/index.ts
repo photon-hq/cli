@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from '@commander-js/extra-typings';
 import { registerEnvCommand } from '~/commands/env.ts';
-import { registerHelloCommand } from '~/commands/hello.ts';
 import { registerLoginCommand } from '~/commands/login.ts';
 import { registerLogoutCommand } from '~/commands/logout.ts';
 import { registerPingCommand } from '~/commands/ping.ts';
@@ -12,11 +11,10 @@ import { c } from '~/lib/output.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 const program = new Command()
-  .name('dashboard')
-  .description('Dashboard CLI')
+  .name('photon')
+  .description('Photon CLI — replaces the dashboard web UI for end-user interaction')
   .version(pkg.version, '-v, --version', 'output the current version');
 
-registerHelloCommand(program);
 registerPingCommand(program);
 registerEnvCommand(program);
 registerLoginCommand(program);

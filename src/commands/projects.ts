@@ -11,7 +11,7 @@ export function registerProjectsCommand(program: Command): void {
   const projects = program
     .command("projects")
     .alias("project")
-    .description("manage your dashboard projects");
+    .description("manage your Photon Dashboard projects");
 
   projects
     .command("list", { isDefault: true })
@@ -35,7 +35,7 @@ export function registerProjectsCommand(program: Command): void {
       if (list.length === 0) {
         console.log(c.dim("No projects yet."));
         console.log(
-          c.hint("Create one with `dashboard projects create` (coming soon).")
+          c.hint("Create one with `photon projects create` (coming soon).")
         );
         return;
       }

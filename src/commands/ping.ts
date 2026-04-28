@@ -5,7 +5,7 @@ import { c, formatApiError } from "~/lib/output.ts";
 export function registerPingCommand(program: Command): void {
   program
     .command("ping")
-    .description("hit the dashboard /api/health endpoint")
+    .description("hit the Photon Dashboard /api/health endpoint")
     .option("-e, --env <name>", "environment name (overrides current)")
     .option("-u, --url <url>", "raw API URL (bypasses env resolution)")
     .action(async (opts) => {

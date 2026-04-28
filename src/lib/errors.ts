@@ -1,7 +1,7 @@
 export class NotAuthenticatedError extends Error {
   constructor(public envName: string) {
     super(
-      `Not authenticated for environment "${envName}". Run \`dashboard login\`${
+      `Not authenticated for environment "${envName}". Run \`photon login\`${
         envName === "production" ? "" : ` --env ${envName}`
       }.`
     );
@@ -18,7 +18,7 @@ export class DeviceFlowDenied extends Error {
 
 export class DeviceFlowExpired extends Error {
   constructor() {
-    super("Device code expired. Run `dashboard login` again.");
+    super("Device code expired. Run `photon login` again.");
     this.name = "DeviceFlowExpired";
   }
 }
@@ -35,7 +35,7 @@ export class UnknownEnvError extends Error {
 export class SessionExpiredError extends Error {
   constructor(public envName: string) {
     super(
-      `Session expired for "${envName}". Run \`dashboard login\`${
+      `Session expired for "${envName}". Run \`photon login\`${
         envName === "production" ? "" : ` --env ${envName}`
       }.`
     );
