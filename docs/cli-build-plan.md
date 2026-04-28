@@ -1,4 +1,4 @@
-# dashboard-cli Build Plan
+# Photon CLI Build Plan
 
 > Companion to `cli-design.md`. That doc establishes principles; this one
 > turns them into work items. Each capability has a concrete command shape,
@@ -7,23 +7,14 @@
 
 ## 0. Resolved decisions
 
-The 5 open questions from `cli-design.md` §7 are answered here so the
-plan can be acted on. Override any of them and adjust the plan accordingly.
-
 | Question | Decision | Reason |
 |---|---|---|
-| Project linking model | **Adopt vercel pattern**: `.dashboard/project.json` in cwd, written by `dashboard link`. Resolution order: `--project` flag → `DASHBOARD_PROJECT_ID` env → linked file → error. | Single biggest UX win; pattern is mature, users already know it from vercel/next/etc. |
-| `DASHBOARD_TOKEN` env name | **`DASHBOARD_TOKEN`** | Consistent with existing `DASHBOARD_API_URL`, `DASHBOARD_ENV`, `DASHBOARD_CONFIG_DIR`. Avoid `PHOTON_*` mix. |
-| Binary name on npm | **`photon`** (package: `@photon/cli`, bin: `photon`) | Short, brand-aligned. `dashboard` is too generic; `photon-dashboard` is verbose. Acceptable risk: collision with existing `photon` packages on npm — verify before claiming. |
-| CI auth path | **Defer**. v1 ships with `--token <T>` and `DASHBOARD_TOKEN` env that accept the same access token issued by `device/token`. Acceptable for solo / small-team CI. Long-term: add better-auth `apiKey` plugin server-side and `dashboard auth tokens create` to the CLI. | Server change is out of CLI scope. Device tokens work for now (default 7d expiry, re-issue via re-login). |
-| Phase ordering | **link → projects writes → spectrum → billing → polish → distribute** | `link` makes everything else ergonomic; writes unblock spectrum (which is per-project); billing is small + URL-only; polish before publish. |
-
-Two new decisions surfaced while writing this plan:
-
-| Question | Decision | Reason |
-|---|---|---|
-| Should the linked project be persisted in cwd's `.dashboard/` or in user config keyed by directory? | **cwd's `.dashboard/`** like vercel. | Matches expectations; survives `git clone`; can be `.gitignore`d per-project; doesn't require central registry. |
-| What's the right `.dashboard/` shape? | `{projectId, projectName, envName}` — projectName cached for display, envName scopes the link to one environment so prod-link in one repo + staging-link in another works. | Caching projectName means `dashboard projects show` doesn't need a round-trip just to print the header. |
+| **Binary name** | **`photon`**, alias **`pho`**. Package name on npm decided at publish time (likely `@photon/cli` or `@photon-codes/cli` — bare `photon` is taken by WordPress.com's image service). | Short, brand-aligned. `pho` saves keystrokes for the most common idle commands (`pho ls`, `pho whoami`). Package name is a Phase 10 concern. |
+| **Env var prefix** | **`PHOTON_*`** across the board: `PHOTON_API_URL`, `PHOTON_ENV`, `PHOTON_CONFIG_DIR`, `PHOTON_TOKEN`, `PHOTON_PROJECT_ID`, `PHOTON_DEBUG`, `PHOTON_NO_COLOR`, `PHOTON_TYPES_SRC`. | Matches the binary name. The current code uses `DASHBOARD_*` from when the binary was provisionally `dashboard`; rename in Phase 5 alongside the bin rename. |
+| **Config dir** | **`~/.config/photon/`** (XDG-respecting; honor `$XDG_CONFIG_HOME` and `$PHOTON_CONFIG_DIR`). | Matches the binary name. Subdirs: `credentials/<env>.json` (existing, chmod 600) and `links/<env>.json` (new, see below). Migration: rename `~/.config/photon-dashboard/` → `~/.config/photon/` on first run if old dir exists; fall through to fresh state otherwise. |
+| **Project linking model** | **User config, per-environment.** `photon link <id>` writes `~/.config/photon/links/<env>.json` (one file per env). Resolution order: `--project <id>` flag → `PHOTON_PROJECT_ID` env → `~/.config/photon/links/<active-env>.json` → error. | Mirrors per-env credentials. Single mental model: "currently active project on currently active env." Different from vercel's per-cwd `.vercel/` because Photon's user base is closer to gh's (occasional ops + scripting) than vercel's (one repo per project). Trade-off: can't have repo A linked to project A while repo B is linked to project B simultaneously — accepted. |
+| **CI / scriptable auth** | **v1: `--token <T>` flag + `PHOTON_TOKEN` env**, both accepting the access_token issued by `device/token` (which is a session token since `bearer()` is loaded server-side). | Works today, no server changes. Device tokens default to 7d expiry — document. Long-term: add better-auth `apiKey` plugin server-side and `photon auth tokens create` (Phase 11). |
+| **Phase ordering** | **link → projects writes → spectrum → billing → polish → distribute** | `link` makes everything else ergonomic; writes unblock spectrum; billing is small; polish before publish. |
 
 ---
 
@@ -41,7 +32,7 @@ These land **first** because every command in §2 depends on them. Build them as
 export const isTTY = (): boolean => Boolean(process.stdout.isTTY);
 export const isCI = (): boolean => Boolean(process.env.CI || process.env.GITHUB_ACTIONS);
 export const useColors = (): boolean =>
-  isTTY() && !process.env.NO_COLOR && !process.env.DASHBOARD_NO_COLOR;
+  isTTY() && !process.env.NO_COLOR && !process.env.PHOTON_NO_COLOR;
 ```
 
 **Modify**: `src/lib/output.ts` to honor `useColors()` — wrap picocolors so it no-ops when colors disabled. picocolors itself respects `NO_COLOR`, but our spinner/table emit ANSI directly; gate them on `isTTY()`.
@@ -75,15 +66,15 @@ export async function confirmDestructive(opts: {
 
 **Effort**: 30 min.
 
-### 1.3 `--token` flag + `DASHBOARD_TOKEN` env (CI auth)
+### 1.3 `--token` flag + `PHOTON_TOKEN` env (CI auth)
 
-**Goal**: scriptable invocation without `dashboard login`. Token is the same `access_token` from `device/token` (which is a session token, since `bearer()` is loaded server-side).
+**Goal**: scriptable invocation without `photon login`. Token is the same `access_token` from `device/token` (which is a session token, since `bearer()` is loaded server-side).
 
 **Modify**: `src/lib/api.ts` `getApi()` to accept `opts.token`:
 
 ```ts
 export async function getApi(opts: ApiOptions = {}): Promise<ApiContext> {
-  const token = opts.token ?? process.env.DASHBOARD_TOKEN;
+  const token = opts.token ?? process.env.PHOTON_TOKEN;
   // ... if token set, skip credential lookup, build headers from it directly
 }
 ```
@@ -98,7 +89,7 @@ export async function getApi(opts: ApiOptions = {}): Promise<ApiContext> {
 
 **Effort**: 1 h (touches every command, but mechanical).
 
-### 1.4 `--debug` flag + `DASHBOARD_DEBUG=1`
+### 1.4 `--debug` flag + `PHOTON_DEBUG=1`
 
 **Goal**: dump every HTTP request/response with timing for troubleshooting.
 
@@ -126,7 +117,7 @@ export function die(message: string, opts?: { hint?: string; context?: string })
 ```
 
 Also add a top-level error handler in `src/index.ts` that:
-- 401 → `Session expired. Run dashboard login --env <name>.`
+- 401 → `Session expired. Run photon login --env <name>.`
 - 403 → `You don't have permission to do that.`
 - 404 → `Not found: <resource>.`
 - 5xx → `Server error. Try again or contact support.`
@@ -136,7 +127,7 @@ Also add a top-level error handler in `src/index.ts` that:
 
 ### 1.6 Project linking (foundational for §2)
 
-**Goal**: persist the active project in cwd, resolve it on every command.
+**Goal**: persist the active project per environment in user config, resolve it on every command.
 
 **File**: `src/lib/link.ts` (new):
 
@@ -144,16 +135,19 @@ Also add a top-level error handler in `src/index.ts` that:
 export interface ProjectLink {
   projectId: string;
   projectName: string; // display-only cache
-  envName: string;     // scopes link to an env
+  envName: string;     // redundant with the file path but useful for round-trip
   linkedAt: string;    // ISO
 }
 
-export async function loadLink(cwd = process.cwd()): Promise<ProjectLink | null>;
-export async function saveLink(link: ProjectLink, cwd = process.cwd()): Promise<void>;
-export async function clearLink(cwd = process.cwd()): Promise<void>;
+// Storage: ~/.config/photon/links/<envName>.json — one file per environment.
+// Mirrors per-env credentials so the active project naturally scopes to env.
+export async function loadLink(envName: string): Promise<ProjectLink | null>;
+export async function saveLink(link: ProjectLink): Promise<void>;
+export async function clearLink(envName: string): Promise<void>;
+export async function listLinks(): Promise<ProjectLink[]>;  // for `photon link --status`
 ```
 
-Storage: `<cwd>/.dashboard/project.json`. Add `.dashboard/` to the README's recommended `.gitignore` snippet.
+Storage path: `~/.config/photon/links/<env>.json`. Re-uses `assertSafeEnvName` from `src/lib/env.ts` to gate the path component (path-traversal protection — same hardening as credentials).
 
 **File**: `src/lib/api-context.ts` (new) — central project resolution:
 
@@ -162,23 +156,28 @@ export async function resolveProject(opts: {
   flagProjectId?: string;
   envOverride?: string;
 }): Promise<{ projectId: string; envName: string }> {
-  // 1. --project flag
-  if (opts.flagProjectId) return { projectId: opts.flagProjectId, envName: ... };
-  // 2. DASHBOARD_PROJECT_ID env
-  if (process.env.DASHBOARD_PROJECT_ID) return { ... };
-  // 3. .dashboard/project.json (must match resolved env)
-  const link = await loadLink();
-  if (link) {
-    if (link.envName !== resolvedEnv) {
-      die(`Linked project is for env "${link.envName}" but current env is "${resolvedEnv}".`,
-          { hint: `Pass --env ${link.envName}, or re-link: dashboard link <id>` });
-    }
-    return { projectId: link.projectId, envName: link.envName };
+  const env = await resolveEnv(opts.envOverride);
+
+  // 1. --project flag (highest precedence)
+  if (opts.flagProjectId) return { projectId: opts.flagProjectId, envName: env.name };
+
+  // 2. PHOTON_PROJECT_ID env var
+  if (process.env.PHOTON_PROJECT_ID) {
+    return { projectId: process.env.PHOTON_PROJECT_ID, envName: env.name };
   }
+
+  // 3. linked project for the active env
+  const link = await loadLink(env.name);
+  if (link) return { projectId: link.projectId, envName: env.name };
+
   // 4. error
-  die("No project linked.", { hint: "Run `dashboard link <id>` or pass --project <id>." });
+  die(`No project linked for env "${env.name}".`, {
+    hint: `Run \`photon link <id>\`${env.name === "production" ? "" : ` --env ${env.name}`}, or pass --project <id>.`,
+  });
 }
 ```
+
+**Why per-env link files**: parallels per-env credentials (`credentials/<env>.json`). Switching env via `photon env use staging` automatically picks up staging's linked project. No accidental cross-env operations.
 
 **Effort**: 2 h (file + integration into commands that need it, see §2).
 
@@ -206,39 +205,46 @@ For each command:
 - **Test plan**: explicit checks.
 - **Effort**: ~rough hours.
 
-### 2.1 `dashboard link <id>` / `dashboard unlink`
+### 2.1 `photon link <id>` / `photon unlink`
 
-**Goal**: persist the active project for the cwd so subsequent commands don't need `--project`.
+**Goal**: persist the active project per environment so subsequent commands don't need `--project`. See §1.6 for the storage model.
 
 **Cmd line**:
 ```ts
 program.command("link <id>")
-  .description("link this directory to a dashboard project")
-  .option("-e, --env <name>", "environment for the link (defaults to current)")
+  .description("set this id as the active project for the current environment")
+  .option("-e, --env <name>", "environment to link the project under (defaults to current)")
   .action(...)
 
 program.command("unlink")
-  .description("remove the project link for this directory")
+  .description("clear the active project for an environment")
+  .option("-e, --env <name>", "environment to unlink (defaults to current)")
   .option("-y, --yes", "skip confirmation")
+  .action(...)
+
+program.command("link:status")     // or `photon link --status`
+  .description("show currently linked project(s) across environments")
+  .option("--json")
   .action(...)
 ```
 
 **Behavior**:
-- `link <id>`: validates the project exists by calling `GET /api/projects/:id` with current env's auth. If 401: `Not authenticated for env=<x>`. If 404: `Project not found`. If 200: write `.dashboard/project.json` with `{projectId, projectName, envName, linkedAt}`. Print: `✓ Linked to <name> (id=<id>) on <env>.`
-- `unlink`: confirm in TTY (`--yes` to skip), then `clearLink()`. Print: `✓ Unlinked.`
-- `link --status` (subcommand): show current link if any, else "No link." Useful for scripts.
+- `link <id>`: validates the project exists by calling `GET /api/projects/:id` with the env's stored credentials. If 401: friendly auth-required message. If 404: `Project not found`. If 200: writes `~/.config/photon/links/<env>.json` with `{projectId, projectName, envName, linkedAt}` (chmod 600 — projectName isn't sensitive, but the file lives next to creds, so apply same perms). Prints: `✓ Linked to <name> (id=<id>) on <env>.`
+- `unlink`: confirm in TTY (`--yes` to skip), then `clearLink(env.name)`. Prints: `✓ Unlinked from <env>.`
+- `link:status`: lists every env that has a link with project name + linked-at timestamp. `--json` for scripts.
 
-**API**: `GET /api/projects/:id` for validation only.
+**API**: `GET /api/projects/:id` for validation only (cheap; bails early if user can't see the project).
 
-**Errors**: 401, 404, network, refusing to overwrite without `--force` if a different project is already linked.
+**Errors**: 401, 404, network. Re-linking the same env overwrites; **no overwrite warning** because the user-config model means you intentionally use `link <id>` to switch projects.
 
 **Files**:
+- `src/lib/link.ts` (new) — see §1.6
 - `src/commands/link.ts` (new)
 - `src/index.ts` register
 
 **Effort**: 1.5 h.
 
-### 2.2 `dashboard projects create`
+### 2.2 `photon projects create`
 
 **Goal**: provision a new project.
 
@@ -270,7 +276,7 @@ program.command("unlink")
 
 **Effort**: 2 h (interactive prompts are most of it).
 
-### 2.3 `dashboard projects update [<id>]`
+### 2.3 `photon projects update [<id>]`
 
 **Cmd line**:
 ```ts
@@ -296,7 +302,7 @@ program.command("unlink")
 
 **Effort**: 1 h.
 
-### 2.4 `dashboard projects delete [<id>]`
+### 2.4 `photon projects delete [<id>]`
 
 **Cmd line**:
 ```ts
@@ -321,7 +327,7 @@ program.command("unlink")
 
 **Effort**: 1 h.
 
-### 2.5 `dashboard projects regenerate-secret [<id>]`
+### 2.5 `photon projects regenerate-secret [<id>]`
 
 **Cmd line**:
 ```ts
@@ -344,7 +350,7 @@ program.command("unlink")
 
 **Effort**: 1 h.
 
-### 2.6 `dashboard projects open [<id>]`
+### 2.6 `photon projects open [<id>]`
 
 **Cmd line**:
 ```ts
@@ -366,7 +372,7 @@ program.command("unlink")
 
 **Effort**: 30 min.
 
-### 2.7 `dashboard projects check-phone <number>`
+### 2.7 `photon projects check-phone <number>`
 
 **Cmd line**:
 ```ts
@@ -385,7 +391,7 @@ program.command("unlink")
 
 **Effort**: 30 min.
 
-### 2.8 `dashboard profile init`
+### 2.8 `photon profile init`
 
 **Goal**: replace the web `/onboarding` flow.
 
@@ -400,7 +406,7 @@ program.command("unlink")
 **Behavior**:
 - TTY: prompt: "Are you setting up as a developer or organization?" then prompt for relevant fields based on choice. Submit to `POST /api/profile/developer` or `/organization`.
 - Non-TTY: requires `--type` and all required fields as flags. (Open question: which fields are required server-side? Need to scan profile schema.)
-- Refuses to run if profile already exists (suggest `dashboard profile update`).
+- Refuses to run if profile already exists (suggest `photon profile update`).
 
 **API**: `POST /api/profile/developer` or `POST /api/profile/organization`.
 
@@ -408,7 +414,7 @@ program.command("unlink")
 
 **Effort**: 2 h (depends on field count; if many fields, longer).
 
-### 2.9 `dashboard profile update [--field=value...]`
+### 2.9 `photon profile update [--field=value...]`
 
 **Cmd line**:
 ```ts
@@ -428,7 +434,7 @@ Recommend **explicit flags** with a TODO to keep them in sync with the schema.
 
 **Effort**: 1 h.
 
-### 2.10 `dashboard auth status`
+### 2.10 `photon auth status`
 
 **Goal**: cross-environment login summary, like `gh auth status`.
 
@@ -446,13 +452,13 @@ Recommend **explicit flags** with a TODO to keep them in sync with the schema.
 
 **API**: optionally calls `/api/profile` for each authed env to validate live status (skip if expensive).
 
-**Files**: `src/commands/auth.ts` (new file, registers an `auth` subgroup so this and future `auth tokens` commands live together. Note: existing `login`/`logout` could move under `auth` group too — but breaking changes are bad; keep them at top-level AND add `dashboard auth login` as alias for compat).
+**Files**: `src/commands/auth.ts` (new file, registers an `auth` subgroup so this and future `auth tokens` commands live together. Note: existing `login`/`logout` could move under `auth` group too — but breaking changes are bad; keep them at top-level AND add `photon auth login` as alias for compat).
 
 **Effort**: 1 h.
 
 ### 2.11 Spectrum: `users / platforms / lines / profile / avatar`
 
-The biggest sub-surface. Group as `dashboard spectrum <noun> <verb>`. Every command takes `[--project <id>]` (defaults to linked).
+The biggest sub-surface. Group as `photon spectrum <noun> <verb>`. Every command takes `[--project <id>]` (defaults to linked).
 
 #### 2.11.a `spectrum users`
 
@@ -531,7 +537,7 @@ dashboard billing manage [-p <id>] [--no-browser]       # POST /api/projects/:id
 
 **Effort**: 2 h.
 
-### 2.13 `dashboard config show`
+### 2.13 `photon config show`
 
 **Goal**: dump active configuration for support / debugging. **Never** print secrets.
 
@@ -551,7 +557,7 @@ Config dir:         ~/.config/photon-dashboard
 
 **Effort**: 30 min.
 
-### 2.14 `dashboard api <path>` — power user escape hatch (v2)
+### 2.14 `photon api <path>` — power user escape hatch (v2)
 
 ```
 dashboard api <path> [-X METHOD] [-d <body>] [-F field=value]
@@ -585,12 +591,12 @@ Authenticated raw request. Useful when a command isn't yet implemented or for on
 
 ### Phase 8 — Billing
 **Items**: §2.12
-**Why fourth**: smallest, mostly URL-handoff-to-browser. Needs `dashboard billing show` to look right, which depends on architecture-review S3 server fix for production correctness — but ship anyway and warn.
+**Why fourth**: smallest, mostly URL-handoff-to-browser. Needs `photon billing show` to look right, which depends on architecture-review S3 server fix for production correctness — but ship anyway and warn.
 **Effort**: ~2 h
 **Blocks**: nothing
 
 ### Phase 9 — Polish
-**Items**: §2.10 (`auth status`), §2.13 (`config show`), update-notifier, error UX refinement, `dashboard --version` improvement (show node/bun versions for support)
+**Items**: §2.10 (`auth status`), §2.13 (`config show`), update-notifier, error UX refinement, `photon --version` improvement (show node/bun versions for support)
 **Effort**: ~3 h
 **Blocks**: nothing
 
@@ -608,7 +614,7 @@ Authenticated raw request. Useful when a command isn't yet implemented or for on
 - §2.14 `dashboard api`
 - `dashboard alias set` (gh-style)
 - `dashboard logs` (needs server-side log streaming first)
-- `dashboard auth tokens create` (needs better-auth `apiKey` plugin server-side)
+- `photon auth tokens create` (needs better-auth `apiKey` plugin server-side)
 - Telemetry (only with strong reason)
 
 ---
@@ -622,7 +628,7 @@ Authenticated raw request. Useful when a command isn't yet implemented or for on
 | `src/lib/tty.ts` | TTY/CI/color detection | ~20 |
 | `src/lib/interactive.ts` | clack wrappers, confirmDestructive | ~40 |
 | `src/lib/debug.ts` | `--debug` logger | ~25 |
-| `src/lib/link.ts` | `.dashboard/project.json` r/w | ~70 |
+| `src/lib/link.ts` | `~/.config/photon/links/<env>.json` r/w | ~70 |
 | `src/lib/api-context.ts` | `resolveProject()` central | ~60 |
 | `src/lib/browser.ts` | `open()` wrapper | ~20 |
 | `src/commands/link.ts` | `link` / `unlink` | ~80 |
@@ -679,43 +685,43 @@ Manual + automated. Until we have a CI test harness, manual is the pragmatic cho
 
 ### Phase 5 manual
 
-- `dashboard --token <bad>` → `Invalid token` (401 from server)
-- `dashboard projects ls --token <good>` → works, no stored creds touched
-- `DASHBOARD_TOKEN=<good> dashboard projects ls` → same
-- `dashboard projects ls | cat` (non-TTY) → no spinners, no colors
-- `NO_COLOR=1 dashboard projects ls` → no colors even in TTY
-- `dashboard --debug projects ls` → request/response logged to stderr
-- `dashboard link abc123` then `dashboard projects show` (no args) → uses link
-- `cd /tmp && dashboard projects show` (no link) → friendly error with hint
-- `dashboard unlink` (TTY) → confirms; `--yes` skips
-- Path traversal: `dashboard env add ../foo https://x` → rejected by `assertSafeEnvName`
+- `photon --token <bad>` → `Invalid token` (401 from server)
+- `photon projects ls --token <good>` → works, no stored creds touched
+- `PHOTON_TOKEN=<good> photon projects ls` → same
+- `photon projects ls | cat` (non-TTY) → no spinners, no colors
+- `NO_COLOR=1 photon projects ls` → no colors even in TTY
+- `photon --debug projects ls` → request/response logged to stderr
+- `photon link abc123` then `photon projects show` (no args) → uses link
+- `cd /tmp && photon projects show` (no link) → friendly error with hint
+- `photon unlink` (TTY) → confirms; `--yes` skips
+- Path traversal: `photon env add ../foo https://x` → rejected by `assertSafeEnvName`
 
 ### Phase 6 manual
 
-- `dashboard projects create` (TTY, no flags) → all prompts; project created; `dashboard projects ls` shows it.
-- `dashboard projects create --name X --location US --spectrum --link` (non-TTY) → created and linked.
-- `dashboard projects update --name "Y"` (with link) → renamed.
-- `dashboard projects delete` (TTY) → "yes" confirm; project gone.
-- `dashboard projects delete --yes` (non-TTY) → no prompt.
-- `dashboard projects open` → browser opens to `.../dashboard/<id>`.
-- `dashboard projects regenerate-secret -y` → new secret printed.
+- `photon projects create` (TTY, no flags) → all prompts; project created; `photon projects ls` shows it.
+- `photon projects create --name X --location US --spectrum --link` (non-TTY) → created and linked.
+- `photon projects update --name "Y"` (with link) → renamed.
+- `photon projects delete` (TTY) → "yes" confirm; project gone.
+- `photon projects delete --yes` (non-TTY) → no prompt.
+- `photon projects open` → browser opens to `.../dashboard/<id>`.
+- `photon projects regenerate-secret -y` → new secret printed.
 
 ### Phase 7 manual
 
 - Each `spectrum` subcommand against the linked project.
-- `dashboard spectrum avatar upload ./photo.jpg` → success; visible on web `/spectrum`.
+- `photon spectrum avatar upload ./photo.jpg` → success; visible on web `/spectrum`.
 
 ### Phase 8 manual
 
-- `dashboard billing plans` → list.
-- `dashboard billing show` → tier + status.
-- `dashboard billing checkout --plan <id>` → URL printed + browser opens.
-- `dashboard billing manage` → portal URL.
+- `photon billing plans` → list.
+- `photon billing show` → tier + status.
+- `photon billing checkout --plan <id>` → URL printed + browser opens.
+- `photon billing manage` → portal URL.
 
 ### Phase 9 manual
 
-- `dashboard auth status` (logged into multiple envs) → table.
-- `dashboard config show` → no secrets, structured.
+- `photon auth status` (logged into multiple envs) → table.
+- `photon config show` → no secrets, structured.
 - Trigger update-notifier by faking version; ensure banner appears in TTY only.
 
 ### Automated tests (deferred to Phase 10 setup)
@@ -790,7 +796,7 @@ That's ~1 dev-week of focused work, or 2-3 weeks part-time.
 
 - [ ] All commands in §2 implemented and manually tested against staging
 - [ ] All cross-cutting flags (`--token`, `--yes`, `--no-color`, `--debug`, `--json`) work consistently
-- [ ] `dashboard link` works; project resolution order verified with all 4 cases
+- [ ] `photon link` works; project resolution order verified with all 4 cases
 - [ ] README rewritten for end-user audience with quickstart + screencast
 - [ ] Published to npm under `@photon/cli` (or fallback name)
 - [ ] `npx @photon/cli login` runs the device flow successfully
