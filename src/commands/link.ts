@@ -22,13 +22,23 @@ export function registerLinkCommands(program: Command): void {
 
       const { data, error, status } = await api.api.projects({ id }).get();
       if (status === 401) throw new SessionExpiredError(env.name);
+      // Branch on 404 / no-data BEFORE the generic error path. Eden
+      // surfaces 404s in `error`, so the original `if (error)` would
+      // swallow the "not found" framing. The server also returns 200 +
+      // null when the project isn't visible to the current user — same
+      // outcome from the user's perspective.
+      if (status === 404 || (!error && !data)) {
+        die(`Project not found: ${id}`, {
+          hint: "List your projects with `photon projects ls`.",
+        });
+      }
       if (error) {
         die(`Could not validate project: ${formatApiError(error)}`);
       }
       if (!data) {
-        die(`Project not found: ${id}`, {
-          hint: "List your projects with `photon projects ls`.",
-        });
+        // Defensive: unreachable given the checks above, but narrows
+        // the type for the next line.
+        die(`Project not found: ${id}`);
       }
 
       const project = data as Project;

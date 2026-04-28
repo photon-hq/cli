@@ -3,10 +3,15 @@ import { dirname, join } from "node:path";
 import { assertSafeEnvName, configDir } from "~/lib/env.ts";
 
 /**
- * Storage: `~/.config/photon/links/<envName>.json` — one file per
- * environment. Mirrors per-env credentials so the active project
- * naturally scopes to env. Switching env via `photon env use <other>`
- * picks up that env's linked project automatically.
+ * Storage: `configDir()/links/<envName>.json` — one file per
+ * environment. The base config directory may be overridden via
+ * `$PHOTON_CONFIG_DIR` / `$XDG_CONFIG_HOME`, and falls back to the
+ * legacy `photon-dashboard` directory if migration fails — so don't
+ * assume a fixed `~/.config/photon/...` path.
+ *
+ * Mirrors per-env credentials so the active project naturally scopes
+ * to env. Switching env via `photon env use <other>` picks up that
+ * env's linked project automatically.
  */
 export interface ProjectLink {
   projectId: string;
@@ -65,8 +70,16 @@ export async function listLinks(): Promise<ProjectLink[]> {
   for (const e of entries) {
     if (!e.endsWith(".json")) continue;
     const envName = e.slice(0, -".json".length);
-    const link = await loadLink(envName);
-    if (link) links.push(link);
+    // readdir returns whatever's on disk — manual edits, editor swap
+    // files, leftovers from older versions. assertSafeEnvName (called
+    // via loadLink → linkPath) will throw for anything outside our
+    // allowed alphabet. Skip silently rather than crash `link:status`.
+    try {
+      const link = await loadLink(envName);
+      if (link) links.push(link);
+    } catch {
+      continue;
+    }
   }
   return links.sort((a, b) => a.envName.localeCompare(b.envName));
 }
