@@ -16,7 +16,6 @@
     "sync:api": "bun run scripts/sync-api-types.ts"
   },
   "devDependencies": {
-    "@elysiajs/eden": "1.4.9",
     "@types/bun": "latest",
     "elysia": "1.4.28"
   },
@@ -26,6 +25,7 @@
   "dependencies": {
     "@clack/prompts": "^1.2.0",
     "@commander-js/extra-typings": "^14.0.0",
+    "@elysiajs/eden": "1.4.9",
     "better-auth": "1.4.18",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.3",

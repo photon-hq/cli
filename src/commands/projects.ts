@@ -20,10 +20,10 @@ export function registerProjectsCommand(program: Command): void {
     .option("-e, --env <name>", "environment (defaults to current)")
     .option("--json", "output JSON")
     .action(async (opts) => {
-      const { api } = await mustGetApi(opts.env);
+      const { api, env } = await mustGetApi(opts.env);
       const { data, error } = await api.api.projects.get();
       if (error) {
-        if (error.status === 401) throw new SessionExpiredError(opts.env ?? "");
+        if (error.status === 401) throw new SessionExpiredError(env.name);
         die(`Failed to list projects: ${formatApiError(error)}`);
       }
 
@@ -58,10 +58,10 @@ export function registerProjectsCommand(program: Command): void {
     .option("-e, --env <name>", "environment (defaults to current)")
     .option("--json", "output JSON")
     .action(async (id, opts) => {
-      const { api } = await mustGetApi(opts.env);
+      const { api, env } = await mustGetApi(opts.env);
       const { data, error } = await api.api.projects({ id }).get();
       if (error) {
-        if (error.status === 401) throw new SessionExpiredError(opts.env ?? "");
+        if (error.status === 401) throw new SessionExpiredError(env.name);
         die(`Failed to fetch project: ${formatApiError(error)}`);
       }
       if (!data) {

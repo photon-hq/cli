@@ -18,10 +18,10 @@ export function registerProfileCommand(program: Command): void {
     .option("-e, --env <name>", "environment (defaults to current)")
     .option("--json", "output JSON")
     .action(async (opts) => {
-      const { api, creds } = await mustGetApi(opts.env);
+      const { api, creds, env } = await mustGetApi(opts.env);
       const { data, error } = await api.api.profile.get();
       if (error) {
-        if (error.status === 401) throw new SessionExpiredError(opts.env ?? "");
+        if (error.status === 401) throw new SessionExpiredError(env.name);
         die(`Failed to fetch profile: ${formatApiError(error)}`);
       }
 

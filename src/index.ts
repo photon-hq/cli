@@ -8,6 +8,7 @@ import { registerPingCommand } from '~/commands/ping.ts';
 import { registerProfileCommand } from '~/commands/profile.ts';
 import { registerProjectsCommand } from '~/commands/projects.ts';
 import { registerWhoamiCommand } from '~/commands/whoami.ts';
+import { c } from '~/lib/output.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 const program = new Command()
@@ -23,8 +24,6 @@ registerLogoutCommand(program);
 registerWhoamiCommand(program);
 registerProfileCommand(program);
 registerProjectsCommand(program);
-
-import { c } from '~/lib/output.ts';
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(c.error(err instanceof Error ? err.message : String(err)));

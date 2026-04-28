@@ -32,7 +32,7 @@ clean — you can cherry-pick or rewrite as you prefer.
 
 End-to-end test of `dashboard login --env staging`:
 
-```
+```text
 ◆ Authenticating to staging (https://staging-app.photon.codes)
   Visit: https://staging-app.photon.codes/device
   Code:  PEDNLHTX

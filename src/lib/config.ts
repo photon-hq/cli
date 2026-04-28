@@ -110,7 +110,11 @@ export async function removeCustomEnv(name: string): Promise<void> {
   }
   const config = await loadConfig();
   if (!(name in config.customEnvs)) {
-    throw new UnknownEnvError(name, Object.keys(config.customEnvs));
+    const customNames = Object.keys(config.customEnvs);
+    if (customNames.length === 0) {
+      throw new Error("No custom environments configured.");
+    }
+    throw new UnknownEnvError(name, customNames);
   }
   const { [name]: _drop, ...rest } = config.customEnvs;
   let nextCurrent = config.currentEnv;
