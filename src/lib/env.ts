@@ -73,15 +73,18 @@ export function configDir(): string {
     ? path.join(xdg, "photon-dashboard")
     : path.join(os.homedir(), ".config", "photon-dashboard");
 
+  // Migration is best-effort. If the rename fails (perms, race, partial),
+  // keep using the legacy path so existing creds + config aren't silently
+  // stranded — the user would otherwise look mysteriously logged out.
+  let resolvedDir = newDir;
   if (!existsSync(newDir) && existsSync(oldDir)) {
     try {
       renameSync(oldDir, newDir);
     } catch {
-      // Migration is best-effort. If it fails (perms, race), fall through
-      // and let the caller create newDir on first write.
+      resolvedDir = oldDir;
     }
   }
-  return newDir;
+  return resolvedDir;
 }
 
 export const configPath = (): string => path.join(configDir(), "config.json");
