@@ -29,7 +29,9 @@ export async function confirmDestructive(
 ): Promise<void> {
   if (opts.yes) return;
   if (!isInteractive()) {
-    die(opts.fallbackHint ?? "Pass --yes to confirm this destructive action.");
+    die("Confirmation required for this destructive action.", {
+      hint: opts.fallbackHint ?? "Pass --yes to confirm.",
+    });
   }
   const answer = await confirm({
     message: opts.message,

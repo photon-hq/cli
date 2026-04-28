@@ -3,7 +3,7 @@ import type { PublicApp } from "~/types/api";
 import { resolveEnv } from "~/lib/config.ts";
 import { loadCredentials } from "~/lib/credentials.ts";
 import type { Credentials } from "~/lib/credentials.ts";
-import { debugHttp } from "~/lib/debug.ts";
+import { debugHttp, isDebug } from "~/lib/debug.ts";
 import type { ResolvedEnv } from "~/lib/env.ts";
 import { NotAuthenticatedError } from "~/lib/errors.ts";
 
@@ -17,10 +17,10 @@ export interface ApiOptions {
    */
   url?: string;
   /**
-   * Override stored credentials with an explicit token. Wins over
-   * stored creds when both are present. Source: `--token` flag or
-   * `PHOTON_TOKEN` env (resolved by the caller; this just accepts
-   * the resolved value).
+   * Override stored credentials with an explicit token. If provided,
+   * this wins over $PHOTON_TOKEN, $DASHBOARD_TOKEN, and stored creds.
+   * If omitted, getApi() falls back to $PHOTON_TOKEN and then
+   * $DASHBOARD_TOKEN (legacy alias) before loading stored credentials.
    */
   token?: string;
   /** Throw NotAuthenticatedError if no credentials are stored for this env. */
@@ -65,12 +65,34 @@ export async function getApi(opts: ApiOptions = {}): Promise<ApiContext> {
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  // Wrap fetch to log every request when --debug is enabled. The treaty
-  // accepts a fetch override via the second argument. We use Object.assign
-  // to copy `preconnect` (Bun-specific) from the global fetch onto our
-  // wrapper, since Eden expects the full `typeof fetch` shape.
-  const tracedFetch = Object.assign(
-    async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+  // Only wrap fetch when --debug is enabled. The wrapper has measurable
+  // per-request overhead (performance.now() + try/catch + URL/Request
+  // unwrapping), and the vast majority of CLI invocations don't need it.
+  const fetcher = isDebug() ? buildTracedFetch() : fetch;
+
+  return {
+    api: treaty<PublicApp>(env.url, {
+      headers,
+      fetcher,
+    }),
+    env,
+    creds,
+  };
+}
+
+/**
+ * Build a fetch wrapper that logs each request via debugHttp.
+ *
+ * Method derivation: prefer init.method, then a Request input's own
+ * method, then default to GET. Without the Request fallback,
+ * `new Request("url", { method: "POST" })` would be misreported as GET.
+ */
+function buildTracedFetch(): typeof fetch {
+  return Object.assign(
+    async (
+      input: Parameters<typeof fetch>[0],
+      init?: Parameters<typeof fetch>[1]
+    ) => {
       const start = performance.now();
       const url =
         typeof input === "string"
@@ -78,7 +100,11 @@ export async function getApi(opts: ApiOptions = {}): Promise<ApiContext> {
           : input instanceof URL
             ? input.toString()
             : input.url;
-      const method = (init?.method ?? "GET").toUpperCase();
+      const method = (
+        init?.method ??
+        (input instanceof Request ? input.method : undefined) ??
+        "GET"
+      ).toUpperCase();
       try {
         const response = await fetch(input, init);
         debugHttp({
@@ -100,13 +126,4 @@ export async function getApi(opts: ApiOptions = {}): Promise<ApiContext> {
     },
     { preconnect: fetch.preconnect.bind(fetch) }
   ) as typeof fetch;
-
-  return {
-    api: treaty<PublicApp>(env.url, {
-      headers,
-      fetcher: tracedFetch,
-    }),
-    env,
-    creds,
-  };
 }
