@@ -22,6 +22,10 @@ function registerPlans(billing: Command): void {
   billing
     .command("plans")
     .description("list available subscription plans")
+    .option(
+      "-p, --project <id>",
+      "project id (accepted for parity with other billing commands; not used)"
+    )
     .option("-e, --env <name>", "environment (defaults to current)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
@@ -111,11 +115,12 @@ function registerCheckout(billing: Command): void {
     .command("checkout")
     .description("start a subscription checkout (opens Stripe in browser)")
     .option("--plan <price-id>", "Stripe price id from `photon billing plans`")
-    .option("--qty <n>", "quantity", (v) => parseInt(v, 10))
+    .option("--qty <n>", "quantity", parsePositiveInt)
     .option("-p, --project <id>", "project id (overrides linked)")
     .option("-e, --env <name>", "environment (defaults to current)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--no-browser", "print the URL instead of launching a browser")
+    .option("--json", "output JSON ({url}) and skip browser open")
     .action(async (opts) => {
       if (!opts.plan) {
         die("--plan <price-id> is required.", {
@@ -143,6 +148,10 @@ function registerCheckout(billing: Command): void {
       if (result.error) die(result.error);
       if (!result.url) die("Server did not return a checkout URL.");
 
+      // --json: scriptable mode — emit only the URL and skip the
+      // browser launch so callers can pipe the URL elsewhere.
+      if (opts.json) return printJson({ url: result.url });
+
       const outcome = await openInBrowser(result.url, {
         noBrowser: !opts.browser,
         label: "Stripe checkout",
@@ -151,6 +160,26 @@ function registerCheckout(billing: Command): void {
         console.log(c.warn("Could not open browser automatically — copy the URL above."));
       }
     });
+}
+
+/**
+ * commander argParser for `--qty`. Validates the input is a positive
+ * integer; throws InvalidArgumentError on bad input so commander
+ * shows a clean parse error instead of NaN reaching the API.
+ */
+function parsePositiveInt(value: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new (require("commander").InvalidArgumentError as new (msg: string) => Error)(
+      `must be a non-negative integer (got "${value}")`
+    );
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throw new (require("commander").InvalidArgumentError as new (msg: string) => Error)(
+      `must be at least 1 (got "${value}")`
+    );
+  }
+  return parsed;
 }
 
 // ──────────────────────────── manage ────────────────────────────
@@ -164,6 +193,7 @@ function registerManage(billing: Command): void {
     .option("-e, --env <name>", "environment (defaults to current)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--no-browser", "print the URL instead of launching a browser")
+    .option("--json", "output JSON ({url}) and skip browser open")
     .action(async (opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
@@ -183,6 +213,8 @@ function registerManage(billing: Command): void {
       const result = data as { success?: true; url?: string; error?: string };
       if (result.error) die(result.error);
       if (!result.url) die("Server did not return a portal URL.");
+
+      if (opts.json) return printJson({ url: result.url });
 
       const outcome = await openInBrowser(result.url, {
         noBrowser: !opts.browser,
@@ -218,11 +250,21 @@ interface Subscription {
 
 function formatPrice(price: BillingPrice): string {
   if (price.unit_amount == null) return c.dim("—");
-  // Stripe amounts are in the smallest currency unit (cents for USD).
-  // No assumptions about zero-decimal currencies here — just /100 with
-  // the currency code; format() can be refined when we add JPY/etc.
-  const dollars = (price.unit_amount / 100).toFixed(2);
-  return `${dollars} ${price.currency.toUpperCase()}`;
+  // Stripe amounts are in the smallest currency unit. Derive the
+  // correct minor-unit precision from the currency code so zero-decimal
+  // currencies (JPY, KRW, VND, etc.) are formatted with no fractional
+  // digits, while normal 2-decimal currencies (USD, EUR, ...) get .XX.
+  const currency = price.currency.toUpperCase();
+  let fractionDigits = 2;
+  try {
+    const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency });
+    fractionDigits = fmt.resolvedOptions().maximumFractionDigits ?? 2;
+  } catch {
+    // Unknown currency code — fall back to 2 decimals.
+  }
+  const divisor = 10 ** fractionDigits;
+  const value = (price.unit_amount / divisor).toFixed(fractionDigits);
+  return `${value} ${currency}`;
 }
 
 function formatTier(tier: string | undefined): string {
