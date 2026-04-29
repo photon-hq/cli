@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 import { Command } from '@commander-js/extra-typings';
+import { registerAuthCommands } from '~/commands/auth.ts';
 import { registerBillingCommands } from '~/commands/billing.ts';
+import { registerConfigCommands } from '~/commands/config.ts';
 import { registerEnvCommand } from '~/commands/env.ts';
 import { registerLinkCommands } from '~/commands/link.ts';
 import { registerLoginCommand } from '~/commands/login.ts';
@@ -19,7 +21,10 @@ import {
   UnknownEnvError,
 } from '~/lib/errors.ts';
 import { die } from '~/lib/output.ts';
+import { startUpdateNotifier } from '~/lib/update-check.ts';
 import pkg from '../package.json' with { type: 'json' };
+
+startUpdateNotifier();
 
 const program = new Command()
   .name('photon')
@@ -44,6 +49,8 @@ registerProjectsCommand(program);
 registerLinkCommands(program);
 registerSpectrumCommands(program);
 registerBillingCommands(program);
+registerAuthCommands(program);
+registerConfigCommands(program);
 
 program.parseAsync(process.argv).catch(handleTopLevelError);
 
