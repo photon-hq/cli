@@ -1,5 +1,5 @@
 {
-  "name": "@photon-ai/cli",
+  "name": "@photon-ai/photon",
   "version": "0.0.1",
   "description": "Photon CLI — typed terminal UI for the Photon Dashboard. Binary: `photon` (alias `pho`).",
   "keywords": [
@@ -47,9 +47,7 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/update-notifier": "^6.0.8",
-    "elysia": "1.4.28"
-  },
-  "peerDependencies": {
+    "elysia": "1.4.28",
     "typescript": "^5"
   },
   "dependencies": {

@@ -3,7 +3,7 @@
 Typed terminal UI for the [Photon Dashboard](https://photon.codes). Replaces the web UI for everyday work — manage projects, Spectrum users / lines / platforms, billing, and your developer profile from a terminal.
 
 ```sh
-bun add -g @photon-ai/cli
+bun add -g @photon-ai/photon
 photon login
 photon projects ls
 ```
@@ -16,7 +16,7 @@ photon projects ls
 
 ```sh
 # 1. Install
-bun add -g @photon-ai/cli
+bun add -g @photon-ai/photon
 
 # 2. Log in (opens a browser to approve the device)
 photon login
@@ -38,6 +38,14 @@ pho ls          # photon projects ls
 pho whoami
 ```
 
+Or run one-off commands without installing via `npx` / `bunx`:
+
+```sh
+bunx @photon-ai/photon login
+bunx @photon-ai/photon projects ls
+npx  @photon-ai/photon whoami     # also works
+```
+
 ---
 
 ## Concepts
@@ -56,18 +64,18 @@ Every command operates against an **environment** (production by default). Built
 photon env list                              # show all
 photon env use staging                       # persist as default
 photon env add my-test https://my.test.tld   # add a custom env
-photon --env staging projects ls             # one-off override
+photon projects ls --env staging             # one-off override
 PHOTON_ENV=staging photon projects ls        # same, via env var
 ```
 
-Credentials are stored **per environment** (`~/.config/photon/credentials/<env>.json`, mode 600), so you can be logged into prod and dev simultaneously.
+Credentials are stored **per environment** (`$PHOTON_CONFIG_DIR/credentials/<env>.json` by default — see [config dir](#config-dir) below — mode 600), so you can be logged into prod and dev simultaneously.
 
 ### Project linking
 
 Most commands operate on a single project. Rather than passing `--project <id>` every time, link a project for the current env:
 
 ```sh
-photon link abc123                  # writes ~/.config/photon/links/<env>.json
+photon link abc123                  # writes $PHOTON_CONFIG_DIR/links/<env>.json
 photon spectrum users ls            # implicit project from link
 photon projects show                # same
 photon link:status                  # see what's linked across envs
@@ -78,10 +86,10 @@ Resolution order: `--project <id>` flag → `$PHOTON_PROJECT_ID` → linked proj
 
 ### CI / scripting
 
-Authenticate once locally, copy the token from `~/.config/photon/credentials/<env>.json`, and use it in CI:
+Authenticate once locally, copy the token from your credentials file (under `$PHOTON_CONFIG_DIR/credentials/<env>.json`), and use it in CI:
 
 ```sh
-photon --token "$PHOTON_TOKEN" projects ls
+photon projects ls --token "$PHOTON_TOKEN"
 # or
 PHOTON_TOKEN=… photon projects ls
 ```
@@ -138,20 +146,37 @@ Run `photon <cmd> --help` for the full flag list of any command.
 
 ---
 
-## Global flags
+## Flags
 
-| Flag | Env var | Effect |
-|---|---|---|
-| `-e, --env <name>` | `PHOTON_ENV` | override active env |
-| `-p, --project <id>` | `PHOTON_PROJECT_ID` | override linked project (per-command) |
-| `-t, --token <token>` | `PHOTON_TOKEN` | bypass stored creds (CI) |
-| `--json` | — | structured output (per-command, opt-in) |
-| `--yes`, `-y` | — | skip destructive-action confirmation |
-| `--no-browser` | — | don't auto-open browser (login, billing, projects open) |
-| `--no-color` | `NO_COLOR=1`, `PHOTON_NO_COLOR=1` | disable colors (NO_COLOR standard) |
-| `--debug` | `PHOTON_DEBUG=1` | verbose HTTP logs to stderr |
+Only `--debug` is truly **program-level** (works in any position). Every other flag is **per-command** and must come after the subcommand:
 
-Other env vars: `PHOTON_CONFIG_DIR` (defaults to `~/.config/photon/`), `PHOTON_TYPES_SRC` (maintainer-only, for `bun run sync:api`), `PHOTON_NO_UPDATE_NOTIFIER=1` (mute update prompt).
+```sh
+photon --debug projects ls --env staging --json    # ✓ --debug global, others per-cmd
+photon --env staging projects ls                   # ✗ won't work (--env is per-cmd)
+```
+
+| Flag | Env var | Scope | Effect |
+|---|---|---|---|
+| `--debug` | `PHOTON_DEBUG=1` | program | verbose HTTP logs to stderr |
+| `-e, --env <name>` | `PHOTON_ENV` | per-cmd | override active env |
+| `-p, --project <id>` | `PHOTON_PROJECT_ID` | per-cmd | override linked project |
+| `-t, --token <token>` | `PHOTON_TOKEN` | per-cmd | bypass stored creds (CI) |
+| `--json` | — | per-cmd | structured output (opt-in) |
+| `--yes`, `-y` | — | per-cmd | skip destructive-action confirmation |
+| `--no-browser` | — | per-cmd | don't auto-open browser (login, billing, projects open) |
+| `--no-color` | `NO_COLOR=1`, `PHOTON_NO_COLOR=1` | program (env-driven) | disable colors (NO_COLOR standard) |
+
+### config dir
+
+The CLI's config root is resolved in this order:
+
+1. `$PHOTON_CONFIG_DIR` (explicit override)
+2. `$XDG_CONFIG_HOME/photon` (XDG standard)
+3. `~/.config/photon/` (default)
+
+If a legacy `~/.config/photon-dashboard/` directory exists from a prior pre-rename install, it migrates automatically to the new path on first run.
+
+Other env vars: `PHOTON_TYPES_SRC` (maintainer-only, for `bun run sync:api`), `PHOTON_NO_UPDATE_NOTIFIER=1` (mute update prompt).
 
 ---
 
