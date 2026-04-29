@@ -169,12 +169,24 @@ type InitResult =
   | { type: "organization"; payload: OrganizationPayload };
 
 async function fillInit(opts: InitOpts): Promise<InitResult> {
-  // Non-interactive: --type required + the relevant fields.
+  // Non-interactive: --type required, must be a known value, and
+  // at least one matching field flag must be present so we don't
+  // silently persist an empty profile (`languages: []`,
+  // `referralSource: ""`).
   if (!isInteractive()) {
     if (!opts.type) {
       die("--type is required in non-interactive mode (developer | organization).");
     }
+    if (opts.type !== "developer" && opts.type !== "organization") {
+      die(`Unknown profile type "${opts.type}". Use "developer" or "organization".`);
+    }
     if (opts.type === "developer") {
+      const hasField = opts.languages !== undefined || opts.referral !== undefined;
+      if (!hasField) {
+        die("At least one of --languages / --referral is required for a developer profile.", {
+          hint: "Pass `--languages typescript,python` and/or `--referral 'word of mouth'`.",
+        });
+      }
       return {
         type: "developer",
         payload: {
@@ -183,20 +195,30 @@ async function fillInit(opts: InitOpts): Promise<InitResult> {
         },
       };
     }
-    if (opts.type === "organization") {
-      return {
-        type: "organization",
-        payload: {
-          companyName: opts.companyName,
-          role: opts.role,
-          companySize: opts.companySize,
-          website: opts.website,
-          platforms: opts.platforms !== undefined ? parseCsv(opts.platforms) : undefined,
-          referralSource: opts.referral,
-        },
-      };
+    // organization
+    const hasOrgField =
+      opts.companyName !== undefined ||
+      opts.role !== undefined ||
+      opts.companySize !== undefined ||
+      opts.website !== undefined ||
+      opts.platforms !== undefined ||
+      opts.referral !== undefined;
+    if (!hasOrgField) {
+      die(
+        "At least one organization field is required (--company-name, --role, --company-size, --website, --platforms, --referral)."
+      );
     }
-    die(`Unknown profile type "${opts.type}". Use "developer" or "organization".`);
+    return {
+      type: "organization",
+      payload: {
+        companyName: opts.companyName,
+        role: opts.role,
+        companySize: opts.companySize,
+        website: opts.website,
+        platforms: opts.platforms !== undefined ? parseCsv(opts.platforms) : undefined,
+        referralSource: opts.referral,
+      },
+    };
   }
 
   intro(c.cyan("Set up your profile"));
@@ -211,7 +233,14 @@ async function fillInit(opts: InitOpts): Promise<InitResult> {
       ],
     });
     if (isCancel(answer)) die("Aborted.");
-    type = answer as "developer" | "organization";
+    type = String(answer);
+  }
+
+  // --type passed in could be anything; validate before branching so an
+  // unknown value like `--type developer-pro` doesn't fall through into
+  // the organization flow.
+  if (type !== "developer" && type !== "organization") {
+    die(`Unknown profile type "${type}". Use "developer" or "organization".`);
   }
 
   if (type === "developer") {
@@ -360,6 +389,38 @@ function registerUpdateCommand(profile: Command): void {
         die("No profile to update.", {
           hint: "Create one first: `photon profile init`.",
         });
+      }
+
+      // Reject flags that don't apply to this profile type — otherwise
+      // running `update --company-name X` on a developer profile would
+      // silently no-op and report "✓ Updated".
+      const developerOnly = ["--languages"];
+      const organizationOnly = [
+        "--company-name",
+        "--role",
+        "--company-size",
+        "--website",
+        "--platforms",
+      ];
+      const passedDeveloperFlags: string[] = [];
+      if (opts.languages !== undefined) passedDeveloperFlags.push("--languages");
+      const passedOrganizationFlags: string[] = [];
+      if (opts.companyName !== undefined) passedOrganizationFlags.push("--company-name");
+      if (opts.role !== undefined) passedOrganizationFlags.push("--role");
+      if (opts.companySize !== undefined) passedOrganizationFlags.push("--company-size");
+      if (opts.website !== undefined) passedOrganizationFlags.push("--website");
+      if (opts.platforms !== undefined) passedOrganizationFlags.push("--platforms");
+      if (current.type === "developer" && passedOrganizationFlags.length > 0) {
+        die(
+          `Flags ${passedOrganizationFlags.join(", ")} apply to organization profiles, but yours is a developer profile.`,
+          { hint: `Valid flags for developer: ${developerOnly.join(", ")}, --referral.` }
+        );
+      }
+      if (current.type === "organization" && passedDeveloperFlags.length > 0) {
+        die(
+          `Flags ${passedDeveloperFlags.join(", ")} apply to developer profiles, but yours is an organization profile.`,
+          { hint: `Valid flags for organization: ${organizationOnly.join(", ")}, --referral.` }
+        );
       }
 
       // Server upsert overwrites every field with whatever we send,
