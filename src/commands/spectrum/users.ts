@@ -67,7 +67,8 @@ export function registerSpectrumUsers(spectrum: Command): void {
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
-      const filled = await fillAddOpts(opts);
+      // Resolve project + auth FIRST so users don't fill out 4 prompts
+      // and only then learn they're not logged in or have no link.
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
         envOverride: opts.env,
@@ -77,6 +78,8 @@ export function registerSpectrumUsers(spectrum: Command): void {
         token: opts.token,
         requireAuth: true,
       });
+
+      const filled = await fillAddOpts(opts);
 
       const { data, error, status } = await api.api
         .projects({ id: projectId })

@@ -70,22 +70,54 @@ export function registerSpectrumAvatar(spectrum: Command): void {
         if (patch.status === 401) throw new SessionExpiredError(resolved.name);
         if (patch.error) {
           // Upload succeeded; surface the patch failure but don't undo.
-          console.warn(
-            c.warn(
-              `Uploaded, but failed to update profile: ${formatApiError(patch.error)}`
-            )
-          );
-          console.log(c.dim(`Avatar URL: ${result.avatarUrl}`));
-          console.log(
-            c.hint(
-              `Update manually: photon spectrum profile update --avatar-url ${result.avatarUrl}`
-            )
-          );
-          process.exit(1);
+          // Build the recovery command with the same --project / --env
+          // / --token context the user originally passed, and quote the
+          // URL so shell-significant chars don't break copy-paste.
+          const recovery = buildRecoveryCommand({
+            projectId,
+            envName: resolved.name,
+            envOverride: opts.env,
+            token: opts.token,
+            avatarUrl: result.avatarUrl,
+          });
+          die(`Uploaded, but failed to update profile: ${formatApiError(patch.error)}`, {
+            hint: `Update manually: ${recovery}`,
+            context: `Avatar URL: ${result.avatarUrl}`,
+          });
         }
       }
 
       console.log(c.success(`Uploaded avatar from ${file}`));
       console.log(c.dim(`  URL: ${result.avatarUrl}`));
     });
+}
+
+function buildRecoveryCommand(opts: {
+  projectId: string;
+  envName: string;
+  envOverride?: string;
+  token?: string;
+  avatarUrl: string;
+}): string {
+  const parts: string[] = ["photon spectrum profile update"];
+  parts.push(`--project ${shellQuote(opts.projectId)}`);
+  // Only include --env if the user passed one explicitly OR it's not
+  // production (the default), so the recovery command stays minimal.
+  if (opts.envOverride !== undefined || opts.envName !== "production") {
+    parts.push(`--env ${shellQuote(opts.envName)}`);
+  }
+  if (opts.token !== undefined) {
+    parts.push(`--token ${shellQuote(opts.token)}`);
+  }
+  parts.push(`--avatar-url ${shellQuote(opts.avatarUrl)}`);
+  return parts.join(" ");
+}
+
+/**
+ * Single-quote a value for safe shell copy-paste. Escapes embedded
+ * single quotes via the standard `'\''` trick. Avoids shell injection
+ * vectors in URLs that contain `&`, `?`, `;`, `|`, etc.
+ */
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
