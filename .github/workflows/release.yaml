@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release:
+        type: boolean
+        description: "Force release (skip the PR-label check)"
+        default: false
+      dry-run:
+        type: boolean
+        description: "Run without publishing"
+        default: false
+
+jobs:
+  release:
+    # Only fire when the PR was actually merged (not just closed).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true }}
+    uses: photon-hq/buildspace/.github/workflows/typescript-service-release.yaml@main
+    permissions:
+      contents: write
+      pull-requests: read
+    with:
+      service-name: photon-cli
+      build-command: "bun run build"
+      release: ${{ github.event_name == 'workflow_dispatch' && inputs.release || false }}
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run || false }}
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
