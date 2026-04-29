@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from '@commander-js/extra-typings';
+import { registerBillingCommands } from '~/commands/billing.ts';
 import { registerEnvCommand } from '~/commands/env.ts';
 import { registerLinkCommands } from '~/commands/link.ts';
 import { registerLoginCommand } from '~/commands/login.ts';
@@ -42,6 +43,7 @@ registerProfileCommand(program);
 registerProjectsCommand(program);
 registerLinkCommands(program);
 registerSpectrumCommands(program);
+registerBillingCommands(program);
 
 program.parseAsync(process.argv).catch(handleTopLevelError);
 
