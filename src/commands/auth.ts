@@ -29,13 +29,29 @@ export function registerAuthCommands(program: Command): void {
               kind: env.builtin ? "built-in" : "custom",
             };
           }
+          // listAuthenticatedEnvs() only checked file existence; the
+          // file could still be corrupt JSON, which loadCredentials()
+          // returns as null. Treat that as "logged out, but warn"
+          // rather than rendering a phantom "yes" with no email.
           const creds = await loadCredentials(env.name);
+          if (!creds) {
+            return {
+              name: env.name,
+              url: env.url,
+              loggedIn: false,
+              user: null,
+              issuedAt: null,
+              corrupt: true,
+              kind: env.builtin ? "built-in" : "custom",
+            };
+          }
           return {
             name: env.name,
             url: env.url,
             loggedIn: true,
-            user: creds?.user ?? null,
-            issuedAt: creds?.issuedAt ?? null,
+            user: creds.user,
+            issuedAt: creds.issuedAt,
+            corrupt: false,
             kind: env.builtin ? "built-in" : "custom",
           };
         })
@@ -47,9 +63,22 @@ export function registerAuthCommands(program: Command): void {
         r.name === config.currentEnv ? c.green("●") : " ",
         r.name,
         r.kind === "built-in" ? c.dim("built-in") : c.dim("custom"),
-        r.loggedIn ? c.green(r.user?.email ?? "yes") : c.dim("no"),
+        r.loggedIn
+          ? c.green(r.user?.email ?? "yes")
+          : r.corrupt
+            ? c.yellow("corrupt")
+            : c.dim("no"),
         r.issuedAt ? new Date(r.issuedAt).toLocaleDateString() : c.dim("—"),
       ]);
       printTable(["", "env", "kind", "logged in", "since"], tableRows);
+      const corruptEnvs = rows.filter((r) => r.corrupt).map((r) => r.name);
+      if (corruptEnvs.length > 0) {
+        console.log();
+        console.log(
+          c.warn(
+            `Credentials file for ${corruptEnvs.join(", ")} is unreadable. Re-login with \`photon login --env <name>\`.`
+          )
+        );
+      }
     });
 }

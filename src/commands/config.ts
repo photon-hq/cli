@@ -2,6 +2,7 @@ import type { Command } from "@commander-js/extra-typings";
 import { listEnvs, loadConfig, resolveEnv } from "~/lib/config.ts";
 import { listAuthenticatedEnvs } from "~/lib/credentials.ts";
 import { configDir } from "~/lib/env.ts";
+import { UnknownEnvError } from "~/lib/errors.ts";
 import { listLinks, loadLink } from "~/lib/link.ts";
 import { c, printJson } from "~/lib/output.ts";
 
@@ -16,15 +17,35 @@ export function registerConfigCommands(program: Command): void {
     .option("--json", "output JSON")
     .action(async (opts) => {
       const cfg = await loadConfig();
-      const env = await resolveEnv();
-      const linkForCurrent = await loadLink(env.name);
+      // `config show` is an inspection command — don't fail just
+      // because the persisted currentEnv refers to an env that no
+      // longer exists (e.g. a custom env that was removed, or a
+      // manual config edit). Catch UnknownEnvError and degrade.
+      let env: { name: string; url: string } | null = null;
+      let envUnresolved = false;
+      try {
+        const resolved = await resolveEnv();
+        env = { name: resolved.name, url: resolved.url };
+      } catch (err) {
+        if (err instanceof UnknownEnvError) {
+          envUnresolved = true;
+          env = { name: cfg.currentEnv, url: "(unknown)" };
+        } else {
+          throw err;
+        }
+      }
+      const linkForCurrent = envUnresolved ? null : await loadLink(env!.name);
       const allLinks = await listLinks();
       const authedEnvs = await listAuthenticatedEnvs();
       const envs = listEnvs(cfg);
 
       const view = {
         configDir: configDir(),
-        currentEnv: { name: env.name, url: env.url },
+        currentEnv: {
+          name: env!.name,
+          url: env!.url,
+          unresolved: envUnresolved,
+        },
         linkedProject: linkForCurrent
           ? {
               id: linkForCurrent.projectId,
@@ -39,7 +60,7 @@ export function registerConfigCommands(program: Command): void {
           kind: e.builtin ? "built-in" : "custom",
         })),
         otherLinks: allLinks
-          .filter((l) => l.envName !== env.name)
+          .filter((l) => l.envName !== env!.name)
           .map((l) => ({
             envName: l.envName,
             projectId: l.projectId,
@@ -53,7 +74,12 @@ export function registerConfigCommands(program: Command): void {
       console.log();
       const labelWidth = 18;
       print("config dir", view.configDir);
-      print("current env", `${c.bold(view.currentEnv.name)} ${c.dim(`(${view.currentEnv.url})`)}`);
+      print(
+        "current env",
+        view.currentEnv.unresolved
+          ? `${c.bold(view.currentEnv.name)} ${c.yellow("(unknown — run `photon env use <name>`)")}`
+          : `${c.bold(view.currentEnv.name)} ${c.dim(`(${view.currentEnv.url})`)}`
+      );
       print(
         "linked project",
         view.linkedProject
