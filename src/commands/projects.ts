@@ -308,8 +308,17 @@ function registerUpdateCommand(projects: Command): void {
       // At least one mutation flag is required so we don't accidentally
       // PATCH with the same values (server treats unspecified booleans as
       // false, so blindly re-sending current state could RESET them).
+      // An empty/whitespace-only --name is also "no mutation" — without
+      // this check, the rename would silently fall back to current.name
+      // and the user would get a "✓ Updated" with nothing changed.
+      const trimmedName = opts.name?.trim();
+      if (opts.name !== undefined && !trimmedName) {
+        die("--name must not be empty.", {
+          hint: "Either pass a non-empty name or omit --name to keep the current one.",
+        });
+      }
       const hasMutation =
-        opts.name !== undefined ||
+        trimmedName !== undefined ||
         opts.spectrum !== undefined ||
         opts.template !== undefined ||
         opts.observability !== undefined;
@@ -345,7 +354,7 @@ function registerUpdateCommand(projects: Command): void {
       const current = fetched.data as Project;
 
       const body = {
-        name: opts.name?.trim() || current.name,
+        name: trimmedName ?? current.name,
         spectrum: opts.spectrum ?? current.spectrum,
         template: opts.template ?? current.template,
         observability: opts.observability ?? current.observability,
@@ -360,7 +369,7 @@ function registerUpdateCommand(projects: Command): void {
       if (result.error) die(result.error);
 
       // Keep the linked-project name cache in sync if we just renamed.
-      if (opts.name && opts.name.trim() !== current.name) {
+      if (trimmedName && trimmedName !== current.name) {
         const link = await loadLink(resolved.name);
         if (link?.projectId === projectId) {
           await saveLink({
@@ -402,14 +411,20 @@ function registerDeleteCommand(projects: Command): void {
       });
 
       // Look up the project name so we can show it in the prompt.
+      // Distinguish "not found" (404 / null body) from genuine errors
+      // (500, network) — otherwise users get a misleading "deleted?"
+      // message when the GET actually failed for a different reason.
       const fetched = await api.api.projects({ id: projectId }).get();
       if (fetched.status === 401) throw new SessionExpiredError(resolved.name);
-      const project = (fetched.data ?? null) as Project | null;
-      if (!project) {
+      if (fetched.status === 404 || (!fetched.error && !fetched.data)) {
         die(`Project not found: ${projectId}`, {
           hint: "Already deleted? `photon projects ls` to confirm.",
         });
       }
+      if (fetched.error) {
+        die(`Failed to look up project: ${formatApiError(fetched.error)}`);
+      }
+      const project = fetched.data as Project;
 
       await confirmDestructive({
         message: `Delete project ${c.bold(project.name)} (${projectId})? This cannot be undone.`,
@@ -496,7 +511,9 @@ function registerOpenCommand(projects: Command): void {
         flagProjectId: idArg ?? opts.project,
         envOverride: opts.env,
       });
-      const url = `${resolved.url}/dashboard/${projectId}`;
+      // Use new URL() rather than concatenation so a custom env URL
+      // with a trailing slash doesn't produce `https://x//dashboard/...`.
+      const url = new URL(`/dashboard/${projectId}`, resolved.url).toString();
       await openInBrowser(url, { noBrowser: !opts.browser, label: "URL" });
     });
 }
