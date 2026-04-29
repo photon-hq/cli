@@ -1,27 +1,53 @@
 {
-  "name": "dashboard-cli",
+  "name": "@photon-ai/photon",
   "version": "0.0.1",
   "description": "Photon CLI — typed terminal UI for the Photon Dashboard. Binary: `photon` (alias `pho`).",
+  "keywords": [
+    "photon",
+    "cli",
+    "dashboard",
+    "spectrum",
+    "messaging",
+    "imessage",
+    "developer-tools"
+  ],
+  "author": "Photon",
+  "homepage": "https://github.com/photon-hq/cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/photon-hq/cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/photon-hq/cli/issues"
+  },
   "type": "module",
-  "private": true,
   "bin": {
-    "photon": "./src/index.ts",
-    "pho": "./src/index.ts"
+    "photon": "./dist/photon.js",
+    "pho": "./dist/photon.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
   },
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build ./src/index.ts --outfile dist/photon.js --target bun --minify",
+    "build": "bun build ./src/index.ts --outfile dist/photon.js --target bun --minify && chmod +x dist/photon.js",
     "compile": "bun build ./src/index.ts --compile --outfile dist/photon",
     "typecheck": "tsc --noEmit",
-    "sync:api": "bun run scripts/sync-api-types.ts"
+    "sync:api": "bun run scripts/sync-api-types.ts",
+    "prepublishOnly": "bun run typecheck && bun run build"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/update-notifier": "^6.0.8",
-    "elysia": "1.4.28"
-  },
-  "peerDependencies": {
+    "elysia": "1.4.28",
     "typescript": "^5"
   },
   "dependencies": {

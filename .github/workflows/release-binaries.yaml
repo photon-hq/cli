@@ -1,0 +1,87 @@
+name: Release Binaries
+
+# Build standalone `photon` binaries (no Bun runtime required) and
+# attach them to the GitHub Release that the `release.yaml` workflow
+# created. Runs on `release: created` so it stays decoupled from the
+# npm publish flow — npm consumers get the Bun bundle, Release-page
+# downloaders get a self-contained executable.
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        description: "Existing release tag to attach binaries to"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: bun-darwin-arm64
+            asset: photon-darwin-arm64
+          - os: macos-15-intel
+            target: bun-darwin-x64
+            asset: photon-darwin-x64
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            asset: photon-linux-x64
+          - os: ubuntu-latest
+            target: bun-linux-arm64
+            asset: photon-linux-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # Pinned for reproducibility — matches the lower bound in
+          # package.json#engines.bun. Bump intentionally when upgrading.
+          bun-version: "1.3.13"
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Compile binary
+        run: |
+          bun build ./src/index.ts \
+            --compile \
+            --target=${{ matrix.target }} \
+            --outfile dist/${{ matrix.asset }}
+
+      - name: Smoke test (native targets only)
+        if: matrix.target == 'bun-darwin-arm64' || matrix.target == 'bun-linux-x64'
+        run: ./dist/${{ matrix.asset }} --version
+
+      - name: Compute SHA256
+        run: |
+          if command -v shasum >/dev/null 2>&1; then
+            shasum -a 256 dist/${{ matrix.asset }} > dist/${{ matrix.asset }}.sha256
+          else
+            sha256sum dist/${{ matrix.asset }} > dist/${{ matrix.asset }}.sha256
+          fi
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ steps.tag.outputs.tag }}" \
+            "dist/${{ matrix.asset }}" \
+            "dist/${{ matrix.asset }}.sha256" \
+            --clobber

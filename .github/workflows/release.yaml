@@ -1,0 +1,33 @@
+name: Release
+
+# Mirrors the photon-hq pattern (see spectrum-ts, uri): push to main,
+# let buildspace's PR-label gate look back at the merge commit and
+# decide whether to actually release. `secrets: inherit` passes
+# org-level OPENAI_API_KEY + NPM_TOKEN through automatically.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release:
+        type: boolean
+        description: "Force release (skip the PR-label check)"
+        default: false
+      dry-run:
+        type: boolean
+        description: "Run without publishing"
+        default: false
+
+jobs:
+  release:
+    uses: photon-hq/buildspace/.github/workflows/typescript-service-release.yaml@main
+    permissions:
+      contents: write
+      pull-requests: read
+    with:
+      service-name: "@photon-ai/photon"
+      build-command: "bun run build"
+      release: ${{ github.event_name == 'workflow_dispatch' && inputs.release || false }}
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs['dry-run'] || false }}
+    secrets: inherit
