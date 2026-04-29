@@ -21,9 +21,11 @@ import {
   UnknownEnvError,
 } from '~/lib/errors.ts';
 import { die } from '~/lib/output.ts';
+import { ensurePhoAlias } from '~/lib/pho-alias.ts';
 import { startUpdateNotifier } from '~/lib/update-check.ts';
 import pkg from '../package.json' with { type: 'json' };
 
+ensurePhoAlias();
 startUpdateNotifier();
 
 const program = new Command()

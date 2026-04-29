@@ -31,7 +31,8 @@ photon spectrum users ls
 photon billing show
 ```
 
-`pho` is an alias for `photon` for high-frequency commands:
+`pho` is an alias for `photon` for high-frequency commands. It's created
+automatically the first time you run `photon` after installing:
 
 ```sh
 pho ls          # photon projects ls

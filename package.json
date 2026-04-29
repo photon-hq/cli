@@ -21,10 +21,7 @@
     "url": "https://github.com/photon-hq/cli/issues"
   },
   "type": "module",
-  "bin": {
-    "photon": "./dist/photon.js",
-    "pho": "./dist/photon.js"
-  },
+  "bin": "./dist/photon.js",
   "files": [
     "dist",
     "README.md"
