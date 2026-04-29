@@ -186,10 +186,4 @@ See [`docs/cli-design.md`](docs/cli-design.md) and [`docs/cli-build-plan.md`](do
 
 ## Releases
 
-Tagged via PR labels. Add the `release` label to any PR; on merge, the [Release workflow](.github/workflows/release.yaml) (a thin caller of [`photon-hq/buildspace`'s `typescript-service-release`](https://github.com/photon-hq/buildspace)) generates a version + notes, bumps `package.json`, creates a GitHub Release, and publishes to npm. Standalone binaries are uploaded by [`release-binaries.yaml`](.github/workflows/release-binaries.yaml) on each release.
-
----
-
-## License
-
-[MIT](./LICENSE).
+Tagged via PR labels. Add the `release` label to any PR; on merge to `main`, the [Release workflow](.github/workflows/release.yaml) (a thin caller of [`photon-hq/buildspace`'s `typescript-service-release`](https://github.com/photon-hq/buildspace)) generates a version + notes, bumps `package.json`, creates a GitHub Release, and publishes to npm. Standalone binaries are uploaded by [`release-binaries.yaml`](.github/workflows/release-binaries.yaml) on each release.
