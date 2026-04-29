@@ -7,6 +7,7 @@ import { registerLogoutCommand } from '~/commands/logout.ts';
 import { registerPingCommand } from '~/commands/ping.ts';
 import { registerProfileCommand } from '~/commands/profile.ts';
 import { registerProjectsCommand } from '~/commands/projects.ts';
+import { registerSpectrumCommands } from '~/commands/spectrum/index.ts';
 import { registerWhoamiCommand } from '~/commands/whoami.ts';
 import { setDebug } from '~/lib/debug.ts';
 import {
@@ -40,6 +41,7 @@ registerWhoamiCommand(program);
 registerProfileCommand(program);
 registerProjectsCommand(program);
 registerLinkCommands(program);
+registerSpectrumCommands(program);
 
 program.parseAsync(process.argv).catch(handleTopLevelError);
 
