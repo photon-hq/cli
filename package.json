@@ -1,6 +1,6 @@
 {
   "name": "@photon-ai/photon",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Photon CLI — typed terminal UI for the Photon Dashboard. Binary: `photon` (alias `pho`).",
   "keywords": [
     "photon",
