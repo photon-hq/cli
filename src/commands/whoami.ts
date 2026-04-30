@@ -6,12 +6,12 @@ import { c, die, formatApiError } from "~/lib/output.ts";
 export function registerWhoamiCommand(program: Command): void {
   program
     .command("whoami")
-    .description("show the user authenticated for an environment")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .description("show the user authenticated for the active backend")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .action(async (opts) => {
       const { api, env, creds } = await getApi({
-        envName: opts.env,
+        apiHost: opts.apiHost,
         token: opts.token,
         requireAuth: true,
       });
@@ -28,7 +28,7 @@ export function registerWhoamiCommand(program: Command): void {
       // creds may be null when --token / PHOTON_TOKEN was used. Use the
       // token-bearing path: print env + a note that we have no cached identity.
       if (!creds) {
-        console.log(c.dim(`authenticated via token on env ${env.name} (${env.url})`));
+        console.log(c.dim(`authenticated via token on backend ${env.name} (${env.url})`));
         if (data && typeof data === "object") {
           const summary = summarizeProfile(data);
           if (summary) console.log(c.dim(`profile: ${summary}`));
@@ -38,7 +38,7 @@ export function registerWhoamiCommand(program: Command): void {
 
       const user = creds.user;
       console.log(c.bold(user.name) + c.dim(` <${user.email}>`));
-      console.log(c.dim(`environment: ${env.name} (${env.url})`));
+      console.log(c.dim(`backend: ${env.name} (${env.url})`));
       console.log(
         c.dim(`signed in: ${new Date(creds.issuedAt).toLocaleString()}`)
       );

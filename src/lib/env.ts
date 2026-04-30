@@ -3,47 +3,130 @@ import os from "node:os";
 import path from "node:path";
 
 /**
- * Built-in environments. Hardcoded — users cannot override these names,
- * but they can add custom environments via `photon env add`.
+ * The only backend URL ever baked into the public bundle. Other backends
+ * (staging, dev, internal previews) are reachable via the `PHOTON_API_HOST`
+ * env var or the per-command `--api-host <url>` flag — that way internal
+ * URLs never ship to npm or to the standalone binaries.
  */
-export const BUILTIN_ENVS = {
-  production: "https://app.photon.codes",
-  staging: "https://staging-app.photon.codes",
-  dev: "http://localhost:3001",
-} as const;
-
-export type BuiltinEnvName = keyof typeof BUILTIN_ENVS;
-
-export const DEFAULT_ENV: BuiltinEnvName = "production";
+export const PRODUCTION_URL = "https://app.photon.codes";
 
 export interface ResolvedEnv {
+  /** Filesystem-safe key derived from the URL, used for credentials/links files. */
   name: string;
+  /** The full base URL (scheme + host [+ port]). */
   url: string;
-  builtin: boolean;
-}
-
-export function isBuiltin(name: string): name is BuiltinEnvName {
-  return name in BUILTIN_ENVS;
 }
 
 /**
- * Validate that an env name is safe to use as a filesystem path component.
+ * Resolve which backend URL to talk to.
  *
- * Env names come from CLI args (`--env`), env vars (`PHOTON_ENV`), and
- * config.json (`customEnvs` keys). Without validation, a name like
- * `../../foo` could read/write/delete files outside the credentials dir
- * via `credentialsPath(envName)`.
- *
- * Restrict to a conservative alphabet that's also nice in shell + UI:
- * lowercase letters, digits, hyphen, underscore. Length 1-64.
+ * Priority: explicit override (e.g. from `--api-host`) > $PHOTON_API_HOST
+ *   > built-in production.
  */
-const SAFE_ENV_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+export function resolveApiHost(override?: string): string {
+  return override ?? process.env.PHOTON_API_HOST ?? PRODUCTION_URL;
+}
 
-export function assertSafeEnvName(name: string): void {
-  if (!SAFE_ENV_NAME_RE.test(name)) {
+/**
+ * Normalize a raw URL string to its `origin` — scheme + host (+ port if
+ * non-default), no trailing slash, no path, no query, no fragment. Throws
+ * a typed message on parse failure.
+ *
+ * Exported so URL-mode callers (e.g. `getApi({ url })` for unauth pings)
+ * can normalize without triggering `hostKey()`'s credential-key constraints
+ * (64-char ceiling, etc.).
+ */
+export function normalizeOrigin(raw: string): string {
+  try {
+    return new URL(raw).origin;
+  } catch {
     throw new Error(
-      `Invalid environment name "${name}" — must be 1-64 chars, ` +
-        `start with a-z or 0-9, and only contain a-z, 0-9, '-', '_'.`
+      `Invalid API host URL: "${raw}". Must include scheme — e.g. https://your.host.tld.`
+    );
+  }
+}
+
+/**
+ * Resolve the active env (URL + filesystem key) for credentials / links.
+ * Throws if the URL is malformed or produces a key that would be unsafe
+ * to use as a filename.
+ *
+ * The returned `url` is the normalized origin so persisted `creds.apiUrl`
+ * is canonical.
+ */
+export function resolveActiveEnv(override?: string): ResolvedEnv {
+  const url = normalizeOrigin(resolveApiHost(override));
+  return { name: hostKey(url), url };
+}
+
+/**
+ * Convert a backend URL to a stable filesystem-safe key. Used for naming
+ * `credentials/<key>.json` and `links/<key>.json` so a user can be logged
+ * into multiple backends simultaneously without collisions.
+ *
+ * Encoding: hostname is lowercased; `.`, `:`, `%` are replaced with `_`
+ * (chosen because `_` is not a valid hostname character per RFC 1123, so
+ * `a-b.com` → `a-b_com` and `a.b-com` → `a_b-com` produce distinct keys).
+ * Non-default ports are appended as `_<port>`.
+ *
+ * Special case: the production URL maps to the literal string "production"
+ * — preserves `~/.config/photon/credentials/production.json` files from
+ * prior CLI versions where envs had named identifiers instead of URLs.
+ */
+export function hostKey(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(
+      `Invalid API host URL: "${url}". Must include scheme — e.g. https://your.host.tld.`
+    );
+  }
+  // Compare on origin so trailing slashes / paths / queries don't break
+  // the back-compat fallback to "production".
+  if (parsed.origin === PRODUCTION_URL) return "production";
+
+  // Strip IPv6 brackets first (some URL parsers preserve them in
+  // `hostname`), then normalize remaining unsafe chars to `_`.
+  const host = parsed.hostname
+    .toLowerCase()
+    .replace(/[[\]]/g, "")
+    .replace(/[.:%]/g, "_");
+  const port = parsed.port ? `_${parsed.port}` : "";
+  const key = `${host}${port}`;
+
+  // assertSafeEnvName caps at 64 chars; surface a clearer message before
+  // it fires deep inside credentialsPath().
+  if (key.length > 64) {
+    throw new Error(
+      `API host "${url}" produces a key longer than 64 characters (got ${key.length}). ` +
+        `Use a shorter hostname or alias the host in your local hosts file / DNS.`
+    );
+  }
+  return key;
+}
+
+/**
+ * Validate that a key is safe to use as a filesystem path component.
+ *
+ * `hostKey()` produces only characters from the allowed alphabet, but
+ * env-name-shaped strings can also enter via legacy config files or
+ * directory listings (`readdir(credentialsDir())`). Without validation, a
+ * value like `../../foo` could read/write/delete files outside the
+ * credentials dir via `credentialsPath(key)`.
+ *
+ * Restrict to a conservative alphabet: lowercase letters, digits, hyphen,
+ * underscore. Length 1-64.
+ */
+// First char allows `_` because hostKey() can produce keys like `_3000`
+// from IPv6 hostnames (after the leading `::` collapses to empties).
+const SAFE_KEY_RE = /^[a-z0-9_][a-z0-9_-]{0,63}$/;
+
+export function assertSafeEnvName(key: string): void {
+  if (!SAFE_KEY_RE.test(key)) {
+    throw new Error(
+      `Invalid environment key "${key}" — must be 1-64 chars, ` +
+        `start with a-z, 0-9, or '_', and only contain a-z, 0-9, '-', '_'.`
     );
   }
 }
@@ -89,9 +172,10 @@ export function configDir(): string {
 
 export const configPath = (): string => path.join(configDir(), "config.json");
 
-export const credentialsPath = (envName: string): string => {
-  assertSafeEnvName(envName);
-  return path.join(configDir(), "credentials", `${envName}.json`);
-};
+export const credentialsDir = (): string =>
+  path.join(configDir(), "credentials");
 
-export const credentialsDir = (): string => path.join(configDir(), "credentials");
+export const credentialsPath = (key: string): string => {
+  assertSafeEnvName(key);
+  return path.join(credentialsDir(), `${key}.json`);
+};

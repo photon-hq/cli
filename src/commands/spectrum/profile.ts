@@ -13,16 +13,16 @@ export function registerSpectrumProfile(spectrum: Command): void {
     .command("show", { isDefault: true })
     .description("show the Spectrum profile")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -59,7 +59,7 @@ export function registerSpectrumProfile(spectrum: Command): void {
     .option("--last-name <name>")
     .option("--avatar-url <url>", "avatar image URL (use `spectrum avatar upload` instead)")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
@@ -75,10 +75,10 @@ export function registerSpectrumProfile(spectrum: Command): void {
 
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });

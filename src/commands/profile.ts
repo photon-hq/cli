@@ -28,12 +28,12 @@ function registerShowCommand(profile: Command): void {
   profile
     .command("show", { isDefault: true })
     .description("show your profile")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
       const { api, creds, env } = await getApi({
-        envName: opts.env,
+        apiHost: opts.apiHost,
         token: opts.token,
         requireAuth: true,
       });
@@ -91,7 +91,7 @@ interface InitOpts {
   website?: string;
   platforms?: string;       // CSV
   // Common
-  env?: string;
+  apiHost?: string;
   token?: string;
   json?: boolean;
 }
@@ -108,12 +108,12 @@ function registerInitCommand(profile: Command): void {
     .option("--company-size <size>", "organization: company size (e.g. 1-10, 11-50)")
     .option("--website <url>", "organization: company website")
     .option("--platforms <list>", "organization: comma-separated platforms")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts: InitOpts) => {
       const { api, env } = await getApi({
-        envName: opts.env,
+        apiHost: opts.apiHost,
         token: opts.token,
         requireAuth: true,
       });
@@ -338,7 +338,7 @@ interface UpdateOpts {
   companySize?: string;
   website?: string;
   platforms?: string;
-  env?: string;
+  apiHost?: string;
   token?: string;
   json?: boolean;
 }
@@ -355,7 +355,7 @@ function registerUpdateCommand(profile: Command): void {
     .option("--company-size <size>", "organization: company size")
     .option("--website <url>", "organization: company website")
     .option("--platforms <list>", "organization: comma-separated platforms")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts: UpdateOpts) => {
@@ -374,7 +374,7 @@ function registerUpdateCommand(profile: Command): void {
       }
 
       const { api, env } = await getApi({
-        envName: opts.env,
+        apiHost: opts.apiHost,
         token: opts.token,
         requireAuth: true,
       });

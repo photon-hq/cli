@@ -15,16 +15,16 @@ export function registerSpectrumLines(spectrum: Command): void {
     .alias("ls")
     .description("list lines for the linked project")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -57,7 +57,7 @@ export function registerSpectrumLines(spectrum: Command): void {
     .description("add a new line (currently iMessage only)")
     .option("--platform <name>", "platform (only 'imessage' supported today)", "imessage")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
@@ -68,10 +68,10 @@ export function registerSpectrumLines(spectrum: Command): void {
       }
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -100,16 +100,16 @@ export function registerSpectrumLines(spectrum: Command): void {
     .alias("delete")
     .description("remove a line")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("-y, --yes", "skip confirmation")
     .action(async (lineId, opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });

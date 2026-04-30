@@ -82,35 +82,44 @@ pho whoami
 
 ## Concepts
 
-### Environments
+### Backend host
 
-Every command operates against an **environment** (production by default). Built-ins:
-
-| Name | URL |
-|---|---|
-| `production` | `https://app.photon.codes` |
-| `staging` | `https://staging-app.photon.codes` |
-| `dev` | `http://localhost:3001` |
+Every command talks to a backend URL. The default — and the only URL baked into the public bundle — is production (`https://app.photon.codes`). To target any other backend (your own deployment, a staging environment, a local dev server), set `PHOTON_API_HOST`:
 
 ```sh
-photon env list                              # show all
-photon env use staging                       # persist as default
-photon env add my-test https://my.test.tld   # add a custom env
-photon projects ls --env staging             # one-off override
-PHOTON_ENV=staging photon projects ls        # same, via env var
+export PHOTON_API_HOST=https://your.backend.tld
+photon login
+photon projects ls
+
+# Or one-off, per command:
+photon projects ls --api-host https://your.backend.tld
+
+# Or inline:
+PHOTON_API_HOST=https://your.backend.tld photon projects ls
 ```
 
-Credentials are stored **per environment** (`$PHOTON_CONFIG_DIR/credentials/<env>.json` by default — see [config dir](#config-dir) below — mode 600), so you can be logged into prod and dev simultaneously.
+Resolution order: `--api-host <url>` flag → `PHOTON_API_HOST` env var → built-in production.
+
+`photon env current` prints the resolved host:
+
+```sh
+$ photon env current
+production (https://app.photon.codes)
+$ PHOTON_API_HOST=http://localhost:3000 photon env current
+localhost-3000 (http://localhost:3000)
+```
+
+Credentials are stored **per host** (`$PHOTON_CONFIG_DIR/credentials/<key>.json` by default — see [config dir](#config-dir) below — mode 600), so you can be logged into multiple backends simultaneously. The `<key>` is derived from the URL — production keeps the literal name `production` for back-compat; other hosts get a sanitized hostname (e.g. `staging-app-photon-codes`, `localhost-3000`).
 
 ### Project linking
 
-Most commands operate on a single project. Rather than passing `--project <id>` every time, link a project for the current env:
+Most commands operate on a single project. Rather than passing `--project <id>` every time, link a project for the current host:
 
 ```sh
-photon link abc123                  # writes $PHOTON_CONFIG_DIR/links/<env>.json
+photon link abc123                  # writes $PHOTON_CONFIG_DIR/links/<key>.json
 photon spectrum users ls            # implicit project from link
 photon projects show                # same
-photon link:status                  # see what's linked across envs
+photon link:status                  # see what's linked across backends
 photon unlink                       # clear the link
 ```
 
@@ -118,7 +127,7 @@ Resolution order: `--project <id>` flag → `$PHOTON_PROJECT_ID` → linked proj
 
 ### CI / scripting
 
-Authenticate once locally, copy the token from your credentials file (under `$PHOTON_CONFIG_DIR/credentials/<env>.json`), and use it in CI:
+Authenticate once locally, copy the token from your credentials file (under `$PHOTON_CONFIG_DIR/credentials/<key>.json`), and use it in CI:
 
 ```sh
 photon projects ls --token "$PHOTON_TOKEN"
@@ -142,15 +151,15 @@ photon billing show --json
 ```text
 photon
 ├── ping                                                hit /api/health
-├── env list/use/add/remove/current                     env management
-├── login [--env] [--no-browser]                        device-auth login
-├── logout [--env]                                      clear creds
-├── whoami [--env]                                      who am I on this env
-├── auth status                                         login state across envs
+├── env current                                         print resolved API host
+├── login [--api-host] [--no-browser]                   device-auth login
+├── logout [--api-host]                                 clear creds
+├── whoami [--api-host]                                 who am I on this backend
+├── auth status                                         login state across backends
 ├── config show                                         dump active config
-├── link <id>                                           link project for env
+├── link <id>                                           link project for backend
 ├── unlink                                              clear link
-├── link:status                                         linked projects (all envs)
+├── link:status                                         linked projects (all backends)
 ├── projects
 │   ├── ls                                              list projects
 │   ├── show [id]                                       project detail
@@ -183,14 +192,14 @@ Run `photon <cmd> --help` for the full flag list of any command.
 Only `--debug` is truly **program-level** (works in any position). Every other flag is **per-command** and must come after the subcommand:
 
 ```sh
-photon --debug projects ls --env staging --json    # ✓ --debug global, others per-cmd
-photon --env staging projects ls                   # ✗ won't work (--env is per-cmd)
+photon --debug projects ls --api-host https://x.tld --json    # ✓ --debug global, others per-cmd
+photon --api-host https://x.tld projects ls                   # ✗ won't work (--api-host is per-cmd)
 ```
 
 | Flag | Env var | Scope | Effect |
 |---|---|---|---|
 | `--debug` | `PHOTON_DEBUG=1` | program | verbose HTTP logs to stderr |
-| `-e, --env <name>` | `PHOTON_ENV` | per-cmd | override active env |
+| `--api-host <url>` | `PHOTON_API_HOST` | per-cmd | override the backend URL |
 | `-p, --project <id>` | `PHOTON_PROJECT_ID` | per-cmd | override linked project |
 | `-t, --token <token>` | `PHOTON_TOKEN` | per-cmd | bypass stored creds (CI) |
 | `--json` | — | per-cmd | structured output (opt-in) |

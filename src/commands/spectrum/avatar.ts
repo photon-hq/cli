@@ -1,6 +1,7 @@
 import type { Command } from "@commander-js/extra-typings";
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
+import { PRODUCTION_URL } from "~/lib/env.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError } from "~/lib/output.ts";
 
@@ -12,7 +13,7 @@ export function registerSpectrumAvatar(spectrum: Command): void {
     .description("upload an image as the Spectrum avatar")
     .option("--no-update-profile", "only upload, don't update the profile to use the new avatar")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .action(async (file, opts) => {
       const local = Bun.file(file);
@@ -22,10 +23,10 @@ export function registerSpectrumAvatar(spectrum: Command): void {
 
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -70,13 +71,12 @@ export function registerSpectrumAvatar(spectrum: Command): void {
         if (patch.status === 401) throw new SessionExpiredError(resolved.name);
         if (patch.error) {
           // Upload succeeded; surface the patch failure but don't undo.
-          // Build the recovery command with the same --project / --env
-          // / --token context the user originally passed, and quote the
-          // URL so shell-significant chars don't break copy-paste.
+          // Build the recovery command with the same --project /
+          // --api-host / --token context the user originally passed, and
+          // quote the URL so shell-significant chars don't break copy-paste.
           const recovery = buildRecoveryCommand({
             projectId,
-            envName: resolved.name,
-            envOverride: opts.env,
+            apiHost: resolved.url,
             token: opts.token,
             avatarUrl: result.avatarUrl,
           });
@@ -94,17 +94,16 @@ export function registerSpectrumAvatar(spectrum: Command): void {
 
 function buildRecoveryCommand(opts: {
   projectId: string;
-  envName: string;
-  envOverride?: string;
+  apiHost: string;
   token?: string;
   avatarUrl: string;
 }): string {
   const parts: string[] = ["photon spectrum profile update"];
   parts.push(`--project ${shellQuote(opts.projectId)}`);
-  // Only include --env if the user passed one explicitly OR it's not
-  // production (the default), so the recovery command stays minimal.
-  if (opts.envOverride !== undefined || opts.envName !== "production") {
-    parts.push(`--env ${shellQuote(opts.envName)}`);
+  // Only include --api-host if it differs from the default production URL,
+  // so the recovery command stays minimal in the common case.
+  if (opts.apiHost !== PRODUCTION_URL) {
+    parts.push(`--api-host ${shellQuote(opts.apiHost)}`);
   }
   if (opts.token !== undefined) {
     parts.push(`--token ${shellQuote(opts.token)}`);

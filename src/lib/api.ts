@@ -4,12 +4,17 @@ import { resolveEnv } from "~/lib/config.ts";
 import { loadCredentials } from "~/lib/credentials.ts";
 import type { Credentials } from "~/lib/credentials.ts";
 import { debugHttp, isDebug } from "~/lib/debug.ts";
+import { normalizeOrigin } from "~/lib/env.ts";
 import type { ResolvedEnv } from "~/lib/env.ts";
 import { NotAuthenticatedError } from "~/lib/errors.ts";
 
 export interface ApiOptions {
-  /** Override the active environment by name. */
-  envName?: string;
+  /**
+   * Override the active backend by URL — typically the value of
+   * `--api-host <url>`. When unset, falls back to the `PHOTON_API_HOST`
+   * env var, then to the built-in production URL.
+   */
+  apiHost?: string;
   /**
    * Bypass env resolution entirely with a raw URL. When set, no
    * credential lookup happens — useful for ping / health checks
@@ -42,9 +47,13 @@ export interface ApiContext {
  * helper throws NotAuthenticatedError before any network call.
  */
 export async function getApi(opts: ApiOptions = {}): Promise<ApiContext> {
+  // URL-mode is for arbitrary-host pings (no credential lookup), so we
+  // skip hostKey() here — its 64-char ceiling and IPv6 quirks are about
+  // safe filenames, not safe HTTP. We still normalize via .origin so the
+  // base URL is canonical regardless of trailing slashes.
   const env: ResolvedEnv = opts.url
-    ? { name: "custom", url: opts.url, builtin: false }
-    : await resolveEnv(opts.envName);
+    ? { name: "custom", url: normalizeOrigin(opts.url) }
+    : await resolveEnv(opts.apiHost);
 
   // Token resolution priority:
   //   --token flag > $PHOTON_TOKEN > $DASHBOARD_TOKEN (legacy) > stored creds

@@ -6,8 +6,9 @@
  */
 
 export class NotAuthenticatedError extends Error {
+  /** Host key (e.g. "production" or "staging-app-photon-codes"). */
   constructor(public envName: string) {
-    super(`Not authenticated for environment "${envName}".`);
+    super(`Not authenticated for backend "${envName}".`);
     this.name = "NotAuthenticatedError";
   }
 }
@@ -26,16 +27,8 @@ export class DeviceFlowExpired extends Error {
   }
 }
 
-export class UnknownEnvError extends Error {
-  constructor(name: string, available: string[]) {
-    super(
-      `Unknown environment "${name}". Available: ${available.join(", ")}.`
-    );
-    this.name = "UnknownEnvError";
-  }
-}
-
 export class SessionExpiredError extends Error {
+  /** Host key (e.g. "production" or "staging-app-photon-codes"). */
   constructor(public envName: string) {
     super(`Session expired for "${envName}".`);
     this.name = "SessionExpiredError";
