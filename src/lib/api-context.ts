@@ -24,11 +24,14 @@ export async function resolveProject(opts: {
 }): Promise<ResolvedProject> {
   const env = await resolveEnv(opts.apiHost);
 
-  if (opts.flagProjectId) {
-    return { projectId: opts.flagProjectId, env };
+  const flag = opts.flagProjectId?.trim();
+  if (flag) {
+    return { projectId: flag, env };
   }
 
-  const fromEnv = process.env.PHOTON_PROJECT_ID;
+  // `?.trim()` so empty / whitespace-only env vars are treated as
+  // unset, matching how `config show` reports them.
+  const fromEnv = process.env.PHOTON_PROJECT_ID?.trim();
   if (fromEnv) {
     return { projectId: fromEnv, env };
   }

@@ -15,7 +15,7 @@
 > See the [README](../README.md) for the current user-facing surface. This doc
 > is preserved for context on rationale and trade-offs that informed earlier
 > decisions.
-
+>
 > Goal: replace the dashboard web UI for end-user interaction with a typed,
 > ergonomic terminal experience. The binary is `photon` (alias `pho`); the
 > npm package name is decided at publish time. This doc grounds the design
