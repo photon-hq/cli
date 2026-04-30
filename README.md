@@ -106,10 +106,10 @@ Resolution order: `--api-host <url>` flag → `PHOTON_API_HOST` env var → buil
 $ photon env current
 production (https://app.photon.codes)
 $ PHOTON_API_HOST=http://localhost:3000 photon env current
-localhost-3000 (http://localhost:3000)
+localhost_3000 (http://localhost:3000)
 ```
 
-Credentials are stored **per host** (`$PHOTON_CONFIG_DIR/credentials/<key>.json` by default — see [config dir](#config-dir) below — mode 600), so you can be logged into multiple backends simultaneously. The `<key>` is derived from the URL — production keeps the literal name `production` for back-compat; other hosts get a sanitized hostname (e.g. `staging-app-photon-codes`, `localhost-3000`).
+Credentials are stored **per host** (`$PHOTON_CONFIG_DIR/credentials/<key>.json` by default — see [config dir](#config-dir) below — mode 600), so you can be logged into multiple backends simultaneously. The `<key>` is derived from the URL — production keeps the literal name `production` for back-compat; other hosts get a sanitized hostname where `.`, `:`, and `%` are replaced with `_` (e.g. `staging-app_photon_codes`, `localhost_3000`). The `_` substitution avoids collisions between distinct hosts like `a-b.com` and `a.b-com`.
 
 ### Project linking
 
