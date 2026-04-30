@@ -16,7 +16,10 @@ export function registerConfigCommands(program: Command): void {
     .action(async (opts) => {
       const active = await resolveEnv();
       const authedEnvs = await listAuthenticatedEnvs();
-      const activeProject = process.env.PHOTON_PROJECT_ID ?? null;
+      // `|| null` (not `?? null`) so empty / whitespace-only env vars
+      // surface as null in JSON, matching how resolveProject() treats
+      // them as unset (truthiness check).
+      const activeProject = process.env.PHOTON_PROJECT_ID?.trim() || null;
 
       const view = {
         configDir: configDir(),

@@ -189,7 +189,7 @@ function registerCreateCommand(projects: Command): void {
         )
       );
       console.log(
-        c.dim(`  To make this the active project: export PHOTON_PROJECT_ID=${result.id}`)
+        c.dim(`  To make this the active project: export PHOTON_PROJECT_ID='${result.id}'`)
       );
     });
 }

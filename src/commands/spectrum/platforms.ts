@@ -13,7 +13,7 @@ export function registerSpectrumPlatforms(spectrum: Command): void {
     .command("list", { isDefault: true })
     .alias("ls")
     .description("list platforms and their enabled state")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
@@ -50,7 +50,7 @@ export function registerSpectrumPlatforms(spectrum: Command): void {
   platforms
     .command("enable <name>")
     .description("enable a platform")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
@@ -61,7 +61,7 @@ export function registerSpectrumPlatforms(spectrum: Command): void {
   platforms
     .command("disable <name>")
     .description("disable a platform")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")

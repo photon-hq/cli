@@ -120,14 +120,14 @@ Most commands operate on a single project. Two ways to specify it:
 photon spectrum users ls --project abc123
 
 # Per shell — set once, applies to every photon invocation in this shell
-export PHOTON_PROJECT_ID=abc123
+export PHOTON_PROJECT_ID='abc123'
 photon spectrum users ls
 photon projects show
 ```
 
 Resolution order: `--project <id>` flag → `$PHOTON_PROJECT_ID` → friendly error.
 
-Put `export PHOTON_PROJECT_ID=…` in your shell rc, or use [`direnv`](https://direnv.net/) to scope it to a directory. Agents and scripts should pass `--project <id>` explicitly per call (or set the env var on the spawn).
+Put `export PHOTON_PROJECT_ID='…'` in your shell rc, or use [`direnv`](https://direnv.net/) to scope it to a directory. Agents and scripts should pass `--project <id>` explicitly per call (or set the env var on the spawn).
 
 **Multi-backend note.** `$PHOTON_PROJECT_ID` is shell-global and single-valued. If you switch `PHOTON_API_HOST` between backends in the same shell, prefer `--project <id>` for the off-default calls, or use a separate shell per backend.
 
@@ -166,7 +166,7 @@ photon
 ├── projects
 │   ├── ls                                              list projects
 │   ├── show [id]                                       project detail
-│   ├── create [-n --location --spectrum ...]           new project
+│   ├── create [--name <n> --location <loc> --spectrum] new project
 │   ├── update [id] [...]                               rename / toggle flags
 │   ├── delete [id] [-y]                                permanent delete
 │   ├── regenerate-secret [id] [-y]                     rotate Spectrum secret
@@ -203,7 +203,7 @@ photon --api-host https://x.tld projects ls                   # ✗ won't work (
 |---|---|---|---|
 | `--debug` | `PHOTON_DEBUG=1` | program | verbose HTTP logs to stderr |
 | `--api-host <url>` | `PHOTON_API_HOST` | per-cmd | override the backend URL |
-| `-p, --project <id>` | `PHOTON_PROJECT_ID` | per-cmd | project id (overrides `$PHOTON_PROJECT_ID`) |
+| `-p, --project <id>` | `PHOTON_PROJECT_ID` | per-cmd | project id for this command; defaults to `$PHOTON_PROJECT_ID` |
 | `-t, --token <token>` | `PHOTON_TOKEN` | per-cmd | bypass stored creds (CI) |
 | `--json` | — | per-cmd | structured output (opt-in) |
 | `--yes`, `-y` | — | per-cmd | skip destructive-action confirmation |
