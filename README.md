@@ -3,49 +3,80 @@
 Typed terminal UI for the [Photon Dashboard](https://photon.codes). Replaces the web UI for everyday work — manage projects, Spectrum users / lines / platforms, billing, and your developer profile from a terminal.
 
 ```sh
-bun add -g @photon-ai/photon
-photon login
-photon projects ls
+npx @photon-ai/photon login        # try it without installing
+bun add -g @photon-ai/photon       # or install for daily use
 ```
 
-> **Bun required.** This CLI ships as a Bun bundle. Install Bun: `curl -fsSL https://bun.sh/install | bash`. Standalone binaries (no Bun needed) are attached to each [GitHub Release](https://github.com/photon-hq/cli/releases) for macOS (arm64 / x64) and Linux (x64 / arm64).
+---
+
+## Install
+
+Three options. Pick whichever fits.
+
+### 1. One-off — no install (`npx` / `bunx`)
+
+```sh
+npx  @photon-ai/photon login
+bunx @photon-ai/photon projects ls
+```
+
+Each invocation pulls the latest release on demand. Good for scripts, throwaway machines, or trying the CLI before committing. Requires Bun on `PATH` (the bundle has a `#!/usr/bin/env bun` shebang) — install it once with:
+
+```sh
+curl -fsSL https://bun.sh/install | bash
+```
+
+### 2. Global install — daily use (`bun add -g`)
+
+```sh
+bun add -g @photon-ai/photon
+photon login
+```
+
+After install, `photon` is on your `PATH`. The `pho` alias (see below) is created automatically the first time you run `photon`.
+
+### 3. Standalone binary — no Bun, no Node
+
+For CI environments or systems where you don't want any runtime:
+
+```sh
+# pick your platform from https://github.com/photon-hq/cli/releases/latest
+curl -L -o /usr/local/bin/photon \
+  https://github.com/photon-hq/cli/releases/latest/download/photon-darwin-arm64
+chmod +x /usr/local/bin/photon
+photon --version
+```
+
+Available for macOS (arm64 / x64) and Linux (x64 / arm64). Each binary ships with a corresponding `.sha256` checksum on the same release page.
 
 ---
 
 ## Quickstart
 
 ```sh
-# 1. Install
-bun add -g @photon-ai/photon
-
-# 2. Log in (opens a browser to approve the device)
+# 1. Log in (opens a browser to approve the device)
 photon login
 
-# 3. Link a project so future commands default to it
+# 2. Link a project so future commands default to it
 photon projects ls
 photon link <project-id>
 
-# 4. Off you go
+# 3. Off you go
 photon projects show
 photon spectrum users ls
 photon billing show
 ```
 
-`pho` is an alias for `photon` for high-frequency commands. It's created
-automatically the first time you run `photon` after installing:
+### The `pho` alias
+
+`pho` is a shortcut for `photon`, useful for high-frequency commands. It's created automatically as a sibling symlink the first time you run `photon` after installing — so no setup needed for global installs:
 
 ```sh
 pho ls          # photon projects ls
 pho whoami
 ```
 
-Or run one-off commands without installing via `npx` / `bunx`:
-
-```sh
-bunx @photon-ai/photon login
-bunx @photon-ai/photon projects ls
-npx  @photon-ai/photon whoami     # also works
-```
+(`npx` / `bunx` users don't get `pho` since they're already typing the full package name; the alias is only created when running through an installed `photon` binary.)
 
 ---
 
