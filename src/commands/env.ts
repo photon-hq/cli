@@ -12,8 +12,12 @@ export function registerEnvCommand(program: Command): void {
   env
     .command("current", { isDefault: true })
     .description("print the resolved API host")
-    .action(async () => {
-      const e = await resolveEnv();
+    .option(
+      "--api-host <url>",
+      "API host URL (defaults to PHOTON_API_HOST or built-in production)"
+    )
+    .action(async (opts) => {
+      const e = await resolveEnv(opts.apiHost);
       console.log(`${c.bold(e.name)} ${c.dim(`(${e.url})`)}`);
     });
 }

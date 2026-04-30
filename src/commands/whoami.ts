@@ -28,7 +28,7 @@ export function registerWhoamiCommand(program: Command): void {
       // creds may be null when --token / PHOTON_TOKEN was used. Use the
       // token-bearing path: print env + a note that we have no cached identity.
       if (!creds) {
-        console.log(c.dim(`authenticated via token on env ${env.name} (${env.url})`));
+        console.log(c.dim(`authenticated via token on backend ${env.name} (${env.url})`));
         if (data && typeof data === "object") {
           const summary = summarizeProfile(data);
           if (summary) console.log(c.dim(`profile: ${summary}`));

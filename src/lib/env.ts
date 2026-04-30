@@ -30,18 +30,23 @@ export function resolveApiHost(override?: string): string {
 /**
  * Resolve the active env (URL + filesystem key) for credentials / links.
  * Throws if the URL is malformed.
+ *
+ * The returned `url` is normalized to `URL.origin` — scheme + host (+ port
+ * if non-default), no trailing slash, no path, no query, no fragment. That
+ * way `https://app.photon.codes/` and `https://app.photon.codes` resolve to
+ * the same backend, and persisted `creds.apiUrl` is canonical.
  */
 export function resolveActiveEnv(override?: string): ResolvedEnv {
-  const url = resolveApiHost(override);
-  // Eagerly validate so a typo'd PHOTON_API_HOST surfaces here instead of
-  // deep inside Eden treaty's fetch.
+  const raw = resolveApiHost(override);
+  let parsed: URL;
   try {
-    new URL(url);
+    parsed = new URL(raw);
   } catch {
     throw new Error(
-      `Invalid API host URL: "${url}". Must include scheme — e.g. https://your.host.tld.`
+      `Invalid API host URL: "${raw}". Must include scheme — e.g. https://your.host.tld.`
     );
   }
+  const url = parsed.origin;
   return { name: hostKey(url), url };
 }
 
@@ -50,13 +55,16 @@ export function resolveActiveEnv(override?: string): ResolvedEnv {
  * `credentials/<key>.json` and `links/<key>.json` so a user can be logged
  * into multiple backends simultaneously without collisions.
  *
+ * Encoding: hostname is lowercased; `.`, `:`, `%` are replaced with `_`
+ * (chosen because `_` is not a valid hostname character per RFC 1123, so
+ * `a-b.com` → `a-b_com` and `a.b-com` → `a_b-com` produce distinct keys).
+ * Non-default ports are appended as `_<port>`.
+ *
  * Special case: the production URL maps to the literal string "production"
- * — preserves existing `~/.config/photon/credentials/production.json` files
- * from prior versions where envs had names instead of URLs.
+ * — preserves `~/.config/photon/credentials/production.json` files from
+ * prior CLI versions where envs had named identifiers instead of URLs.
  */
 export function hostKey(url: string): string {
-  if (url === PRODUCTION_URL) return "production";
-
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -65,13 +73,28 @@ export function hostKey(url: string): string {
       `Invalid API host URL: "${url}". Must include scheme — e.g. https://your.host.tld.`
     );
   }
+  // Compare on origin so trailing slashes / paths / queries don't break
+  // the back-compat fallback to "production".
+  if (parsed.origin === PRODUCTION_URL) return "production";
 
-  // hostname → safe key. Replace dots with hyphens (assertSafeEnvName
-  // allows only [a-z0-9_-]). Include the port if present so e.g.
-  // `localhost:3000` and `localhost:3001` don't collide on disk.
-  const host = parsed.hostname.toLowerCase().replace(/\./g, "-");
-  const port = parsed.port ? `-${parsed.port}` : "";
-  return `${host}${port}`;
+  // Strip IPv6 brackets first (some URL parsers preserve them in
+  // `hostname`), then normalize remaining unsafe chars to `_`.
+  const host = parsed.hostname
+    .toLowerCase()
+    .replace(/[[\]]/g, "")
+    .replace(/[.:%]/g, "_");
+  const port = parsed.port ? `_${parsed.port}` : "";
+  const key = `${host}${port}`;
+
+  // assertSafeEnvName caps at 64 chars; surface a clearer message before
+  // it fires deep inside credentialsPath().
+  if (key.length > 64) {
+    throw new Error(
+      `API host "${url}" produces a key longer than 64 characters (got ${key.length}). ` +
+        `Use a shorter hostname or alias the host in your local hosts file / DNS.`
+    );
+  }
+  return key;
 }
 
 /**
@@ -86,13 +109,15 @@ export function hostKey(url: string): string {
  * Restrict to a conservative alphabet: lowercase letters, digits, hyphen,
  * underscore. Length 1-64.
  */
-const SAFE_KEY_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+// First char allows `_` because hostKey() can produce keys like `_3000`
+// from IPv6 hostnames (after the leading `::` collapses to empties).
+const SAFE_KEY_RE = /^[a-z0-9_][a-z0-9_-]{0,63}$/;
 
 export function assertSafeEnvName(key: string): void {
   if (!SAFE_KEY_RE.test(key)) {
     throw new Error(
       `Invalid environment key "${key}" — must be 1-64 chars, ` +
-        `start with a-z or 0-9, and only contain a-z, 0-9, '-', '_'.`
+        `start with a-z, 0-9, or '_', and only contain a-z, 0-9, '-', '_'.`
     );
   }
 }

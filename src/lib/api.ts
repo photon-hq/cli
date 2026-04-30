@@ -4,7 +4,7 @@ import { resolveEnv } from "~/lib/config.ts";
 import { loadCredentials } from "~/lib/credentials.ts";
 import type { Credentials } from "~/lib/credentials.ts";
 import { debugHttp, isDebug } from "~/lib/debug.ts";
-import { hostKey } from "~/lib/env.ts";
+import { resolveActiveEnv } from "~/lib/env.ts";
 import type { ResolvedEnv } from "~/lib/env.ts";
 import { NotAuthenticatedError } from "~/lib/errors.ts";
 
@@ -47,8 +47,10 @@ export interface ApiContext {
  * helper throws NotAuthenticatedError before any network call.
  */
 export async function getApi(opts: ApiOptions = {}): Promise<ApiContext> {
+  // Both branches go through resolveActiveEnv so the URL is normalized
+  // (origin only) and the host key is computed consistently.
   const env: ResolvedEnv = opts.url
-    ? { name: hostKey(opts.url), url: opts.url }
+    ? resolveActiveEnv(opts.url)
     : await resolveEnv(opts.apiHost);
 
   // Token resolution priority:
