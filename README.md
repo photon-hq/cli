@@ -57,9 +57,9 @@ Available for macOS (arm64 / x64) and Linux (x64 / arm64). Each binary ships wit
 # 1. Log in (opens a browser to approve the device)
 photon login
 
-# 2. Link a project so future commands default to it
+# 2. Pick a project for this shell session
 photon projects ls
-photon link <project-id>
+export PHOTON_PROJECT_ID=<project-id>
 
 # 3. Off you go
 photon projects show
@@ -111,19 +111,25 @@ localhost_3000 (http://localhost:3000)
 
 Credentials are stored **per host** (`$PHOTON_CONFIG_DIR/credentials/<key>.json` by default — see [config dir](#config-dir) below — mode 600), so you can be logged into multiple backends simultaneously. The `<key>` is derived from the URL — production keeps the literal name `production` for back-compat; other hosts get a sanitized hostname where `.`, `:`, and `%` are replaced with `_` (e.g. `staging-app_photon_codes`, `localhost_3000`). The `_` substitution avoids collisions between distinct hosts like `a-b.com` and `a.b-com`.
 
-### Project linking
+### Setting an active project
 
-Most commands operate on a single project. Rather than passing `--project <id>` every time, link a project for the current host:
+Most commands operate on a single project. Two ways to specify it:
 
 ```sh
-photon link abc123                  # writes $PHOTON_CONFIG_DIR/links/<key>.json
-photon spectrum users ls            # implicit project from link
-photon projects show                # same
-photon link:status                  # see what's linked across backends
-photon unlink                       # clear the link
+# Per command — explicit, scoped to one invocation
+photon spectrum users ls --project abc123
+
+# Per shell — set once, applies to every photon invocation in this shell
+export PHOTON_PROJECT_ID=abc123
+photon spectrum users ls
+photon projects show
 ```
 
-Resolution order: `--project <id>` flag → `$PHOTON_PROJECT_ID` → linked project → friendly error.
+Resolution order: `--project <id>` flag → `$PHOTON_PROJECT_ID` → friendly error.
+
+Put `export PHOTON_PROJECT_ID=…` in your shell rc, or use [`direnv`](https://direnv.net/) to scope it to a directory. Agents and scripts should pass `--project <id>` explicitly per call (or set the env var on the spawn).
+
+**Multi-backend note.** `$PHOTON_PROJECT_ID` is shell-global and single-valued. If you switch `PHOTON_API_HOST` between backends in the same shell, prefer `--project <id>` for the off-default calls, or use a separate shell per backend.
 
 ### CI / scripting
 
@@ -157,13 +163,10 @@ photon
 ├── whoami [--api-host]                                 who am I on this backend
 ├── auth status                                         login state across backends
 ├── config show                                         dump active config
-├── link <id>                                           link project for backend
-├── unlink                                              clear link
-├── link:status                                         linked projects (all backends)
 ├── projects
 │   ├── ls                                              list projects
 │   ├── show [id]                                       project detail
-│   ├── create [-n --location --spectrum ...] [--link]  new project
+│   ├── create [-n --location --spectrum ...]           new project
 │   ├── update [id] [...]                               rename / toggle flags
 │   ├── delete [id] [-y]                                permanent delete
 │   ├── regenerate-secret [id] [-y]                     rotate Spectrum secret
@@ -200,7 +203,7 @@ photon --api-host https://x.tld projects ls                   # ✗ won't work (
 |---|---|---|---|
 | `--debug` | `PHOTON_DEBUG=1` | program | verbose HTTP logs to stderr |
 | `--api-host <url>` | `PHOTON_API_HOST` | per-cmd | override the backend URL |
-| `-p, --project <id>` | `PHOTON_PROJECT_ID` | per-cmd | override linked project |
+| `-p, --project <id>` | `PHOTON_PROJECT_ID` | per-cmd | project id (overrides `$PHOTON_PROJECT_ID`) |
 | `-t, --token <token>` | `PHOTON_TOKEN` | per-cmd | bypass stored creds (CI) |
 | `--json` | — | per-cmd | structured output (opt-in) |
 | `--yes`, `-y` | — | per-cmd | skip destructive-action confirmation |

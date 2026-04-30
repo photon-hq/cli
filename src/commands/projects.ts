@@ -5,7 +5,6 @@ import { resolveProject } from "~/lib/api-context.ts";
 import { openInBrowser } from "~/lib/browser.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
-import { clearLink, loadLink, saveLink } from "~/lib/link.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 import { isInteractive } from "~/lib/tty.ts";
 import type { Project } from "~/lib/types.ts";
@@ -77,9 +76,9 @@ function registerShowCommand(projects: Command): void {
   projects
     .command("show [id]")
     .alias("get")
-    .description("show details for one project (defaults to linked)")
+    .description("show details for one project (defaults to $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (idArg, opts) => {
@@ -133,7 +132,6 @@ interface CreateOpts {
   spectrum?: boolean;
   template?: boolean;
   observability?: boolean;
-  link?: boolean;
   apiHost?: string;
   token?: string;
   json?: boolean;
@@ -150,7 +148,6 @@ function registerCreateCommand(projects: Command): void {
     .option("--no-spectrum", "disable Spectrum")
     .option("--template", "use as template")
     .option("--observability", "enable observability")
-    .option("--link", "link the new project as the active one for this env")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
@@ -181,17 +178,8 @@ function registerCreateCommand(projects: Command): void {
         die("Server did not return a project id.");
       }
 
-      if (opts.link) {
-        await saveLink({
-          projectId: result.id,
-          projectName: filled.name,
-          envName: env.name,
-          linkedAt: new Date().toISOString(),
-        });
-      }
-
       if (opts.json) {
-        printJson({ id: result.id, name: filled.name, env: env.name, linked: opts.link === true });
+        printJson({ id: result.id, name: filled.name, env: env.name });
         return;
       }
 
@@ -200,9 +188,9 @@ function registerCreateCommand(projects: Command): void {
           `Created ${c.bold(filled.name)} ${c.dim(`(${result.id})`)} on ${c.bold(env.name)}`
         )
       );
-      if (opts.link) {
-        console.log(c.dim(`  Linked as the active project for ${env.name}.`));
-      }
+      console.log(
+        c.dim(`  To make this the active project: export PHOTON_PROJECT_ID=${result.id}`)
+      );
     });
 }
 
@@ -292,7 +280,7 @@ function registerUpdateCommand(projects: Command): void {
     .command("update [id]")
     .alias("edit")
     .alias("set")
-    .description("update an existing project (defaults to linked)")
+    .description("update an existing project (defaults to $PHOTON_PROJECT_ID)")
     .option("-n, --name <name>", "new name")
     .option("--spectrum", "enable Spectrum")
     .option("--no-spectrum", "disable Spectrum")
@@ -300,7 +288,7 @@ function registerUpdateCommand(projects: Command): void {
     .option("--no-template", "stop using as template")
     .option("--observability", "enable observability")
     .option("--no-observability", "disable observability")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
@@ -368,17 +356,6 @@ function registerUpdateCommand(projects: Command): void {
       const result = data as { success?: true; error?: string };
       if (result.error) die(result.error);
 
-      // Keep the linked-project name cache in sync if we just renamed.
-      if (trimmedName && trimmedName !== current.name) {
-        const link = await loadLink(resolved.name);
-        if (link?.projectId === projectId) {
-          await saveLink({
-            ...link,
-            projectName: body.name,
-          });
-        }
-      }
-
       if (opts.json) {
         printJson({ id: projectId, ...body });
         return;
@@ -394,8 +371,8 @@ function registerDeleteCommand(projects: Command): void {
     .command("delete [id]")
     .alias("rm")
     .alias("remove")
-    .description("permanently delete a project (defaults to linked)")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .description("permanently delete a project (defaults to $PHOTON_PROJECT_ID)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("-y, --yes", "skip confirmation")
@@ -436,13 +413,16 @@ function registerDeleteCommand(projects: Command): void {
       if (status === 401) throw new SessionExpiredError(resolved.name);
       if (error) die(`Failed to delete project: ${formatApiError(error)}`);
 
-      // Clean up any link pointing at this project on this env.
-      const link = await loadLink(resolved.name);
-      if (link?.projectId === projectId) {
-        await clearLink(resolved.name);
-      }
-
       console.log(c.success(`Deleted ${c.bold(project.name)} ${c.dim(`(${projectId})`)}`));
+
+      // If the active project env var points at the project we just deleted,
+      // surface a hint. We can't unset it from a subprocess, so the user has
+      // to do it themselves.
+      if (process.env.PHOTON_PROJECT_ID === projectId) {
+        console.error(
+          c.warn(`Active project just deleted. Run \`unset PHOTON_PROJECT_ID\` to clear.`)
+        );
+      }
     });
 }
 
@@ -452,8 +432,8 @@ function registerRegenerateSecretCommand(projects: Command): void {
   projects
     .command("regenerate-secret [id]")
     .alias("rotate-secret")
-    .description("rotate the project's Spectrum API secret (defaults to linked)")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .description("rotate the project's Spectrum API secret (defaults to $PHOTON_PROJECT_ID)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("-y, --yes", "skip confirmation")
@@ -502,8 +482,8 @@ function registerRegenerateSecretCommand(projects: Command): void {
 function registerOpenCommand(projects: Command): void {
   projects
     .command("open [id]")
-    .description("open the project in the dashboard web UI (defaults to linked)")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .description("open the project in the dashboard web UI (defaults to $PHOTON_PROJECT_ID)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("--no-browser", "print the URL instead of launching a browser")
     .action(async (idArg, opts) => {
