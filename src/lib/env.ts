@@ -28,25 +28,34 @@ export function resolveApiHost(override?: string): string {
 }
 
 /**
- * Resolve the active env (URL + filesystem key) for credentials / links.
- * Throws if the URL is malformed.
+ * Normalize a raw URL string to its `origin` — scheme + host (+ port if
+ * non-default), no trailing slash, no path, no query, no fragment. Throws
+ * a typed message on parse failure.
  *
- * The returned `url` is normalized to `URL.origin` — scheme + host (+ port
- * if non-default), no trailing slash, no path, no query, no fragment. That
- * way `https://app.photon.codes/` and `https://app.photon.codes` resolve to
- * the same backend, and persisted `creds.apiUrl` is canonical.
+ * Exported so URL-mode callers (e.g. `getApi({ url })` for unauth pings)
+ * can normalize without triggering `hostKey()`'s credential-key constraints
+ * (64-char ceiling, etc.).
  */
-export function resolveActiveEnv(override?: string): ResolvedEnv {
-  const raw = resolveApiHost(override);
-  let parsed: URL;
+export function normalizeOrigin(raw: string): string {
   try {
-    parsed = new URL(raw);
+    return new URL(raw).origin;
   } catch {
     throw new Error(
       `Invalid API host URL: "${raw}". Must include scheme — e.g. https://your.host.tld.`
     );
   }
-  const url = parsed.origin;
+}
+
+/**
+ * Resolve the active env (URL + filesystem key) for credentials / links.
+ * Throws if the URL is malformed or produces a key that would be unsafe
+ * to use as a filename.
+ *
+ * The returned `url` is the normalized origin so persisted `creds.apiUrl`
+ * is canonical.
+ */
+export function resolveActiveEnv(override?: string): ResolvedEnv {
+  const url = normalizeOrigin(resolveApiHost(override));
   return { name: hostKey(url), url };
 }
 

@@ -4,7 +4,7 @@ import { resolveEnv } from "~/lib/config.ts";
 import { loadCredentials } from "~/lib/credentials.ts";
 import type { Credentials } from "~/lib/credentials.ts";
 import { debugHttp, isDebug } from "~/lib/debug.ts";
-import { resolveActiveEnv } from "~/lib/env.ts";
+import { normalizeOrigin } from "~/lib/env.ts";
 import type { ResolvedEnv } from "~/lib/env.ts";
 import { NotAuthenticatedError } from "~/lib/errors.ts";
 
@@ -47,10 +47,12 @@ export interface ApiContext {
  * helper throws NotAuthenticatedError before any network call.
  */
 export async function getApi(opts: ApiOptions = {}): Promise<ApiContext> {
-  // Both branches go through resolveActiveEnv so the URL is normalized
-  // (origin only) and the host key is computed consistently.
+  // URL-mode is for arbitrary-host pings (no credential lookup), so we
+  // skip hostKey() here — its 64-char ceiling and IPv6 quirks are about
+  // safe filenames, not safe HTTP. We still normalize via .origin so the
+  // base URL is canonical regardless of trailing slashes.
   const env: ResolvedEnv = opts.url
-    ? resolveActiveEnv(opts.url)
+    ? { name: "custom", url: normalizeOrigin(opts.url) }
     : await resolveEnv(opts.apiHost);
 
   // Token resolution priority:
