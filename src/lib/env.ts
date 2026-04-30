@@ -3,46 +3,95 @@ import os from "node:os";
 import path from "node:path";
 
 /**
- * Built-in environments. Hardcoded — users cannot override these names,
- * but they can add custom environments via `photon env add`.
+ * The only backend URL ever baked into the public bundle. Other backends
+ * (staging, dev, internal previews) are reachable via the `PHOTON_API_HOST`
+ * env var or the per-command `--api-host <url>` flag — that way internal
+ * URLs never ship to npm or to the standalone binaries.
  */
-export const BUILTIN_ENVS = {
-  production: "https://app.photon.codes",
-  staging: "https://staging-app.photon.codes",
-  dev: "http://localhost:3001",
-} as const;
-
-export type BuiltinEnvName = keyof typeof BUILTIN_ENVS;
-
-export const DEFAULT_ENV: BuiltinEnvName = "production";
+export const PRODUCTION_URL = "https://app.photon.codes";
 
 export interface ResolvedEnv {
+  /** Filesystem-safe key derived from the URL, used for credentials/links files. */
   name: string;
+  /** The full base URL (scheme + host [+ port]). */
   url: string;
-  builtin: boolean;
-}
-
-export function isBuiltin(name: string): name is BuiltinEnvName {
-  return name in BUILTIN_ENVS;
 }
 
 /**
- * Validate that an env name is safe to use as a filesystem path component.
+ * Resolve which backend URL to talk to.
  *
- * Env names come from CLI args (`--env`), env vars (`PHOTON_ENV`), and
- * config.json (`customEnvs` keys). Without validation, a name like
- * `../../foo` could read/write/delete files outside the credentials dir
- * via `credentialsPath(envName)`.
- *
- * Restrict to a conservative alphabet that's also nice in shell + UI:
- * lowercase letters, digits, hyphen, underscore. Length 1-64.
+ * Priority: explicit override (e.g. from `--api-host`) > $PHOTON_API_HOST
+ *   > built-in production.
  */
-const SAFE_ENV_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+export function resolveApiHost(override?: string): string {
+  return override ?? process.env.PHOTON_API_HOST ?? PRODUCTION_URL;
+}
 
-export function assertSafeEnvName(name: string): void {
-  if (!SAFE_ENV_NAME_RE.test(name)) {
+/**
+ * Resolve the active env (URL + filesystem key) for credentials / links.
+ * Throws if the URL is malformed.
+ */
+export function resolveActiveEnv(override?: string): ResolvedEnv {
+  const url = resolveApiHost(override);
+  // Eagerly validate so a typo'd PHOTON_API_HOST surfaces here instead of
+  // deep inside Eden treaty's fetch.
+  try {
+    new URL(url);
+  } catch {
     throw new Error(
-      `Invalid environment name "${name}" — must be 1-64 chars, ` +
+      `Invalid API host URL: "${url}". Must include scheme — e.g. https://your.host.tld.`
+    );
+  }
+  return { name: hostKey(url), url };
+}
+
+/**
+ * Convert a backend URL to a stable filesystem-safe key. Used for naming
+ * `credentials/<key>.json` and `links/<key>.json` so a user can be logged
+ * into multiple backends simultaneously without collisions.
+ *
+ * Special case: the production URL maps to the literal string "production"
+ * — preserves existing `~/.config/photon/credentials/production.json` files
+ * from prior versions where envs had names instead of URLs.
+ */
+export function hostKey(url: string): string {
+  if (url === PRODUCTION_URL) return "production";
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(
+      `Invalid API host URL: "${url}". Must include scheme — e.g. https://your.host.tld.`
+    );
+  }
+
+  // hostname → safe key. Replace dots with hyphens (assertSafeEnvName
+  // allows only [a-z0-9_-]). Include the port if present so e.g.
+  // `localhost:3000` and `localhost:3001` don't collide on disk.
+  const host = parsed.hostname.toLowerCase().replace(/\./g, "-");
+  const port = parsed.port ? `-${parsed.port}` : "";
+  return `${host}${port}`;
+}
+
+/**
+ * Validate that a key is safe to use as a filesystem path component.
+ *
+ * `hostKey()` produces only characters from the allowed alphabet, but
+ * env-name-shaped strings can also enter via legacy config files or
+ * directory listings (`readdir(credentialsDir())`). Without validation, a
+ * value like `../../foo` could read/write/delete files outside the
+ * credentials dir via `credentialsPath(key)`.
+ *
+ * Restrict to a conservative alphabet: lowercase letters, digits, hyphen,
+ * underscore. Length 1-64.
+ */
+const SAFE_KEY_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+export function assertSafeEnvName(key: string): void {
+  if (!SAFE_KEY_RE.test(key)) {
+    throw new Error(
+      `Invalid environment key "${key}" — must be 1-64 chars, ` +
         `start with a-z or 0-9, and only contain a-z, 0-9, '-', '_'.`
     );
   }
@@ -89,9 +138,10 @@ export function configDir(): string {
 
 export const configPath = (): string => path.join(configDir(), "config.json");
 
-export const credentialsPath = (envName: string): string => {
-  assertSafeEnvName(envName);
-  return path.join(configDir(), "credentials", `${envName}.json`);
-};
+export const credentialsDir = (): string =>
+  path.join(configDir(), "credentials");
 
-export const credentialsDir = (): string => path.join(configDir(), "credentials");
+export const credentialsPath = (key: string): string => {
+  assertSafeEnvName(key);
+  return path.join(credentialsDir(), `${key}.json`);
+};

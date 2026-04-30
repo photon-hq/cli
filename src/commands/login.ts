@@ -11,7 +11,7 @@ import {
 import { c, die, formatApiError } from "~/lib/output.ts";
 
 interface LoginOpts {
-  env?: string;
+  apiHost?: string;
   browser?: boolean;
 }
 
@@ -19,7 +19,7 @@ export function registerLoginCommand(program: Command): void {
   program
     .command("login")
     .description("authenticate via the device authorization flow")
-    .option("-e, --env <name>", "environment to log into (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("--no-browser", "don't auto-open the verification URL")
     .action(async (opts: LoginOpts) => {
       try {
@@ -33,8 +33,8 @@ export function registerLoginCommand(program: Command): void {
     });
 }
 
-async function runLogin({ env: envOverride, browser = true }: LoginOpts): Promise<void> {
-  const env = await resolveEnv(envOverride);
+async function runLogin({ apiHost, browser = true }: LoginOpts): Promise<void> {
+  const env = await resolveEnv(apiHost);
   console.log(c.info(`Authenticating to ${c.bold(env.name)} ${c.dim(`(${env.url})`)}`));
 
   const auth = getAuthClient(env.url);

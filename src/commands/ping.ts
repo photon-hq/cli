@@ -6,11 +6,11 @@ export function registerPingCommand(program: Command): void {
   program
     .command("ping")
     .description("hit the Photon Dashboard /api/health endpoint")
-    .option("-e, --env <name>", "environment name (overrides current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-u, --url <url>", "raw API URL (bypasses env resolution)")
     .action(async (opts) => {
       const { api, env } = await getApi({
-        envName: opts.env,
+        apiHost: opts.apiHost,
         url: opts.url,
       });
 

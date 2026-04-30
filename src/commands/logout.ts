@@ -7,10 +7,10 @@ import { c } from "~/lib/output.ts";
 export function registerLogoutCommand(program: Command): void {
   program
     .command("logout")
-    .description("clear stored credentials for an environment")
-    .option("-e, --env <name>", "environment to log out of (defaults to current)")
+    .description("clear stored credentials for the active backend")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .action(async (opts) => {
-      const env = await resolveEnv(opts.env);
+      const env = await resolveEnv(opts.apiHost);
       const creds = await loadCredentials(env.name);
 
       if (!creds) {

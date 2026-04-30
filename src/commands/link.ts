@@ -10,12 +10,12 @@ import type { Project } from "~/lib/types.ts";
 export function registerLinkCommands(program: Command): void {
   program
     .command("link <id>")
-    .description("set this id as the active project for the current environment")
-    .option("-e, --env <name>", "environment to link the project under (defaults to current)")
+    .description("set this id as the active project for the current backend")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .action(async (id, opts) => {
       const { api, env } = await getApi({
-        envName: opts.env,
+        apiHost: opts.apiHost,
         token: opts.token,
         requireAuth: true,
       });
@@ -57,11 +57,11 @@ export function registerLinkCommands(program: Command): void {
 
   program
     .command("unlink")
-    .description("clear the active project link for an environment")
-    .option("-e, --env <name>", "environment to unlink (defaults to current)")
+    .description("clear the project link for the active backend")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-y, --yes", "skip confirmation")
     .action(async (opts) => {
-      const env = await resolveEnv(opts.env);
+      const env = await resolveEnv(opts.apiHost);
       const existing = await loadLink(env.name);
       if (!existing) {
         console.log(c.dim(`No link to clear for env ${c.bold(env.name)}.`));
@@ -82,7 +82,7 @@ export function registerLinkCommands(program: Command): void {
   // so the help output shows it as a first-class operation.
   program
     .command("link:status")
-    .description("show currently linked project(s) across environments")
+    .description("show currently linked project(s) across backends")
     .option("--json", "output JSON")
     .action(async (opts) => {
       const links = await listLinks();

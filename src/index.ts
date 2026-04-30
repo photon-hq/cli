@@ -18,7 +18,6 @@ import {
   DeviceFlowExpired,
   NotAuthenticatedError,
   SessionExpiredError,
-  UnknownEnvError,
 } from '~/lib/errors.ts';
 import { die } from '~/lib/output.ts';
 import { ensurePhoAlias } from '~/lib/pho-alias.ts';
@@ -64,14 +63,12 @@ program.parseAsync(process.argv).catch(handleTopLevelError);
  */
 function handleTopLevelError(err: unknown): never {
   if (err instanceof NotAuthenticatedError || err instanceof SessionExpiredError) {
-    const flag = err.envName === 'production' ? '' : ` --env ${err.envName}`;
+    // Hint mentions the API host as a flag only if the user wasn't on the
+    // default production backend. For production, `photon login` is enough.
+    const flag =
+      err.envName === 'production' ? '' : ` --api-host <url> # for "${err.envName}"`;
     die(err.message, {
-      hint: `Run \`photon login${flag}\``,
-    });
-  }
-  if (err instanceof UnknownEnvError) {
-    die(err.message, {
-      hint: 'List envs: `photon env list`. Add a custom one: `photon env add <name> <url>`.',
+      hint: `Run \`photon login${flag}\`.`,
     });
   }
   if (err instanceof DeviceFlowDenied) {
@@ -85,7 +82,7 @@ function handleTopLevelError(err: unknown): never {
     // network failures. Surface a network-specific hint.
     if (/Unable to connect|fetch failed|ECONNREFUSED/i.test(err.message)) {
       die(err.message, {
-        hint: 'Check your connection or pass --env / --url to target a reachable host.',
+        hint: 'Check your connection, or set PHOTON_API_HOST / pass --api-host <url> to target a reachable backend.',
       });
     }
     die(err.message);

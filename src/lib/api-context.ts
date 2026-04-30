@@ -17,16 +17,16 @@ export interface ResolvedProject {
  *   3. `~/.config/photon/links/<active-env>.json` written by `photon link`
  *   4. nothing → die with a hint
  *
- * The env follows the standard env resolution (`--env` flag → $PHOTON_ENV →
- * config.currentEnv → DEFAULT). The project is anchored to whichever env
- * resolves; mismatches between linked project and active env can't happen
- * because each env has its own link file.
+ * The backend follows the standard host resolution (`--api-host <url>` flag →
+ * `$PHOTON_API_HOST` env var → built-in production URL). The project is
+ * anchored to whichever host resolves; mismatches between linked project and
+ * active host can't happen because each host has its own link file.
  */
 export async function resolveProject(opts: {
   flagProjectId?: string;
-  envOverride?: string;
+  apiHost?: string;
 }): Promise<ResolvedProject> {
-  const env = await resolveEnv(opts.envOverride);
+  const env = await resolveEnv(opts.apiHost);
 
   if (opts.flagProjectId) {
     return { projectId: opts.flagProjectId, env };
@@ -42,8 +42,8 @@ export async function resolveProject(opts: {
     return { projectId: link.projectId, env };
   }
 
-  const flag = env.name === "production" ? "" : ` --env ${env.name}`;
-  die(`No project linked for env "${env.name}".`, {
+  const flag = opts.apiHost ? ` --api-host ${opts.apiHost}` : "";
+  die(`No project linked for backend "${env.name}".`, {
     hint: `Run \`photon link <id>${flag}\`, or pass \`--project <id>\`.`,
   });
 }

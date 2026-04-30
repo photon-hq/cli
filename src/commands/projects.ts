@@ -33,12 +33,12 @@ function registerListCommand(projects: Command): void {
     .command("list", { isDefault: true })
     .alias("ls")
     .description("list your projects")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
       const { api, env } = await getApi({
-        envName: opts.env,
+        apiHost: opts.apiHost,
         token: opts.token,
         requireAuth: true,
       });
@@ -78,17 +78,17 @@ function registerShowCommand(projects: Command): void {
     .command("show [id]")
     .alias("get")
     .description("show details for one project (defaults to linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-p, --project <id>", "project id (overrides linked)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (idArg, opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: idArg ?? opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -134,7 +134,7 @@ interface CreateOpts {
   template?: boolean;
   observability?: boolean;
   link?: boolean;
-  env?: string;
+  apiHost?: string;
   token?: string;
   json?: boolean;
 }
@@ -151,13 +151,13 @@ function registerCreateCommand(projects: Command): void {
     .option("--template", "use as template")
     .option("--observability", "enable observability")
     .option("--link", "link the new project as the active one for this env")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts: CreateOpts) => {
       const filled = await fillCreateOpts(opts);
       const { api, env } = await getApi({
-        envName: opts.env,
+        apiHost: opts.apiHost,
         token: opts.token,
         requireAuth: true,
       });
@@ -282,7 +282,7 @@ interface UpdateOpts {
   template?: boolean;
   observability?: boolean;
   project?: string;
-  env?: string;
+  apiHost?: string;
   token?: string;
   json?: boolean;
 }
@@ -301,7 +301,7 @@ function registerUpdateCommand(projects: Command): void {
     .option("--observability", "enable observability")
     .option("--no-observability", "disable observability")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (idArg: string | undefined, opts: UpdateOpts) => {
@@ -330,10 +330,10 @@ function registerUpdateCommand(projects: Command): void {
 
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: idArg ?? opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -396,16 +396,16 @@ function registerDeleteCommand(projects: Command): void {
     .alias("remove")
     .description("permanently delete a project (defaults to linked)")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("-y, --yes", "skip confirmation")
     .action(async (idArg, opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: idArg ?? opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -454,17 +454,17 @@ function registerRegenerateSecretCommand(projects: Command): void {
     .alias("rotate-secret")
     .description("rotate the project's Spectrum API secret (defaults to linked)")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("-y, --yes", "skip confirmation")
     .option("--json", "output JSON")
     .action(async (idArg, opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: idArg ?? opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -504,12 +504,12 @@ function registerOpenCommand(projects: Command): void {
     .command("open [id]")
     .description("open the project in the dashboard web UI (defaults to linked)")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("--no-browser", "print the URL instead of launching a browser")
     .action(async (idArg, opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: idArg ?? opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       // Use new URL() rather than concatenation so a custom env URL
       // with a trailing slash doesn't produce `https://x//dashboard/...`.
@@ -524,12 +524,12 @@ function registerCheckPhoneCommand(projects: Command): void {
   projects
     .command("check-phone <number>")
     .description("check whether a phone number is available on Spectrum")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (number, opts) => {
       const { api, env } = await getApi({
-        envName: opts.env,
+        apiHost: opts.apiHost,
         token: opts.token,
         requireAuth: true,
       });

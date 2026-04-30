@@ -14,16 +14,16 @@ export function registerSpectrumPlatforms(spectrum: Command): void {
     .alias("ls")
     .description("list platforms and their enabled state")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -51,7 +51,7 @@ export function registerSpectrumPlatforms(spectrum: Command): void {
     .command("enable <name>")
     .description("enable a platform")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (name, opts) => {
@@ -62,7 +62,7 @@ export function registerSpectrumPlatforms(spectrum: Command): void {
     .command("disable <name>")
     .description("disable a platform")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (name, opts) => {
@@ -73,14 +73,14 @@ export function registerSpectrumPlatforms(spectrum: Command): void {
 async function togglePlatform(
   name: string,
   enabled: boolean,
-  opts: { project?: string; env?: string; token?: string; json?: boolean }
+  opts: { project?: string; apiHost?: string; token?: string; json?: boolean }
 ): Promise<void> {
   const { projectId, env: resolved } = await resolveProject({
     flagProjectId: opts.project,
-    envOverride: opts.env,
+    apiHost: opts.apiHost,
   });
   const { api } = await getApi({
-    envName: resolved.name,
+    apiHost: resolved.url,
     token: opts.token,
     requireAuth: true,
   });

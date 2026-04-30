@@ -26,12 +26,12 @@ function registerPlans(billing: Command): void {
       "-p, --project <id>",
       "project id (accepted for parity with other billing commands; not used)"
     )
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
       const { api, env } = await getApi({
-        envName: opts.env,
+        apiHost: opts.apiHost,
         token: opts.token,
         requireAuth: true,
       });
@@ -68,16 +68,16 @@ function registerShow(billing: Command): void {
     .command("show")
     .description("show the project's current subscription (defaults to linked)")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -117,7 +117,7 @@ function registerCheckout(billing: Command): void {
     .option("--plan <price-id>", "Stripe price id from `photon billing plans`")
     .option("--qty <n>", "quantity", parsePositiveInt)
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--no-browser", "print the URL instead of launching a browser")
     .option("--json", "output JSON ({url}) and skip browser open")
@@ -129,10 +129,10 @@ function registerCheckout(billing: Command): void {
       }
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
@@ -190,17 +190,17 @@ function registerManage(billing: Command): void {
     .alias("portal")
     .description("open the Stripe customer portal for this project")
     .option("-p, --project <id>", "project id (overrides linked)")
-    .option("-e, --env <name>", "environment (defaults to current)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--no-browser", "print the URL instead of launching a browser")
     .option("--json", "output JSON ({url}) and skip browser open")
     .action(async (opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
-        envOverride: opts.env,
+        apiHost: opts.apiHost,
       });
       const { api } = await getApi({
-        envName: resolved.name,
+        apiHost: resolved.url,
         token: opts.token,
         requireAuth: true,
       });
