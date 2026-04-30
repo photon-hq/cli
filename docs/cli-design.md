@@ -1,5 +1,21 @@
 # Photon CLI Design
 
+> ⚠️ **Historical document.** This file captures the original design from the
+> CLI's pre-1.0 phase. Several decisions documented below have since been
+> superseded — notably:
+>
+> - **Project linking has been removed.** Sections referencing `photon link`,
+>   `~/.config/photon/links/<env>.json`, or per-env link files no longer reflect
+>   the implementation. Project resolution is now `--project <id>` flag →
+>   `$PHOTON_PROJECT_ID` env var → error.
+> - **Built-in env list is gone.** Backend selection runs through
+>   `$PHOTON_API_HOST` / `--api-host <url>` instead of a hardcoded
+>   production/staging/dev list.
+>
+> See the [README](../README.md) for the current user-facing surface. This doc
+> is preserved for context on rationale and trade-offs that informed earlier
+> decisions.
+>
 > Goal: replace the dashboard web UI for end-user interaction with a typed,
 > ergonomic terminal experience. The binary is `photon` (alias `pho`); the
 > npm package name is decided at publish time. This doc grounds the design

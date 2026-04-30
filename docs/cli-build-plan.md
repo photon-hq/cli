@@ -1,5 +1,12 @@
 # Photon CLI Build Plan
 
+> ⚠️ **Historical document.** Captures the original phased build plan. Notable
+> deltas from current implementation: the `link` / `links/<env>.json` system
+> documented below was removed in favor of `--project <id>` + `$PHOTON_PROJECT_ID`,
+> and the built-in env list (production/staging/dev) was replaced with a
+> single `$PHOTON_API_HOST` knob. See the [README](../README.md) for the
+> current user-facing surface.
+>
 > Companion to `cli-design.md`. That doc establishes principles; this one
 > turns them into work items. Each capability has a concrete command shape,
 > the API endpoint(s) it consumes, edge cases, files to add/modify, and an

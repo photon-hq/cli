@@ -1,6 +1,5 @@
 import { resolveEnv } from "~/lib/config.ts";
 import type { ResolvedEnv } from "~/lib/env.ts";
-import { loadLink } from "~/lib/link.ts";
 import { die } from "~/lib/output.ts";
 
 export interface ResolvedProject {
@@ -14,13 +13,10 @@ export interface ResolvedProject {
  * Resolution order (highest precedence first):
  *   1. `--project <id>` flag
  *   2. `$PHOTON_PROJECT_ID` env var
- *   3. `~/.config/photon/links/<active-env>.json` written by `photon link`
- *   4. nothing → die with a hint
+ *   3. nothing → die with a hint
  *
  * The backend follows the standard host resolution (`--api-host <url>` flag →
- * `$PHOTON_API_HOST` env var → built-in production URL). The project is
- * anchored to whichever host resolves; mismatches between linked project and
- * active host can't happen because each host has its own link file.
+ * `$PHOTON_API_HOST` env var → built-in production URL).
  */
 export async function resolveProject(opts: {
   flagProjectId?: string;
@@ -28,22 +24,19 @@ export async function resolveProject(opts: {
 }): Promise<ResolvedProject> {
   const env = await resolveEnv(opts.apiHost);
 
-  if (opts.flagProjectId) {
-    return { projectId: opts.flagProjectId, env };
+  const flag = opts.flagProjectId?.trim();
+  if (flag) {
+    return { projectId: flag, env };
   }
 
-  const fromEnv = process.env.PHOTON_PROJECT_ID;
+  // `?.trim()` so empty / whitespace-only env vars are treated as
+  // unset, matching how `config show` reports them.
+  const fromEnv = process.env.PHOTON_PROJECT_ID?.trim();
   if (fromEnv) {
     return { projectId: fromEnv, env };
   }
 
-  const link = await loadLink(env.name);
-  if (link) {
-    return { projectId: link.projectId, env };
-  }
-
-  const flag = opts.apiHost ? ` --api-host ${opts.apiHost}` : "";
-  die(`No project linked for backend "${env.name}".`, {
-    hint: `Run \`photon link <id>${flag}\`, or pass \`--project <id>\`.`,
+  die(`No project specified for backend "${env.name}".`, {
+    hint: "Pass `--project <id>`, or set `PHOTON_PROJECT_ID` in your shell.",
   });
 }

@@ -12,7 +12,7 @@ export function registerSpectrumAvatar(spectrum: Command): void {
     .command("upload <file>")
     .description("upload an image as the Spectrum avatar")
     .option("--no-update-profile", "only upload, don't update the profile to use the new avatar")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .action(async (file, opts) => {

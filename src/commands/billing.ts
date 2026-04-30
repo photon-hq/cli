@@ -66,8 +66,8 @@ function registerPlans(billing: Command): void {
 function registerShow(billing: Command): void {
   billing
     .command("show")
-    .description("show the project's current subscription (defaults to linked)")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .description("show the project's current subscription (defaults to $PHOTON_PROJECT_ID)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
@@ -116,7 +116,7 @@ function registerCheckout(billing: Command): void {
     .description("start a subscription checkout (opens Stripe in browser)")
     .option("--plan <price-id>", "Stripe price id from `photon billing plans`")
     .option("--qty <n>", "quantity", parsePositiveInt)
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--no-browser", "print the URL instead of launching a browser")
@@ -189,7 +189,7 @@ function registerManage(billing: Command): void {
     .command("manage")
     .alias("portal")
     .description("open the Stripe customer portal for this project")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--no-browser", "print the URL instead of launching a browser")

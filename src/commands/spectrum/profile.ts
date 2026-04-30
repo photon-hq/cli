@@ -12,7 +12,7 @@ export function registerSpectrumProfile(spectrum: Command): void {
   profile
     .command("show", { isDefault: true })
     .description("show the Spectrum profile")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
@@ -58,7 +58,7 @@ export function registerSpectrumProfile(spectrum: Command): void {
     .option("--first-name <name>")
     .option("--last-name <name>")
     .option("--avatar-url <url>", "avatar image URL (use `spectrum avatar upload` instead)")
-    .option("-p, --project <id>", "project id (overrides linked)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
