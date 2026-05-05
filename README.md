@@ -3,8 +3,8 @@
 Typed terminal UI for the [Photon Dashboard](https://photon.codes). Replaces the web UI for everyday work — manage projects, Spectrum users / lines / platforms, billing, and your developer profile from a terminal.
 
 ```sh
-npx @photon-ai/photon login        # try it without installing
-bun add -g @photon-ai/photon       # or install for daily use
+npx @photon-ai/cli login        # try it without installing
+bun add -g @photon-ai/cli       # or install for daily use
 ```
 
 ---
@@ -16,8 +16,8 @@ Three options. Pick whichever fits.
 ### 1. One-off — no install (`npx` / `bunx`)
 
 ```sh
-npx  @photon-ai/photon login
-bunx @photon-ai/photon projects ls
+npx  @photon-ai/cli login
+bunx @photon-ai/cli projects ls
 ```
 
 Each invocation pulls the latest release on demand. Good for scripts, throwaway machines, or trying the CLI before committing. Requires Bun on `PATH` (the bundle has a `#!/usr/bin/env bun` shebang) — install it once with:
@@ -29,7 +29,7 @@ curl -fsSL https://bun.sh/install | bash
 ### 2. Global install — daily use (`bun add -g`)
 
 ```sh
-bun add -g @photon-ai/photon
+bun add -g @photon-ai/cli
 photon login
 ```
 

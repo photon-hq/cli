@@ -1,5 +1,5 @@
 {
-  "name": "@photon-ai/photon",
+  "name": "@photon-ai/cli",
   "version": "0.1.3",
   "description": "Photon CLI — typed terminal UI for the Photon Dashboard. Binary: `photon` (alias `pho`).",
   "keywords": [
@@ -21,7 +21,9 @@
     "url": "https://github.com/photon-hq/cli/issues"
   },
   "type": "module",
-  "bin": "./dist/photon.js",
+  "bin": {
+    "photon": "./dist/photon.js"
+  },
   "files": [
     "dist",
     "README.md"

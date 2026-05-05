@@ -7,7 +7,8 @@ import { join, resolve, sep } from "node:path";
  *
  * Why not declare both bins in package.json? npm 11's `npx <scoped-pkg>`
  * (no version) skips bin auto-resolve when `bin` has multiple keys. Keeping
- * `bin` as a single string preserves clean `npx @photon-ai/photon` usage.
+ * `bin` as a single entry (`{ photon: "./dist/photon.js" }`) preserves clean
+ * `npx @photon-ai/cli` usage.
  *
  * Why not a `postinstall` script? Bun blocks postinstall by default — that
  * would silently strip `pho` from `bun add -g` (our primary install path).
