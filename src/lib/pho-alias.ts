@@ -1,5 +1,5 @@
-import { existsSync, lstatSync, symlinkSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { lstatSync, realpathSync, symlinkSync } from "node:fs";
+import { delimiter, join, resolve, sep } from "node:path";
 
 /**
  * Lazily install `pho` as a sibling of `photon` in whichever bin directory
@@ -13,45 +13,56 @@ import { join, resolve, sep } from "node:path";
  * Why not a `postinstall` script? Bun blocks postinstall by default — that
  * would silently strip `pho` from `bun add -g` (our primary install path).
  *
- * Approach: walk up from the running script's path to the package root, then
- * try the standard bin-dir layouts adjacent to it. First match wins.
+ * Approach: scan $PATH (plus well-known global bin fallbacks) for a
+ * `photon` entry whose realpath matches ours, then drop a `pho → ./photon`
+ * symlink next to it. Package-manager agnostic — works for bun, npm, pnpm,
+ * yarn, and `bun link` without hardcoding directory layouts.
  *
- *   <root>/node_modules/.bin                          (local install)
- *   <prefix>/bin            with <prefix>/lib/node_modules/...  (npm/yarn/pnpm -g)
- *   ~/.bun/bin              with ~/.bun/install/global/node_modules/...  (bun -g)
- *
- * Cost is two stat calls per launch after `pho` exists. Errors are swallowed
- * — `pho` is convenience, never load-bearing.
+ * Cost after `pho` exists: ~3 fast syscalls per launch (one realpathSync
+ * for argv[1], one for the matching photon entry, one lstatSync for pho).
+ * Errors are swallowed — `pho` is convenience, never load-bearing.
  */
 export function ensurePhoAlias(): void {
   try {
     const me = process.argv[1];
     if (!me) return;
 
-    // Guard: only run when launched from an installed package layout.
-    // Source-mode runs (`bun run src/index.ts`) skip this entirely.
-    const installedShape = new RegExp(
-      `${escapeForRegex(sep)}node_modules${escapeForRegex(sep)}.+${escapeForRegex(sep)}dist${escapeForRegex(sep)}photon\\.js$`,
-    );
-    if (!installedShape.test(me)) return;
+    // Only act on built artifacts. Source-mode (`bun run src/index.ts`)
+    // and compiled binaries (`dist/photon`) skip entirely.
+    if (!me.endsWith(`${sep}dist${sep}photon.js`)) return;
 
-    // process.argv[1] resolves symlinks → me is `<pkg>/dist/photon.js`.
-    // pkgRoot is two levels up.
-    const pkgRoot = resolve(me, "..", "..");
+    const myReal = realpathSync(resolve(me));
+    const home = process.env.HOME || process.env.USERPROFILE || "";
 
-    const candidates = [
-      resolve(pkgRoot, "..", "..", ".bin"),                    // local: node_modules/.bin
-      resolve(pkgRoot, "..", "..", "..", "..", "bin"),         // npm/yarn/pnpm global: <prefix>/bin
-      resolve(pkgRoot, "..", "..", "..", "..", "..", "bin"),   // bun global: ~/.bun/bin
-    ];
+    // PATH entries first, then well-known global bin directories that may
+    // be absent in restricted shells (IDE terminals, CI, etc.).
+    const dirs = (process.env.PATH || "").split(delimiter);
+    if (home) {
+      dirs.push(
+        join(home, ".bun", "bin"),
+        join(home, ".local", "share", "pnpm"),
+        join(home, ".yarn", "bin"),
+      );
+    }
+    dirs.push("/usr/local/bin");
 
-    for (const dir of candidates) {
+    const seen = new Set<string>();
+    for (const dir of dirs) {
+      if (!dir || seen.has(dir)) continue;
+      seen.add(dir);
+
       const photon = join(dir, "photon");
-      const pho = join(dir, "pho");
-      if (!existsSync(photon)) continue;
 
-      // lstatSync detects ANY entry at `pho` — including broken symlinks
-      // that existsSync would miss (existsSync follows the link target).
+      // Verify this `photon` ultimately resolves to the same file as us.
+      // realpathSync throws for non-existent paths → cheap existence check.
+      try {
+        if (realpathSync(photon) !== myReal) continue;
+      } catch {
+        continue;
+      }
+
+      // Found our bin directory — create `pho` if absent.
+      const pho = join(dir, "pho");
       try {
         lstatSync(pho);
         return; // something already lives here; leave it alone
@@ -65,8 +76,4 @@ export function ensurePhoAlias(): void {
   } catch {
     // best-effort
   }
-}
-
-function escapeForRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
