@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { Command } from '@commander-js/extra-typings';
 import { registerAuthCommands } from '~/commands/auth.ts';
 import { registerBillingCommands } from '~/commands/billing.ts';

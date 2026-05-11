@@ -133,6 +133,8 @@ function buildTracedFetch(): typeof fetch {
         throw err;
       }
     },
-    { preconnect: fetch.preconnect.bind(fetch) }
+    typeof fetch.preconnect === "function"
+      ? { preconnect: fetch.preconnect.bind(fetch) }
+      : {}
   ) as typeof fetch;
 }

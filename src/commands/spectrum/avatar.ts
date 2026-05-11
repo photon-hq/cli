@@ -1,9 +1,19 @@
 import type { Command } from "@commander-js/extra-typings";
+import { readFile, stat } from "node:fs/promises";
+import { extname } from "node:path";
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
 import { PRODUCTION_URL } from "~/lib/env.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError } from "~/lib/output.ts";
+
+const MIME_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+};
 
 export function registerSpectrumAvatar(spectrum: Command): void {
   const avatar = spectrum.command("avatar").description("manage the Spectrum avatar image");
@@ -16,10 +26,13 @@ export function registerSpectrumAvatar(spectrum: Command): void {
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .action(async (file, opts) => {
-      const local = Bun.file(file);
-      if (!(await local.exists())) {
+      const stats = await stat(file).catch(() => null);
+      if (!stats) {
         die(`File not found: ${file}`);
       }
+      const body = await readFile(file);
+      const size = stats.size;
+      const mime = MIME_TYPES[extname(file).toLowerCase()] || "application/octet-stream";
 
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
@@ -51,12 +64,12 @@ export function registerSpectrumAvatar(spectrum: Command): void {
 
       // 2) PUT the file body to the presigned URL. Spectrum returns a
       // simple PUT-style URL (per services/spectrum.ts), not multipart.
-      console.log(c.dim(`Uploading ${file} (${(local.size / 1024).toFixed(1)} KB)…`));
+      console.log(c.dim(`Uploading ${file} (${(size / 1024).toFixed(1)} KB)…`));
       const putResp = await fetch(result.uploadUrl, {
         method: "PUT",
-        body: local,
+        body,
         headers: {
-          "Content-Type": local.type || "application/octet-stream",
+          "Content-Type": mime,
         },
       });
       if (!putResp.ok) {
