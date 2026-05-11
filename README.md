@@ -11,9 +11,18 @@ bun add -g @photon-ai/cli       # or install for daily use
 
 ## Install
 
-Three options. Pick whichever fits.
+Four options. Pick whichever fits.
 
-### 1. One-off — no install (`npx` / `bunx`)
+### 1. Homebrew (macOS / Linux)
+
+```sh
+brew install photon-hq/photon/photon
+photon login
+```
+
+Auto-updates with `brew upgrade photon`. No runtime dependencies — the formula installs a self-contained binary.
+
+### 2. One-off — no install (`npx` / `bunx`)
 
 ```sh
 npx  @photon-ai/cli login
@@ -26,7 +35,7 @@ Each invocation pulls the latest release on demand. Good for scripts, throwaway 
 curl -fsSL https://bun.sh/install | bash
 ```
 
-### 2. Global install — daily use (`bun add -g`)
+### 3. Global install — daily use (`bun add -g`)
 
 ```sh
 bun add -g @photon-ai/cli
@@ -35,7 +44,7 @@ photon login
 
 After install, `photon` is on your `PATH`. The `pho` alias (see below) is created automatically the first time you run `photon`.
 
-### 3. Standalone binary — no Bun, no Node
+### 4. Standalone binary — no Bun, no Node
 
 For CI environments or systems where you don't want any runtime:
 

@@ -1,4 +1,4 @@
-import { chmod, mkdir, readdir, unlink } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { credentialsDir, credentialsPath } from "~/lib/env.ts";
 
@@ -20,12 +20,9 @@ export interface Credentials {
 export async function loadCredentials(
   envName: string
 ): Promise<Credentials | null> {
-  const file = Bun.file(credentialsPath(envName));
-  if (!(await file.exists())) {
-    return null;
-  }
   try {
-    return (await file.json()) as Credentials;
+    const raw = await readFile(credentialsPath(envName), "utf-8");
+    return JSON.parse(raw) as Credentials;
   } catch {
     return null;
   }
@@ -34,7 +31,7 @@ export async function loadCredentials(
 export async function saveCredentials(creds: Credentials): Promise<void> {
   const path = credentialsPath(creds.envName);
   await mkdir(dirname(path), { recursive: true });
-  await Bun.write(path, JSON.stringify(creds, null, 2) + "\n");
+  await writeFile(path, JSON.stringify(creds, null, 2) + "\n", "utf-8");
   // chmod 600 — only the owner can read this file. Token is sensitive.
   await chmod(path, 0o600);
 }
