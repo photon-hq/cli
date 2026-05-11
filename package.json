@@ -12,6 +12,7 @@
     "developer-tools"
   ],
   "author": "Photon",
+  "license": "MIT",
   "homepage": "https://github.com/photon-hq/cli#readme",
   "repository": {
     "type": "git",
