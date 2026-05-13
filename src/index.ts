@@ -28,7 +28,7 @@ startUpdateNotifier();
 
 const program = new Command()
   .name('photon')
-  .description('Photon CLI — replaces the dashboard web UI for end-user interaction')
+  .description('Photon CLI — bring your agents to any interface')
   .version(pkg.version, '-v, --version', 'output the current version')
   .option('--debug', 'verbose output incl. HTTP request/response')
   .hook('preAction', (thisCommand) => {
