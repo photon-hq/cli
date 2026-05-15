@@ -1,0 +1,22 @@
+name: Security Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    if: contains(github.event.pull_request.labels.*.name, 'agent-flow')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/security-check
+        with:
+          base-ref: ${{ github.event.pull_request.base.sha }}

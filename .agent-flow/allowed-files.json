@@ -1,0 +1,22 @@
+{
+  "description": "Files that AI agents are permitted to modify",
+  "allowed": [
+    "src/commands/**/*.ts",
+    "src/lib/types.ts",
+    "src/lib/output.ts",
+    "tests/**/*.ts",
+    "tests/**/*.json",
+    "tests/**/*.snap",
+    "CHANGELOG.md",
+    "AGENT_NOTES.md"
+  ],
+  "forbidden": [
+    ".github/workflows/**",
+    "types/api.d.ts",
+    "bun.lock",
+    "scripts/**",
+    ".env*",
+    "*.yaml",
+    "*.yml"
+  ]
+}

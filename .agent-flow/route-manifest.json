@@ -1,0 +1,145 @@
+{
+  "generated_at": "2026-05-15T15:22:47.810Z",
+  "routes": [
+    {
+      "path": "api.billing.checkout",
+      "method": "post",
+      "used_by": "src/commands/billing.ts"
+    },
+    {
+      "path": "api.billing.plans",
+      "method": "get",
+      "used_by": "src/commands/billing.ts"
+    },
+    {
+      "path": "api.health",
+      "method": "get",
+      "used_by": "src/commands/ping.ts"
+    },
+    {
+      "path": "api.profile",
+      "method": "get",
+      "used_by": "src/commands/whoami.ts"
+    },
+    {
+      "path": "api.profile",
+      "method": "get",
+      "used_by": "src/commands/profile.ts"
+    },
+    {
+      "path": "api.profile.developer",
+      "method": "post",
+      "used_by": "src/commands/profile.ts"
+    },
+    {
+      "path": "api.profile.organization",
+      "method": "post",
+      "used_by": "src/commands/profile.ts"
+    },
+    {
+      "path": "api.projects",
+      "method": "get",
+      "used_by": "src/commands/projects.ts"
+    },
+    {
+      "path": "api.projects",
+      "method": "post",
+      "used_by": "src/commands/projects.ts"
+    },
+    {
+      "path": "api.projects.:param",
+      "method": "delete",
+      "used_by": "src/commands/projects.ts"
+    },
+    {
+      "path": "api.projects.:param",
+      "method": "get",
+      "used_by": "src/commands/projects.ts"
+    },
+    {
+      "path": "api.projects.:param",
+      "method": "patch",
+      "used_by": "src/commands/projects.ts"
+    },
+    {
+      "path": "api.projects.:param.lines",
+      "method": "get",
+      "used_by": "src/commands/spectrum/lines.ts"
+    },
+    {
+      "path": "api.projects.:param.lines",
+      "method": "post",
+      "used_by": "src/commands/spectrum/lines.ts"
+    },
+    {
+      "path": "api.projects.:param.lines.:param",
+      "method": "delete",
+      "used_by": "src/commands/spectrum/lines.ts"
+    },
+    {
+      "path": "api.projects.:param.platforms",
+      "method": "get",
+      "used_by": "src/commands/spectrum/platforms.ts"
+    },
+    {
+      "path": "api.projects.:param.platforms.toggle",
+      "method": "post",
+      "used_by": "src/commands/spectrum/platforms.ts"
+    },
+    {
+      "path": "api.projects.:param.regenerate-secret",
+      "method": "post",
+      "used_by": "src/commands/projects.ts"
+    },
+    {
+      "path": "api.projects.:param.spectrum.avatar-upload-url",
+      "method": "get",
+      "used_by": "src/commands/spectrum/avatar.ts"
+    },
+    {
+      "path": "api.projects.:param.spectrum.profile",
+      "method": "get",
+      "used_by": "src/commands/spectrum/profile.ts"
+    },
+    {
+      "path": "api.projects.:param.spectrum.profile",
+      "method": "patch",
+      "used_by": "src/commands/spectrum/avatar.ts"
+    },
+    {
+      "path": "api.projects.:param.spectrum.profile",
+      "method": "patch",
+      "used_by": "src/commands/spectrum/profile.ts"
+    },
+    {
+      "path": "api.projects.:param.spectrum.users",
+      "method": "get",
+      "used_by": "src/commands/spectrum/users.ts"
+    },
+    {
+      "path": "api.projects.:param.spectrum.users",
+      "method": "post",
+      "used_by": "src/commands/spectrum/users.ts"
+    },
+    {
+      "path": "api.projects.:param.spectrum.users.:param",
+      "method": "delete",
+      "used_by": "src/commands/spectrum/users.ts"
+    },
+    {
+      "path": "api.projects.:param.subscription",
+      "method": "get",
+      "used_by": "src/commands/billing.ts"
+    },
+    {
+      "path": "api.projects.:param.subscription.manage",
+      "method": "post",
+      "used_by": "src/commands/billing.ts"
+    },
+    {
+      "path": "api.projects.check-availability",
+      "method": "get",
+      "used_by": "src/commands/projects.ts"
+    }
+  ]
+}

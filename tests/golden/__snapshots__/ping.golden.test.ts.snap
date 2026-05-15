@@ -1,0 +1,7 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`ping golden output success output matches snapshot 1`] = `
+"→ http://127.0.0.1:PORT
+✓ 200 (XXms): {"status":"ok"}
+"
+`;
