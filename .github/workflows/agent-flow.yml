@@ -252,7 +252,7 @@ jobs:
   # --- Pick the winning agent ---
   pick-winner:
     needs: [prepare, agent-codegen]
-    if: needs.prepare.outputs.strategy == 'agent'
+    if: always() && needs.prepare.outputs.strategy == 'agent' && needs.prepare.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -308,7 +308,7 @@ jobs:
   # --- Fallback: all agents failed ---
   all-failed:
     needs: [prepare, pick-winner]
-    if: failure() && needs.prepare.outputs.strategy == 'agent'
+    if: always() && needs.pick-winner.result == 'failure' && needs.prepare.outputs.strategy == 'agent'
     runs-on: ubuntu-latest
     steps:
       - name: Open triage issue
