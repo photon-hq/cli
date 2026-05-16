@@ -89,9 +89,12 @@ jobs:
           fi
 
       - name: Commit prep changes
+        env:
+          CROSS_REPO_PAT: ${{ secrets.CROSS_REPO_PAT }}
         run: |
           git config user.name "photon-bot"
           git config user.email "bot@photon.codes"
+          git remote set-url origin "https://x-access-token:${CROSS_REPO_PAT}@github.com/${{ github.repository }}.git"
           git add types/api.d.ts UPSTREAM_DIFF.md
           git diff --cached --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore: sync API types from dashboard@${{ steps.vars.outputs.tag }}"
@@ -227,9 +230,12 @@ jobs:
 
       - name: Push if green
         if: steps.check.outcome == 'success'
+        env:
+          CROSS_REPO_PAT: ${{ secrets.CROSS_REPO_PAT }}
         run: |
           git config user.name "photon-bot"
           git config user.email "bot@photon.codes"
+          git remote set-url origin "https://x-access-token:${CROSS_REPO_PAT}@github.com/${{ github.repository }}.git"
           git add -A
           git diff --cached --quiet || git commit -m "feat: update CLI for dashboard@${{ needs.prepare.outputs.tag }} [${{ matrix.agent }}]"
           git push origin HEAD
