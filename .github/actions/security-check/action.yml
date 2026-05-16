@@ -48,7 +48,7 @@ runs:
         echo "Checking for forbidden dependencies..."
 
         if [ -f ".agent-flow/forbidden-deps.json" ]; then
-          FORBIDDEN=$(cat .agent-flow/forbidden-deps.json | grep -o '"[^"]*"' | tr -d '"' | tail -n +3)
+          FORBIDDEN=$(jq -r '.forbidden[]' .agent-flow/forbidden-deps.json)
 
           for dep in $FORBIDDEN; do
             if grep -q "\"$dep\"" package.json 2>/dev/null; then

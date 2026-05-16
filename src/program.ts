@@ -25,7 +25,7 @@ export function buildProgram(): Command {
     .option('--debug', 'verbose output incl. HTTP request/response')
     .hook('preAction', (thisCommand) => {
       const opts = thisCommand.opts() as { debug?: boolean };
-      if (opts.debug) setDebug(true);
+      setDebug(!!opts.debug);
     });
 
   registerPingCommand(program);

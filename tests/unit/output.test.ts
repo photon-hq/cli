@@ -54,20 +54,24 @@ describe("color helpers (c)", () => {
   test("c.success prepends check mark", () => {
     const result = c.success("done");
     expect(result).toContain("done");
+    expect(result).toMatch(/✓/);
   });
 
   test("c.error prepends cross mark", () => {
     const result = c.error("failed");
     expect(result).toContain("failed");
+    expect(result).toMatch(/✗/);
   });
 
   test("c.info prepends diamond", () => {
     const result = c.info("note");
     expect(result).toContain("note");
+    expect(result).toMatch(/◆/);
   });
 
   test("c.warn prepends exclamation", () => {
     const result = c.warn("careful");
     expect(result).toContain("careful");
+    expect(result).toMatch(/!/);
   });
 });

@@ -35,9 +35,27 @@ console.warn(
   `⚠ ${snapshotFiles.length} snapshot file(s) changed:\n` +
     snapshotFiles.map((f) => `  - ${f}`).join("\n")
 );
-console.warn(
-  '\nPlease document each change under "## Snapshot changes" in the PR description.'
-);
-console.warn("(This is a warning for now — it will become a hard failure in the future.)");
 
+const prNumber = process.env.GITHUB_REF?.match(/refs\/pull\/(\d+)/)?.[1];
+if (!prNumber) {
+  console.warn("Could not determine PR number — skipping body check.");
+  process.exit(0);
+}
+
+const prBody =
+  await Bun.$`gh pr view ${prNumber} --json body -q .body`.text();
+
+const snapshotSection = prBody.match(/## Snapshot changes\s*([\s\S]*?)(?=\n##|\n*$)/);
+const sectionBody = snapshotSection?.[1]?.trim();
+if (!sectionBody || sectionBody === "(none)") {
+  console.error(
+    '\n✗ Snapshot files changed but the PR body has no "## Snapshot changes" section (or it says "(none)").'
+  );
+  console.error(
+    "  Please document each snapshot change in the PR description."
+  );
+  process.exit(1);
+}
+
+console.log("Snapshot changes documented in PR body — OK.");
 process.exit(0);

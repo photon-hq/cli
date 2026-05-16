@@ -14,6 +14,16 @@ export interface RunOptions {
   env?: Record<string, string>;
 }
 
+let runLock: Promise<void> = Promise.resolve();
+
+async function withRunLock<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = runLock;
+  let release!: () => void;
+  runLock = new Promise<void>((resolve) => { release = resolve; });
+  await prev;
+  try { return await fn(); } finally { release(); }
+}
+
 /**
  * Run a CLI command in-process, returning captured stdout/stderr and
  * an exit code. The process is never actually exited — `process.exit`
@@ -23,6 +33,7 @@ export async function runCommand(
   args: string[],
   opts: RunOptions = {},
 ): Promise<RunResult> {
+  return withRunLock(async () => {
   const stdoutChunks: string[] = [];
   const stderrChunks: string[] = [];
 
@@ -110,4 +121,5 @@ export async function runCommand(
     stderr: stderrChunks.join(""),
     exitCode,
   };
+  });
 }

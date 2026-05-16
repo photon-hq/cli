@@ -13,6 +13,9 @@ process.env.FORCE_TTY = "0";
 // Deterministic timestamps when PHOTON_TEST_NOW is set.
 if (process.env.PHOTON_TEST_NOW) {
   const frozen = Number(process.env.PHOTON_TEST_NOW);
+  if (!Number.isFinite(frozen)) {
+    throw new Error("PHOTON_TEST_NOW must be a finite number");
+  }
   Date.now = () => frozen;
 }
 

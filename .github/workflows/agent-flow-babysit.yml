@@ -82,7 +82,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          direct_prompt: |
+          prompt: |
             This is babysit attempt ${{ steps.attempts.outputs.attempt }}/3.
 
             The previous CI run failed. Here are the failure logs:
@@ -94,8 +94,7 @@ jobs:
             Read AGENTS.md for the rules. Fix the issues and make `bun run check` pass.
 
             Budget: 15 tool calls max. Focus on the specific failures shown above.
-          claude_args: "--model claude-sonnet-4-6 --max-turns 15"
-          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep"
+          claude_args: "--model claude-sonnet-4-6 --max-turns 15 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
 
       - name: Label attempt
         if: steps.attempts.outputs.exceeded == 'false'

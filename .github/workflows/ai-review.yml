@@ -30,12 +30,16 @@ jobs:
               echo "CI has failures — skipping AI review"
               exit 0
             fi
-            if ! echo "$STATUS" | grep -q "PENDING"; then
+            if ! echo "$STATUS" | grep -qE "PENDING|IN_PROGRESS"; then
               echo "CI complete"
               break
             fi
             sleep 10
           done
+          if echo "$STATUS" | grep -qE "PENDING|IN_PROGRESS"; then
+            echo "CI still pending after timeout — skipping AI review"
+            exit 0
+          fi
 
       - name: Run Codex review
         uses: openai/codex-action@v1
@@ -63,9 +67,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          LAST_COMMENT=$(gh pr view ${{ github.event.pull_request.number }} --comments --json comments -q '.comments[-1].body' 2>/dev/null || echo "")
-          if echo "$LAST_COMMENT" | grep -q "ai-review:passed"; then
+          BOT_COMMENT=$(gh pr view ${{ github.event.pull_request.number }} --comments --json comments \
+            -q '[.comments[] | select(.author.type == "Bot" or .author.login == "github-actions[bot]")] | last | .body' 2>/dev/null || echo "")
+          if echo "$BOT_COMMENT" | grep -q "ai-review:passed"; then
             gh pr edit ${{ github.event.pull_request.number }} --add-label "ai-review:passed"
-          elif echo "$LAST_COMMENT" | grep -q "ai-review:changes-requested"; then
+          elif echo "$BOT_COMMENT" | grep -q "ai-review:changes-requested"; then
             gh pr edit ${{ github.event.pull_request.number }} --add-label "ai-review:changes-requested"
           fi
