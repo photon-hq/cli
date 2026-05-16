@@ -149,7 +149,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        agent: [claude, codex, cursor]
+        agent: [claude, cursor]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
@@ -180,26 +180,23 @@ jobs:
             The upstream Photon Dashboard released ${{ needs.prepare.outputs.tag }}.
             types/api.d.ts has already been synced.
 
-            Your task:
-            1. Run `bun run typecheck` — if it fails, fix type errors in src/commands/ and src/lib/types.ts
-            2. Update or add commands for any new/changed API endpoints described in UPSTREAM_DIFF.md
-            3. Update tests in tests/ to cover changes
-            4. Run `bun run check` and fix any failures
-            5. Commit your changes
+            ## Priority 1 — MUST DO (typecheck must pass)
+            1. Run `bun run typecheck`. If it fails, fix ALL type errors.
+               - Focus on src/commands/ files that reference deleted/renamed routes
+               - Update src/lib/types.ts if DTOs need new fields
+            2. Run `bun run check` (typecheck + test + build). Fix failures.
+            3. Commit when green.
 
-            Budget: 25 tool calls max. Stop when `bun run check` passes.
-          claude_args: "--model claude-sonnet-4-6 --max-turns 25 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
+            ## Priority 2 — NICE TO HAVE (only if budget remains)
+            - Add new commands for newly added routes (see UPSTREAM_DIFF.md)
+            - Add tests for changed commands
 
-      # --- Codex ---
-      - name: Run Codex
-        if: matrix.agent == 'codex'
-        uses: openai/codex-action@v1
-        with:
-          prompt-file: ".github/prompts/agent-flow.md"
-          model: "codex"
-          sandbox: "workspace-write"
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+            ## Strategy
+            - Start with `bun run typecheck` to see what's broken
+            - Fix the BREAKING changes first (removed/renamed routes)
+            - Do NOT try to implement all new routes — focus on making existing code compile
+            - Iterate: edit → `bun run check` → fix → repeat until green
+          claude_args: "--model claude-sonnet-4-6 --max-turns 50 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
 
       # --- Cursor SDK ---
       - name: Run Cursor SDK
@@ -248,7 +245,7 @@ jobs:
       - name: Select winner
         id: pick
         run: |
-          for agent in claude codex cursor; do
+          for agent in claude cursor; do
             if [ "$(cat outcomes/$agent.txt 2>/dev/null)" = "success" ]; then
               echo "winner=$agent" >> "$GITHUB_OUTPUT"
               echo "Found winner: $agent"
@@ -300,20 +297,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue create \
+            --repo "${{ github.repository }}" \
             --title "Agent flow failed: dashboard@${{ needs.prepare.outputs.tag }}" \
-            --body "$(cat <<EOF
-          All 3 AI agents failed to produce a green \`bun run check\` for
-          dashboard release **${{ needs.prepare.outputs.tag }}**.
+            --body "All agents failed to produce a green \`bun run check\` for dashboard release **${{ needs.prepare.outputs.tag }}**.
 
           **Branch:** \`${{ needs.prepare.outputs.branch }}\`
-          **Dashboard SHA:** ${{ needs.prepare.outputs.sha }}
+          **Dashboard SHA:** \`${{ needs.prepare.outputs.sha }}\`
+          **Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
           ### Next steps
           1. Check the workflow run logs for each agent
           2. Manually create a PR from the prep branch
-          3. Consider running agents locally with more context
-
-          /cc @photon-hq/cli-team
-          EOF
-          )" \
+          3. Consider running agents locally with more context" \
             --label "agent-flow" --label "needs-human"
