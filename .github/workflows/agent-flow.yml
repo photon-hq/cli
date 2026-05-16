@@ -65,7 +65,7 @@ jobs:
       - name: Create branch
         id: branch
         run: |
-          BRANCH="agent-flow/${{ steps.vars.outputs.tag }}"
+          BRANCH="agent-flow/${{ steps.vars.outputs.tag }}/base"
           echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
           git checkout -b "$BRANCH"
 
@@ -164,7 +164,7 @@ jobs:
 
       - name: Create agent worktree
         run: |
-          AGENT_BRANCH="${{ needs.prepare.outputs.branch }}-${{ matrix.agent }}"
+          AGENT_BRANCH="agent-flow/${{ needs.prepare.outputs.tag }}/${{ matrix.agent }}"
           git checkout -b "$AGENT_BRANCH"
 
       # --- Claude Code ---
@@ -261,7 +261,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BRANCH="${{ needs.prepare.outputs.branch }}-${{ steps.pick.outputs.winner }}"
+          BRANCH="agent-flow/${{ needs.prepare.outputs.tag }}/${{ steps.pick.outputs.winner }}"
           gh pr create \
             --head "$BRANCH" --base main \
             --title "feat: sync CLI with dashboard@${{ needs.prepare.outputs.tag }}" \
