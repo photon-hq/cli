@@ -180,15 +180,23 @@ jobs:
             The upstream Photon Dashboard released ${{ needs.prepare.outputs.tag }}.
             types/api.d.ts has already been synced.
 
-            Your task:
-            1. Run `bun run typecheck` — if it fails, fix type errors in src/commands/ and src/lib/types.ts
-            2. Update or add commands for any new/changed API endpoints described in UPSTREAM_DIFF.md
-            3. Update tests in tests/ to cover changes
-            4. Run `bun run check` and fix any failures
-            5. Commit your changes
+            ## Priority 1 — MUST DO (typecheck must pass)
+            1. Run `bun run typecheck`. If it fails, fix ALL type errors.
+               Focus on src/commands/ files that reference deleted/renamed routes.
+            2. Update src/lib/types.ts if DTOs need new fields.
+            3. Run `bun run check` (typecheck + test + build). Fix failures.
+            4. Commit when green.
 
-            Budget: 25 tool calls max. Stop when `bun run check` passes.
-          claude_args: "--model claude-sonnet-4-6 --max-turns 25 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
+            ## Priority 2 — NICE TO HAVE (only if budget remains)
+            - Add new commands for newly added routes (see UPSTREAM_DIFF.md)
+            - Add tests for changed commands
+
+            ## Strategy
+            - Start with `bun run typecheck` to see what's broken
+            - Fix BREAKING changes first (removed/renamed routes)
+            - Do NOT try to implement all new routes — focus on making existing code compile
+            - Iterate: edit → `bun run check` → fix → repeat until green
+          claude_args: "--model claude-opus-4-7 --max-turns 50 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
 
       # --- Codex ---
       - name: Run Codex
