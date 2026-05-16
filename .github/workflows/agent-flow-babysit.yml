@@ -58,7 +58,7 @@ jobs:
 
       - name: Checkout PR
         if: steps.attempts.outputs.exceeded == 'false'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_branch }}
           fetch-depth: 0
