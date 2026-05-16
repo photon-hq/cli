@@ -42,7 +42,10 @@
     "build": "bun build ./src/index.ts --outfile dist/photon.js --target node --minify && chmod +x dist/photon.js",
     "compile": "bun build ./src/index.ts --compile --outfile dist/photon",
     "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "check": "bun run typecheck && bun test && bun run build",
     "sync:api": "bun run scripts/sync-api-types.ts",
+    "manifest": "bun run scripts/generate-route-manifest.ts",
     "prepublishOnly": "bun run typecheck && bun run build"
   },
   "devDependencies": {

@@ -1,0 +1,34 @@
+[
+  {
+    "id": "plan_free",
+    "name": "Free",
+    "description": "Get started at no cost",
+    "prices": [
+      {
+        "id": "price_free_monthly",
+        "unit_amount": 0,
+        "currency": "usd",
+        "recurring": { "interval": "month" }
+      }
+    ]
+  },
+  {
+    "id": "plan_pro",
+    "name": "Pro",
+    "description": "For growing teams",
+    "prices": [
+      {
+        "id": "price_pro_monthly",
+        "unit_amount": 2900,
+        "currency": "usd",
+        "recurring": { "interval": "month" }
+      },
+      {
+        "id": "price_pro_yearly",
+        "unit_amount": 29000,
+        "currency": "usd",
+        "recurring": { "interval": "year" }
+      }
+    ]
+  }
+]

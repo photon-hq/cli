@@ -1,0 +1,16 @@
+{
+  "description": "Packages that must never be added as dependencies",
+  "forbidden": [
+    "axios", "node-fetch", "got", "superagent",
+    "chalk", "kleur", "ansi-colors",
+    "zod", "yup", "joi",
+    "jest", "vitest", "mocha", "ava", "tap",
+    "ts-node", "tsx", "ts-jest",
+    "ws", "socket.io", "socket.io-client",
+    "express", "koa", "fastify", "hono",
+    "dotenv", "dotenv-cli",
+    "ioredis", "redis", "pg", "postgres", "mysql2",
+    "better-sqlite3", "knex", "prisma", "drizzle-orm",
+    "lodash", "underscore", "ramda"
+  ]
+}

@@ -1,0 +1,76 @@
+name: "Agent: Review"
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # Only review agent-flow PRs (human PRs get CodeRabbit only)
+    if: contains(github.event.pull_request.labels.*.name, 'agent-flow')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wait for CI to complete
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Waiting for CI checks to complete..."
+          for i in $(seq 1 60); do
+            STATUS=$(gh pr checks ${{ github.event.pull_request.number }} --json state -q '.[].state' 2>/dev/null | sort -u)
+            if echo "$STATUS" | grep -q "FAILURE"; then
+              echo "CI has failures — skipping AI review"
+              exit 0
+            fi
+            if ! echo "$STATUS" | grep -qE "PENDING|IN_PROGRESS"; then
+              echo "CI complete"
+              break
+            fi
+            sleep 10
+          done
+          if echo "$STATUS" | grep -qE "PENDING|IN_PROGRESS"; then
+            echo "CI still pending after timeout — skipping AI review"
+            exit 0
+          fi
+
+      - name: Run Codex review
+        uses: openai/codex-action@v1
+        with:
+          prompt: |
+            Review this PR as a code reviewer. Focus on:
+            1. API drift: do Eden treaty calls in src/commands/ match types/api.d.ts?
+            2. Missing test coverage for changed commands
+            3. DTO casting safety in src/lib/types.ts
+            4. Forbidden dependencies (check .agent-flow/forbidden-deps.json)
+            5. Snapshot changes without justification in PR body
+            6. Any raw fetch() calls instead of getApi() + Eden
+            7. Error handling: 401 should throw SessionExpiredError
+
+            Post your review as a PR comment. Use this format:
+            - For issues: "⚠️ [file:line] description"
+            - For suggestions: "💡 [file:line] description"
+            - End with a summary: "ai-review:passed" or "ai-review:changes-requested"
+          model: "codex"
+          sandbox: "read-only"
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Label based on review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BOT_COMMENT=$(gh pr view ${{ github.event.pull_request.number }} --comments --json comments \
+            -q '[.comments[] | select(.author.type == "Bot" or .author.login == "github-actions[bot]")] | last | .body' 2>/dev/null || echo "")
+          if echo "$BOT_COMMENT" | grep -q "ai-review:passed"; then
+            gh pr edit ${{ github.event.pull_request.number }} --add-label "ai-review:passed"
+          elif echo "$BOT_COMMENT" | grep -q "ai-review:changes-requested"; then
+            gh pr edit ${{ github.event.pull_request.number }} --add-label "ai-review:changes-requested"
+          fi
