@@ -51,6 +51,7 @@ jobs:
       - run: bun run scripts/${{ matrix.check }}.ts
         env:
           GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ github.token }}
 
   smoke:
     needs: check
