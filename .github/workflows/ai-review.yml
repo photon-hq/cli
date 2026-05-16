@@ -1,4 +1,4 @@
-name: AI Review
+name: "Agent: Review"
 
 on:
   pull_request:

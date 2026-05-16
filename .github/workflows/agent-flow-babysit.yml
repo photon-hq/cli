@@ -1,8 +1,8 @@
-name: Agent Flow Babysit
+name: "Agent: Babysit"
 
 on:
   workflow_run:
-    workflows: ["Check"]
+    workflows: ["Check", "Agent: Security"]
     types: [completed]
 
 permissions:

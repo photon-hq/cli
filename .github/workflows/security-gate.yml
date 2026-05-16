@@ -1,4 +1,4 @@
-name: Security Gate
+name: "Agent: Security"
 
 on:
   pull_request:
