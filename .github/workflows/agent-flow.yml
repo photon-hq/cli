@@ -196,7 +196,7 @@ jobs:
             - Fix the BREAKING changes first (removed/renamed routes)
             - Do NOT try to implement all new routes — focus on making existing code compile
             - Iterate: edit → `bun run check` → fix → repeat until green
-          claude_args: "--model claude-sonnet-4-6 --max-turns 50 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
+          claude_args: "--model claude-opus-4-7 --max-turns 50 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
 
       # --- Codex ---
       - name: Run Codex

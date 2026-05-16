@@ -94,7 +94,7 @@ jobs:
             Read AGENTS.md for the rules. Fix the issues and make `bun run check` pass.
 
             Budget: 15 tool calls max. Focus on the specific failures shown above.
-          claude_args: "--model claude-sonnet-4-6 --max-turns 15 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
+          claude_args: "--model claude-opus-4-7 --max-turns 25 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
 
       - name: Label attempt
         if: steps.attempts.outputs.exceeded == 'false'
