@@ -1,4 +1,4 @@
-name: "Agent: Sync"
+name: Agent Flow
 
 on:
   repository_dispatch:
@@ -53,7 +53,7 @@ jobs:
           GH_TOKEN: ${{ secrets.CROSS_REPO_PAT }}
         run: |
           git clone --depth 1 --branch "${{ steps.vars.outputs.tag }}" \
-            "https://x-access-token:${GH_TOKEN}@github.com/photon-hq/dashboard.git" \
+            "https://x-access-token:${GH_TOKEN}@github.com/Photon-Codes/dashboard.git" \
             ../dashboard
 
       - name: Build upstream API types
@@ -164,7 +164,7 @@ jobs:
 
       - name: Create agent worktree
         run: |
-          AGENT_BRANCH="${{ needs.prepare.outputs.branch }}/${{ matrix.agent }}"
+          AGENT_BRANCH="${{ needs.prepare.outputs.branch }}-${{ matrix.agent }}"
           git checkout -b "$AGENT_BRANCH"
 
       # --- Claude Code ---
@@ -261,7 +261,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BRANCH="${{ needs.prepare.outputs.branch }}/${{ steps.pick.outputs.winner }}"
+          BRANCH="${{ needs.prepare.outputs.branch }}-${{ steps.pick.outputs.winner }}"
           gh pr create \
             --head "$BRANCH" --base main \
             --title "feat: sync CLI with dashboard@${{ needs.prepare.outputs.tag }}" \
