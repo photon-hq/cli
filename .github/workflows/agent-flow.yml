@@ -149,7 +149,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        agent: [claude, cursor]
+        agent: [claude, codex, cursor]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
@@ -198,6 +198,18 @@ jobs:
             - Iterate: edit → `bun run check` → fix → repeat until green
           claude_args: "--model claude-sonnet-4-6 --max-turns 50 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
 
+      # --- Codex ---
+      - name: Run Codex
+        if: matrix.agent == 'codex'
+        continue-on-error: true
+        uses: openai/codex-action@v1
+        with:
+          prompt-file: ".github/prompts/agent-flow.md"
+          model: "codex"
+          sandbox: "workspace-write"
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
       # --- Cursor SDK ---
       - name: Run Cursor SDK
         if: matrix.agent == 'cursor'
@@ -245,7 +257,7 @@ jobs:
       - name: Select winner
         id: pick
         run: |
-          for agent in claude cursor; do
+          for agent in claude codex cursor; do
             if [ "$(cat outcomes/$agent.txt 2>/dev/null)" = "success" ]; then
               echo "winner=$agent" >> "$GITHUB_OUTPUT"
               echo "Found winner: $agent"
