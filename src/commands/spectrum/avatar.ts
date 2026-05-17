@@ -47,7 +47,7 @@ export function registerSpectrumAvatar(spectrum: Command): void {
       // 1) Ask the server for a presigned URL.
       const urlResp = await api.api
         .projects({ id: projectId })
-        .spectrum["avatar-upload-url"].get();
+        .spectrum.avatar.upload.post({ contentType: mime, size });
       if (urlResp.status === 401) throw new SessionExpiredError(resolved.name);
       if (urlResp.error)
         die(`Failed to get upload URL: ${formatApiError(urlResp.error)}`);
@@ -76,7 +76,17 @@ export function registerSpectrumAvatar(spectrum: Command): void {
         die(`Upload failed: ${putResp.status} ${putResp.statusText}`);
       }
 
-      // 3) Optionally update the Spectrum profile to point at the new URL.
+      // 3) Commit the upload so the server finalizes the avatar URL.
+      const commit = await api.api
+        .projects({ id: projectId })
+        .spectrum.avatar.commit.post({ avatarUrl: result.avatarUrl });
+      if (commit.status === 401) throw new SessionExpiredError(resolved.name);
+      if (commit.error)
+        die(`Uploaded, but commit failed: ${formatApiError(commit.error)}`, {
+          context: `Avatar URL: ${result.avatarUrl}`,
+        });
+
+      // 4) Optionally update the Spectrum profile to point at the new URL.
       if (opts.updateProfile !== false) {
         const patch = await api.api
           .projects({ id: projectId })
