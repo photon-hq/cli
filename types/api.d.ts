@@ -17,7 +17,17 @@ declare const publicApp: Elysia<"", {
 } & {
     typebox: {};
     error: {};
+} & {
+    typebox: {};
+    error: {};
 }, {
+    schema: {};
+    standaloneSchema: {};
+    macro: {};
+    macroFn: {};
+    parser: {};
+    response: {};
+} & {
     schema: {};
     standaloneSchema: {};
     macro: {};
@@ -232,8 +242,60 @@ declare const publicApp: Elysia<"", {
         projects: {
             ":id": {
                 spectrum: {
-                    "avatar-upload-url": {
-                        get: {
+                    avatar: {
+                        upload: {
+                            post: {
+                                body: any;
+                                params: {
+                                    id: string;
+                                } & {};
+                                query: any;
+                                headers: any;
+                                response: {
+                                    [x: string]: any;
+                                    [x: number]: any;
+                                    [x: symbol]: any;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                spectrum: {
+                    avatar: {
+                        commit: {
+                            post: {
+                                body: any;
+                                params: {
+                                    id: string;
+                                } & {};
+                                query: any;
+                                headers: any;
+                                response: {
+                                    [x: string]: any;
+                                    [x: number]: any;
+                                    [x: symbol]: any;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                spectrum: {
+                    avatar: {
+                        delete: {
                             body: any;
                             params: any;
                             query: any;
@@ -397,6 +459,108 @@ declare const publicApp: Elysia<"", {
     api: {
         projects: {
             ":id": {
+                whatsapp: {
+                    templates: {
+                        get: {
+                            body: unknown;
+                            params: {
+                                id: string;
+                            } & {};
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                whatsapp: {
+                    templates: {
+                        post: {
+                            body: any;
+                            params: {
+                                id: string;
+                            } & {};
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                whatsapp: {
+                    templates: {
+                        ":templateId": {
+                            patch: {
+                                body: any;
+                                params: {
+                                    id: string;
+                                    templateId: string;
+                                } & {};
+                                query: any;
+                                headers: any;
+                                response: {
+                                    [x: string]: any;
+                                    [x: number]: any;
+                                    [x: symbol]: any;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                whatsapp: {
+                    templates: {
+                        ":templateId": {
+                            delete: {
+                                body: unknown;
+                                params: {
+                                    id: string;
+                                    templateId: string;
+                                } & {};
+                                query: any;
+                                headers: any;
+                                response: {
+                                    [x: string]: any;
+                                    [x: number]: any;
+                                    [x: symbol]: any;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
                 platforms: {
                     get: {
                         body: any;
@@ -485,6 +649,334 @@ declare const publicApp: Elysia<"", {
             ":id": {
                 lines: {
                     ":lineId": {
+                        delete: {
+                            body: any;
+                            params: any;
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                voice: {
+                    settings: {
+                        get: {
+                            body: any;
+                            params: any;
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                voice: {
+                    "imessage-enabled": {
+                        patch: {
+                            body: any;
+                            params: {
+                                id: string;
+                            } & {};
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                voice: {
+                    "sip-inbound": {
+                        patch: {
+                            body: any;
+                            params: {
+                                id: string;
+                            } & {};
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                voice: {
+                    "sip-inbound": {
+                        delete: {
+                            body: any;
+                            params: any;
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                slack: {
+                    get: {
+                        body: any;
+                        params: any;
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                slack: {
+                    put: {
+                        body: any;
+                        params: {
+                            id: string;
+                        } & {};
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                slack: {
+                    delete: {
+                        body: any;
+                        params: any;
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                slack: {
+                    installations: {
+                        get: {
+                            body: any;
+                            params: any;
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                slack: {
+                    installations: {
+                        ":teamId": {
+                            delete: {
+                                body: any;
+                                params: any;
+                                query: any;
+                                headers: any;
+                                response: {
+                                    [x: string]: any;
+                                    [x: number]: any;
+                                    [x: symbol]: any;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                webhooks: {
+                    get: {
+                        body: any;
+                        params: any;
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                webhooks: {
+                    post: {
+                        body: any;
+                        params: {
+                            id: string;
+                        } & {};
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                webhooks: {
+                    ":webhookId": {
+                        delete: {
+                            body: any;
+                            params: any;
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                members: {
+                    get: {
+                        body: any;
+                        params: any;
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                members: {
+                    post: {
+                        body: any;
+                        params: {
+                            id: string;
+                        } & {};
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                members: {
+                    ":memberUserId": {
                         delete: {
                             body: any;
                             params: any;
@@ -613,6 +1105,24 @@ declare const publicApp: Elysia<"", {
                     [x: string]: any;
                     [x: number]: any;
                     [x: symbol]: any;
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        profile: {
+            "spectrum-updates": {
+                patch: {
+                    body: any;
+                    params: {};
+                    query: any;
+                    headers: any;
+                    response: {
+                        [x: string]: any;
+                        [x: number]: any;
+                        [x: symbol]: any;
+                    };
                 };
             };
         };
