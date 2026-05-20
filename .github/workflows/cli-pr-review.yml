@@ -1,0 +1,262 @@
+name: CLI Agent PR Review
+# Reviews agent-generated PRs and addresses bot feedback.
+# Replaces the previously-attempted Cursor "CLI Agent PR Review & Fix"
+# automation, which had unreliable trigger filtering for bot authors.
+#
+# Scenarios:
+#   A. PR opened/ready_for_review by cursor[bot]  -> verify rules, promote draft
+#   B. coderabbitai/copilot comment or review     -> address bot feedback
+#   C. PR pushed (synchronize) by cursor[bot]     -> self re-review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize, reopened]
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Decide once whether this event is worth a Claude run.
+    if: |
+      (
+        github.event_name == 'pull_request' &&
+        (github.event.pull_request.user.login == 'cursor[bot]' || github.actor == 'cursor[bot]')
+      ) ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request != null &&
+        (github.event.comment.user.login == 'coderabbitai[bot]' || github.event.comment.user.login == 'copilot-pull-request-reviewer[bot]') &&
+        !contains(github.event.comment.body, 'auto-generated reply by CodeRabbit')
+      ) ||
+      (
+        github.event_name == 'pull_request_review' &&
+        github.event.pull_request.user.login == 'cursor[bot]' &&
+        (github.event.review.user.login == 'coderabbitai[bot]' || github.event.review.user.login == 'copilot-pull-request-reviewer[bot]')
+      )
+    steps:
+      - name: Identify scenario
+        id: scenario
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          case "$EVENT-$ACTION" in
+            pull_request-opened|pull_request-reopened)
+              echo "name=A" >> "$GITHUB_OUTPUT"
+              echo "desc=Initial review (Scenario A — PR opened by cursor[bot])" >> "$GITHUB_OUTPUT"
+              echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+              ;;
+            pull_request-ready_for_review)
+              echo "name=A" >> "$GITHUB_OUTPUT"
+              echo "desc=Initial review (Scenario A — PR readied for review)" >> "$GITHUB_OUTPUT"
+              echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+              ;;
+            pull_request-synchronize)
+              echo "name=C" >> "$GITHUB_OUTPUT"
+              echo "desc=Re-review (Scenario C — cursor[bot] pushed new commits)" >> "$GITHUB_OUTPUT"
+              echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+              ;;
+            issue_comment-created|pull_request_review-submitted)
+              echo "name=B" >> "$GITHUB_OUTPUT"
+              echo "desc=Bot feedback (Scenario B — coderabbitai/copilot review)" >> "$GITHUB_OUTPUT"
+              if [ "$EVENT" = "issue_comment" ]; then
+                echo "pr_number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+              else
+                echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+            *)
+              echo "name=skip" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Checkout PR branch (pull_request / pull_request_review events)
+        if: steps.scenario.outputs.name != 'skip' && github.event_name != 'issue_comment'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Checkout default branch then PR branch (issue_comment)
+        if: steps.scenario.outputs.name != 'skip' && github.event_name == 'issue_comment'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Switch to PR branch (issue_comment)
+        if: steps.scenario.outputs.name != 'skip' && github.event_name == 'issue_comment'
+        env:
+          PR_NUMBER: ${{ steps.scenario.outputs.pr_number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          HEAD_REF=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq .headRefName)
+          git fetch origin "$HEAD_REF"
+          git checkout "$HEAD_REF"
+
+      - name: Setup Bun
+        if: steps.scenario.outputs.name != 'skip'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.13"
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.scenario.outputs.name != 'skip'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ steps.scenario.outputs.pr_number }}
+            SCENARIO: ${{ steps.scenario.outputs.name }} — ${{ steps.scenario.outputs.desc }}
+            EVENT: ${{ github.event_name }} ${{ github.event.action }}
+            ACTOR: ${{ github.actor }}
+
+            You are the steward of agent-generated PRs in the Photon CLI (@photon-ai/cli).
+            The PR branch is already checked out in the current working directory.
+
+            ## Common context (always)
+
+            1. Read `AGENTS.md` for project rules.
+            2. Read `UPSTREAM_DIFF.md` in the PR branch for what changed upstream.
+            3. Read the PR description and diff via `gh pr view ${{ steps.scenario.outputs.pr_number }} --repo ${{ github.repository }}` and `gh pr diff ${{ steps.scenario.outputs.pr_number }} --repo ${{ github.repository }}`.
+
+            This is NOT a general code review. Focus on agent-flow concerns.
+
+            ---
+
+            ## Scenario A — PR opened by cursor[bot] (DRAFT review)
+
+            The PR is in DRAFT state. Verify against AGENTS.md hard rules:
+
+            - Bun only (no Node/npm/pnpm/yarn introduced)
+            - `types/api.d.ts` only changed via `bun run sync:api` (additive Elysia intersections, no hand edits)
+            - No forbidden deps in `package.json`: axios, chalk, zod, jest, vitest, ts-node, ws, express, dotenv, ioredis, pg, better-sqlite3
+            - Every command uses `getApi()` + Eden treaty + `{ data, error, status }` destructure
+            - 401 throws `SessionExpiredError`, no raw `fetch()` to Photon API
+            - `.github/workflows/` untouched
+            - Snapshot changes explained in PR body under "## Snapshot changes"
+            - One PR = one upstream version bump (no unrelated refactors)
+
+            Verify upstream coverage:
+            - Every removed/renamed route migrated or removed from `src/commands/`
+            - DTOs in `src/lib/types.ts` reflect changed shapes
+            - New routes may be deferred — confirm PR body acknowledges them
+
+            ### If Approve (no blockers):
+            ```bash
+            gh pr ready ${{ steps.scenario.outputs.pr_number }} --repo ${{ github.repository }}
+            gh pr edit ${{ steps.scenario.outputs.pr_number }} --repo ${{ github.repository }} --add-label agent-review:approved --add-label agent-flow
+            ```
+            Then post a single summary comment.
+
+            ### If Concerns / Block:
+            - Leave PR in draft
+            - Post comment listing issues
+            - Add label `agent-review:changes-requested`
+
+            ---
+
+            ## Scenario B — Comment / review by coderabbitai or copilot-pull-request-reviewer
+
+            A bot posted feedback. Triage their findings.
+
+            ### Read bot feedback
+            ```bash
+            gh pr view ${{ steps.scenario.outputs.pr_number }} --repo ${{ github.repository }} --json reviews,comments
+            gh api repos/${{ github.repository }}/pulls/${{ steps.scenario.outputs.pr_number }}/comments
+            ```
+
+            ### Triage
+            - **Real issues**: correctness, security, divergence bugs, type errors, missing tests
+            - **Noise**: style nits, "consider adding docstring", speculative hypotheticals, suggestions for out-of-scope features
+
+            ### Fix real issues
+            1. PR branch is already checked out.
+            2. Make the minimal fix
+            3. Run `bun install --frozen-lockfile && bun run check` until green
+            4. Commit: `fix(area): address review feedback — <short description>` and push
+
+            ### Reply to inline comments
+            For each `<COMMENT_ID>` you addressed:
+            ```bash
+            gh api repos/${{ github.repository }}/pulls/${{ steps.scenario.outputs.pr_number }}/comments/<COMMENT_ID>/replies \
+              -f body='Fixed in <SHA>: <one-sentence explanation>.'
+            ```
+            For declined:
+            ```bash
+            gh api repos/${{ github.repository }}/pulls/${{ steps.scenario.outputs.pr_number }}/comments/<COMMENT_ID>/replies \
+              -f body='Not applying: <reason>. Leaving as-is.'
+            ```
+
+            ### Resolve threads via GraphQL
+            ```bash
+            gh api graphql -f query='query { repository(owner: "photon-hq", name: "cli") { pullRequest(number: ${{ steps.scenario.outputs.pr_number }}) { reviewThreads(first: 30) { nodes { id isResolved comments(first: 1) { nodes { author { login } } } } } } }'
+            ```
+            Then batch-resolve threads you addressed:
+            ```bash
+            gh api graphql -f query='mutation { t1: resolveReviewThread(input: {threadId: "<ID>"}) { thread { id isResolved } } }'
+            ```
+
+            ### Add label and summary
+            ```bash
+            gh pr edit ${{ steps.scenario.outputs.pr_number }} --repo ${{ github.repository }} --add-label bot-feedback:resolved
+            ```
+            Post a single summary comment listing what you fixed vs declined.
+
+            ---
+
+            ## Scenario C — PR pushed by cursor[bot] (self re-review)
+
+            cursor[bot] pushed a new commit. Re-run Scenario A checks against new HEAD.
+            If still good, the PR may already be Ready — just post an updated review comment.
+            If concerns appear, post comment and add label `agent-review:changes-requested`.
+
+            ---
+
+            ## Comment template (use for every scenario)
+
+            ```
+            ## Agent PR Review
+
+            **Scenario**: ${{ steps.scenario.outputs.name }} — see above
+            **Verdict**: ✅ Approve / ⚠️ Concerns / ❌ Block
+
+            ### What's right
+            - [bullets]
+
+            ### Concerns
+            - [if any] [file:line] — description and suggested fix
+
+            ### Fixes applied (Scenario B only)
+            - [SHA] [file:line] — what changed and why
+
+            ### Declined (Scenario B only)
+            - [comment-id] — reason
+
+            ### Deferred (acknowledged in PR body)
+            - [list]
+
+            ### Final note
+            [one-sentence summary]
+            ```
+
+            Post ONE summary comment per run via `gh pr comment`.
+            Use `gh pr comment ${{ steps.scenario.outputs.pr_number }} --repo ${{ github.repository }} --body-file /tmp/comment.md` for clean formatting.
+
+          claude_args: |
+            --allowedTools "Read,Write,Edit,Bash(gh:*),Bash(git:*),Bash(bun:*),Bash(cat:*),Bash(ls:*),Bash(grep:*),Bash(rg:*),Bash(jq:*)"
