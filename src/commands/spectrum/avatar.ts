@@ -44,28 +44,33 @@ export function registerSpectrumAvatar(spectrum: Command): void {
         requireAuth: true,
       });
 
-      // 1) Ask the server for a presigned URL.
+      // 1) Ask the server for a presigned upload URL. Upstream v0.2.9
+      // replaced the single GET /spectrum/avatar-upload-url endpoint with
+      // a two-step POST /spectrum/avatar/upload (presign) +
+      // POST /spectrum/avatar/commit (finalize) flow. The presign step
+      // returns the storage `key` we must echo back to /commit so the
+      // server can verify the object exists in S3 and persist the
+      // canonical avatar URL.
       const urlResp = await api.api
         .projects({ id: projectId })
-        .spectrum["avatar-upload-url"].get();
+        .spectrum.avatar.upload.post({ contentType: mime });
       if (urlResp.status === 401) throw new SessionExpiredError(resolved.name);
       if (urlResp.error)
         die(`Failed to get upload URL: ${formatApiError(urlResp.error)}`);
-      const result = urlResp.data as {
-        success?: true;
+      const presign = urlResp.data as {
         uploadUrl?: string;
-        avatarUrl?: string;
+        key?: string;
         error?: string;
       };
-      if (result.error) die(result.error);
-      if (!result.uploadUrl || !result.avatarUrl) {
-        die("Server did not return upload + avatar URLs.");
+      if (presign.error) die(presign.error);
+      if (!presign.uploadUrl || !presign.key) {
+        die("Server did not return upload URL + key.");
       }
 
       // 2) PUT the file body to the presigned URL. Spectrum returns a
       // simple PUT-style URL (per services/spectrum.ts), not multipart.
       console.log(c.dim(`Uploading ${file} (${(size / 1024).toFixed(1)} KB)…`));
-      const putResp = await fetch(result.uploadUrl, {
+      const putResp = await fetch(presign.uploadUrl, {
         method: "PUT",
         body,
         headers: {
@@ -76,11 +81,30 @@ export function registerSpectrumAvatar(spectrum: Command): void {
         die(`Upload failed: ${putResp.status} ${putResp.statusText}`);
       }
 
-      // 3) Optionally update the Spectrum profile to point at the new URL.
+      // 3) Commit the upload so Spectrum finalizes the avatar artifact
+      // and returns the canonical avatarUrl we can persist on the profile.
+      const commitResp = await api.api
+        .projects({ id: projectId })
+        .spectrum.avatar.commit.post({ key: presign.key });
+      if (commitResp.status === 401) throw new SessionExpiredError(resolved.name);
+      if (commitResp.error)
+        die(`Failed to commit avatar: ${formatApiError(commitResp.error)}`);
+      const commit = commitResp.data as {
+        success?: true;
+        avatarUrl?: string;
+        error?: string;
+      };
+      if (commit.error) die(commit.error);
+      if (!commit.avatarUrl) {
+        die("Server did not return committed avatar URL.");
+      }
+      const avatarUrl = commit.avatarUrl;
+
+      // 4) Optionally update the Spectrum profile to point at the new URL.
       if (opts.updateProfile !== false) {
         const patch = await api.api
           .projects({ id: projectId })
-          .spectrum.profile.patch({ avatarUrl: result.avatarUrl });
+          .spectrum.profile.patch({ avatarUrl });
         if (patch.status === 401) throw new SessionExpiredError(resolved.name);
         if (patch.error) {
           // Upload succeeded; surface the patch failure but don't undo.
@@ -91,17 +115,17 @@ export function registerSpectrumAvatar(spectrum: Command): void {
             projectId,
             apiHost: resolved.url,
             token: opts.token,
-            avatarUrl: result.avatarUrl,
+            avatarUrl,
           });
           die(`Uploaded, but failed to update profile: ${formatApiError(patch.error)}`, {
             hint: `Update manually: ${recovery}`,
-            context: `Avatar URL: ${result.avatarUrl}`,
+            context: `Avatar URL: ${avatarUrl}`,
           });
         }
       }
 
       console.log(c.success(`Uploaded avatar from ${file}`));
-      console.log(c.dim(`  URL: ${result.avatarUrl}`));
+      console.log(c.dim(`  URL: ${avatarUrl}`));
     });
 }
 
