@@ -19,6 +19,15 @@ on:
         description: "Run without publishing"
         default: false
 
+# npm OIDC Trusted Publishing prerequisites (so future maintainers don't relearn this):
+#   1. A trusted publisher must be configured on npmjs.com for @photon-ai/cli with the
+#      GitHub org `photon-hq`, repo `cli`, the CALLER workflow filename `release.yaml`
+#      (npm validates the caller, not buildspace's reusable workflow), no environment,
+#      and "Allow npm publish" enabled.
+#   2. `use-oidc: true` + `id-token: write` below.
+#   3. buildspace's publish-npm action upgrades npm to >= 11.5.1 (Node 20 ships npm 10,
+#      which can't authenticate tokenlessly).
+
 jobs:
   release:
     uses: photon-hq/buildspace/.github/workflows/typescript-service-release.yaml@main
