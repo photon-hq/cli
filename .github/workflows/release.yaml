@@ -25,9 +25,11 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
+      id-token: write
     with:
       service-name: "@photon-ai/cli"
       build-command: "bun run build"
+      use-oidc: true
       release: ${{ github.event_name == 'workflow_dispatch' && inputs.release || false }}
       dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs['dry-run'] || false }}
     secrets: inherit
