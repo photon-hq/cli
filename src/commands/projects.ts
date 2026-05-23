@@ -2,6 +2,17 @@ import type { Command } from "@commander-js/extra-typings";
 import { intro, isCancel, log, outro, text, confirm as clackConfirm } from "@clack/prompts";
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
+import {
+  createCheckoutAndOpen,
+  fetchPlans,
+  fetchSubscription,
+  matchPlanTier,
+  openPortalAndOpen,
+  pickPlanInteractively,
+  resolveBrowserPolicy,
+  TIER_NAMES,
+  type TierName,
+} from "~/lib/billing-flow.ts";
 import { openInBrowser } from "~/lib/browser.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
@@ -22,6 +33,7 @@ export function registerProjectsCommand(program: Command): void {
   registerDeleteCommand(projects);
   registerRegenerateSecretCommand(projects);
   registerOpenCommand(projects);
+  registerUpgradeCommand(projects);
   registerCheckPhoneCommand(projects);
 }
 
@@ -496,6 +508,178 @@ function registerOpenCommand(projects: Command): void {
       const url = new URL(`/dashboard/${projectId}`, resolved.url).toString();
       await openInBrowser(url, { noBrowser: !opts.browser, label: "URL" });
     });
+}
+
+// ──────────────────────────── upgrade ────────────────────────────
+
+interface UpgradeOpts {
+  plan?: string;
+  qty?: number;
+  checkout?: boolean;
+  manage?: boolean;
+  project?: string;
+  apiHost?: string;
+  token?: string;
+  browser?: boolean;
+  json?: boolean;
+}
+
+/**
+ * Upgrade / pay for a project. Mirrors the web's billing page: free
+ * projects get the checkout flow (pick a plan → Stripe Checkout), already
+ * subscribed projects get the Stripe customer portal (manage / cancel /
+ * change plan).
+ *
+ * Signature follows Heroku `addons:upgrade ADDON [PLAN]` — both id and
+ * tier are positional, so the most common form is just
+ * `photon projects upgrade my-app pro`.
+ */
+function registerUpgradeCommand(projects: Command): void {
+  projects
+    .command("upgrade [id] [tier]")
+    .description(
+      "subscribe / pay for a project (smart-routes to Stripe checkout or billing portal)"
+    )
+    .option("--plan <price-id>", "Stripe price id (escape hatch; overrides tier picker)")
+    .option("--qty <n>", "quantity (default 1)", parsePositiveInt)
+    .option("--checkout", "force checkout flow (even if currently subscribed)")
+    .option("--manage", "force Stripe portal (downgrade / cancel / change card)")
+    .option("-p, --project <id>", "project id (overrides positional [id] and $PHOTON_PROJECT_ID)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
+    .option("-t, --token <token>", "API token (overrides stored creds)")
+    .option("--no-browser", "print the URL instead of launching a browser")
+    .option("--json", "output JSON ({action,url,tier?}) and skip browser open")
+    .action(async (idArg: string | undefined, tierArg: string | undefined, opts: UpgradeOpts) => {
+      if (opts.checkout && opts.manage) {
+        die("--checkout and --manage are mutually exclusive.");
+      }
+
+      // Positional [id] [tier] disambiguation: if only one positional was
+      // given and it matches a known tier name, treat it as tier (id then
+      // falls back to --project / $PHOTON_PROJECT_ID). This lets users run
+      // `photon projects upgrade pro` when PHOTON_PROJECT_ID is set,
+      // matching the Heroku-style ergonomics from the plan.
+      let positionalId = idArg;
+      let tier = normalizeTier(tierArg);
+      if (!tier && positionalId && isKnownTier(positionalId) && !tierArg) {
+        tier = normalizeTier(positionalId);
+        positionalId = undefined;
+      }
+      if (tierArg && !tier) {
+        die(`Unknown tier "${tierArg}".`, {
+          hint: `Use one of: ${TIER_NAMES.join(", ")} — or pass --plan <price-id>.`,
+        });
+      }
+
+      const { projectId, env: resolved } = await resolveProject({
+        flagProjectId: opts.project ?? positionalId,
+        apiHost: opts.apiHost,
+      });
+      const { api } = await getApi({
+        apiHost: resolved.url,
+        token: opts.token,
+        requireAuth: true,
+      });
+
+      const noBrowser = resolveBrowserPolicy({
+        explicitNoBrowser: opts.browser === false,
+        json: opts.json ?? false,
+      });
+
+      let route: "checkout" | "manage";
+      if (opts.checkout || opts.plan || tier) {
+        route = "checkout";
+      } else if (opts.manage) {
+        route = "manage";
+      } else {
+        const sub = await fetchSubscription(api, projectId, resolved.name);
+        const active = sub.status === "active" || sub.status === "past_due";
+        route = active ? "manage" : "checkout";
+        if (route === "manage" && !opts.json) {
+          console.log(
+            c.info(
+              `Project ${c.bold(projectId)} is on ${sub.tier ?? "—"} (${sub.status ?? "—"}). Opening Stripe portal…`
+            )
+          );
+          console.log(c.dim("  To pick a different plan instead, re-run with --checkout."));
+        }
+      }
+
+      if (route === "manage") {
+        await openPortalAndOpen({
+          api,
+          projectId,
+          envName: resolved.name,
+          json: opts.json ?? false,
+          noBrowser,
+        });
+        return;
+      }
+
+      // checkout path: resolve a priceId from --plan > tier > interactive
+      let priceId: string;
+      let tierLabel: string | undefined = tier;
+      if (opts.plan) {
+        priceId = opts.plan;
+      } else if (tier) {
+        const plans = await fetchPlans(api, resolved.name);
+        const matched = matchPlanTier(plans, tier);
+        if (!matched || !matched.prices?.[0]) {
+          die(`No plan matching tier "${tier}".`, {
+            hint: "List options with `photon billing plans`.",
+          });
+        }
+        priceId = matched.prices[0].id;
+      } else {
+        const plans = await fetchPlans(api, resolved.name);
+        const picked = await pickPlanInteractively(plans);
+        priceId = picked.price.id;
+        tierLabel = picked.plan.name;
+      }
+
+      await createCheckoutAndOpen({
+        api,
+        projectId,
+        priceId,
+        quantity: opts.qty,
+        envName: resolved.name,
+        json: opts.json ?? false,
+        noBrowser,
+        tierLabel,
+      });
+    });
+}
+
+function isKnownTier(s: string): boolean {
+  return TIER_NAMES.includes(s.trim().toLowerCase() as TierName);
+}
+
+function normalizeTier(s: string | undefined): TierName | undefined {
+  if (!s) return undefined;
+  const lower = s.trim().toLowerCase();
+  return (TIER_NAMES as readonly string[]).includes(lower)
+    ? (lower as TierName)
+    : undefined;
+}
+
+/**
+ * commander argParser for `--qty`. Validates the input is a positive
+ * integer; throws InvalidArgumentError so commander shows a clean error
+ * instead of NaN reaching the API.
+ */
+function parsePositiveInt(value: string): number {
+  if (!/^\d+$/.test(value)) {
+    throw new (require("commander").InvalidArgumentError as new (msg: string) => Error)(
+      `must be a non-negative integer (got "${value}")`
+    );
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throw new (require("commander").InvalidArgumentError as new (msg: string) => Error)(
+      `must be at least 1 (got "${value}")`
+    );
+  }
+  return parsed;
 }
 
 // ──────────────────────────── check-phone ────────────────────────────
