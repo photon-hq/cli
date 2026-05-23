@@ -24,8 +24,10 @@ let server: any = null;
 // Mutable, per-test state. Reset via resetMockState() between tests.
 interface MockState {
   subscription: typeof subscriptionFree | typeof subscriptionActive;
-  /** When set, all subscription/manage and billing/checkout responses
-   *  short-circuit to a 401 to exercise SessionExpiredError handling. */
+  /** When set, EVERY auth-gated route in this mock server returns 401,
+   *  regardless of the request's Authorization header. Use this to
+   *  exercise SessionExpiredError flows without having to manipulate
+   *  the test's PHOTON_TOKEN. */
   forceUnauthorized: boolean;
 }
 

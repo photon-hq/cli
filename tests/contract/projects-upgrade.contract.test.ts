@@ -27,7 +27,7 @@ describe("photon projects upgrade — smart routing", () => {
   test("free subscription routes to checkout", async () => {
     setMockSubscription("free");
     const { stdout, exitCode } = await runCommand(
-      ["projects", "upgrade", PROJECT_ID, "pro", "--json"],
+      ["projects", "upgrade", PROJECT_ID, "business", "--json"],
       {
         env: { PHOTON_TOKEN: "test-token", PHOTON_API_HOST: baseUrl },
       }
@@ -37,7 +37,7 @@ describe("photon projects upgrade — smart routing", () => {
     const parsed = JSON.parse(stdout);
     expect(parsed.action).toBe("checkout");
     expect(parsed.url).toContain("checkout.stripe.com");
-    expect(parsed.tier).toBe("pro");
+    expect(parsed.tier).toBe("business");
   });
 
   test("active subscription routes to manage", async () => {
@@ -60,7 +60,7 @@ describe("photon projects upgrade — explicit overrides", () => {
   test("--checkout forces checkout even when active", async () => {
     setMockSubscription("active");
     const { stdout, exitCode } = await runCommand(
-      ["projects", "upgrade", PROJECT_ID, "pro", "--checkout", "--json"],
+      ["projects", "upgrade", PROJECT_ID, "business", "--checkout", "--json"],
       {
         env: { PHOTON_TOKEN: "test-token", PHOTON_API_HOST: baseUrl },
       }
@@ -85,6 +85,23 @@ describe("photon projects upgrade — explicit overrides", () => {
     expect(parsed.action).toBe("manage");
   });
 
+  test("--manage wins over a positional tier", async () => {
+    // Regression: ensure --manage routes to portal even when a tier
+    // (or --plan) is also provided. Earlier ordering had checkout win
+    // whenever tier/plan was present, defeating the flag contract.
+    setMockSubscription("active");
+    const { stdout, exitCode } = await runCommand(
+      ["projects", "upgrade", PROJECT_ID, "business", "--manage", "--json"],
+      {
+        env: { PHOTON_TOKEN: "test-token", PHOTON_API_HOST: baseUrl },
+      }
+    );
+
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.action).toBe("manage");
+  });
+
   test("--checkout + --manage is rejected", async () => {
     const { stderr, exitCode } = await runCommand(
       ["projects", "upgrade", PROJECT_ID, "--checkout", "--manage"],
@@ -97,7 +114,7 @@ describe("photon projects upgrade — explicit overrides", () => {
     expect(stderr).toContain("mutually exclusive");
   });
 
-  test("--plan <price-id> bypasses the tier picker", async () => {
+  test("--plan <price-id> bypasses the tier picker (no tier in --json)", async () => {
     setMockSubscription("free");
     const { stdout, exitCode } = await runCommand(
       [
@@ -117,6 +134,25 @@ describe("photon projects upgrade — explicit overrides", () => {
     const parsed = JSON.parse(stdout);
     expect(parsed.action).toBe("checkout");
     expect(parsed.url).toContain("checkout.stripe.com");
+    // --plan is a raw Stripe price id; we don't infer a tier from it.
+    expect(parsed.tier).toBeUndefined();
+  });
+
+  test("tier with multiple billing intervals fails fast", async () => {
+    // The "Pro" fixture has both monthly and yearly prices. Without an
+    // explicit --plan, the CLI can't pick one without surprising the
+    // user, so it dies with a hint pointing at --plan / the picker.
+    setMockSubscription("free");
+    const { stderr, exitCode } = await runCommand(
+      ["projects", "upgrade", PROJECT_ID, "pro"],
+      {
+        env: { PHOTON_TOKEN: "test-token", PHOTON_API_HOST: baseUrl },
+      }
+    );
+
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("multiple billing intervals");
+    expect(stderr).toContain("--plan");
   });
 });
 
@@ -128,7 +164,7 @@ describe("photon projects upgrade — non-TTY browser policy", () => {
     // (would otherwise blow up under `bun test`). Success criterion: the
     // URL is present in stdout and the process exits cleanly.
     const { stdout, exitCode } = await runCommand(
-      ["projects", "upgrade", PROJECT_ID, "pro"],
+      ["projects", "upgrade", PROJECT_ID, "business"],
       {
         env: { PHOTON_TOKEN: "test-token", PHOTON_API_HOST: baseUrl },
       }
@@ -144,7 +180,7 @@ describe("photon projects upgrade — error handling", () => {
     setMockSubscription("free");
     setMockUnauthorized(true);
     const { stderr, exitCode } = await runCommand(
-      ["projects", "upgrade", PROJECT_ID, "pro", "--json"],
+      ["projects", "upgrade", PROJECT_ID, "business", "--json"],
       {
         env: { PHOTON_TOKEN: "test-token", PHOTON_API_HOST: baseUrl },
       }

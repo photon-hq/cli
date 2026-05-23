@@ -14,6 +14,7 @@ import {
   type TierName,
 } from "~/lib/billing-flow.ts";
 import { openInBrowser } from "~/lib/browser.ts";
+import { parsePositiveInt } from "~/lib/commander.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
@@ -586,14 +587,21 @@ function registerUpgradeCommand(projects: Command): void {
         json: opts.json ?? false,
       });
 
+      // Route precedence (most specific wins):
+      //   1. --manage explicitly requested portal
+      //   2. --checkout / --plan / [tier] explicitly requested checkout
+      //   3. smart routing based on current subscription status
       let route: "checkout" | "manage";
-      if (opts.checkout || opts.plan || tier) {
-        route = "checkout";
-      } else if (opts.manage) {
+      if (opts.manage) {
         route = "manage";
+      } else if (opts.checkout || opts.plan || tier) {
+        route = "checkout";
       } else {
         const sub = await fetchSubscription(api, projectId, resolved.name);
         const active = sub.status === "active" || sub.status === "past_due";
+        // "unknown" comes from upstream failures in fetchSubscription —
+        // route to checkout (safe default) but the caller already
+        // printed a warn explaining the routing wasn't authoritative.
         route = active ? "manage" : "checkout";
         if (route === "manage" && !opts.json) {
           console.log(
@@ -618,23 +626,34 @@ function registerUpgradeCommand(projects: Command): void {
 
       // checkout path: resolve a priceId from --plan > tier > interactive
       let priceId: string;
-      let tierLabel: string | undefined = tier;
+      let tierLabel: string | undefined;
       if (opts.plan) {
+        // --plan is a raw Stripe price id; intentionally don't claim a
+        // tier in --json output since the price may not map to one.
         priceId = opts.plan;
       } else if (tier) {
         const plans = await fetchPlans(api, resolved.name);
         const matched = matchPlanTier(plans, tier);
-        if (!matched || !matched.prices?.[0]) {
+        const onlyPrice = matched?.prices?.length === 1 ? matched.prices[0] : undefined;
+        if (!matched || !matched.prices?.length) {
           die(`No plan matching tier "${tier}".`, {
             hint: "List options with `photon billing plans`.",
           });
         }
-        priceId = matched.prices[0].id;
+        if (!onlyPrice) {
+          die(`Tier "${tier}" has multiple billing intervals.`, {
+            hint: "Pass --plan <price-id> to choose, or omit the tier to use the interactive picker.",
+          });
+        }
+        priceId = onlyPrice.id;
+        tierLabel = tier;
       } else {
         const plans = await fetchPlans(api, resolved.name);
         const picked = await pickPlanInteractively(plans);
         priceId = picked.price.id;
-        tierLabel = picked.plan.name;
+        // Normalize the picker's plan name back to a canonical tier
+        // when possible, so --json `tier` is stable across paths.
+        tierLabel = canonicalTierFor(picked.plan.name);
       }
 
       await createCheckoutAndOpen({
@@ -663,23 +682,16 @@ function normalizeTier(s: string | undefined): TierName | undefined {
 }
 
 /**
- * commander argParser for `--qty`. Validates the input is a positive
- * integer; throws InvalidArgumentError so commander shows a clean error
- * instead of NaN reaching the API.
+ * Map a plan display name back to the canonical tier we expose to
+ * users. Substring match mirrors web's tier detection. Returns
+ * undefined when the plan doesn't fit any of our advertised tiers.
  */
-function parsePositiveInt(value: string): number {
-  if (!/^\d+$/.test(value)) {
-    throw new (require("commander").InvalidArgumentError as new (msg: string) => Error)(
-      `must be a non-negative integer (got "${value}")`
-    );
+function canonicalTierFor(planName: string): TierName | undefined {
+  const lower = planName.toLowerCase();
+  for (const t of TIER_NAMES) {
+    if (lower.includes(t)) return t;
   }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    throw new (require("commander").InvalidArgumentError as new (msg: string) => Error)(
-      `must be at least 1 (got "${value}")`
-    );
-  }
-  return parsed;
+  return undefined;
 }
 
 // ──────────────────────────── check-phone ────────────────────────────

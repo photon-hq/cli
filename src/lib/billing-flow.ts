@@ -68,13 +68,16 @@ export async function fetchPlans(api: Api, envName: string): Promise<BillingPlan
 
 /**
  * Fetch the subscription for a project. 401 throws SessionExpired; other
- * upstream failures are treated as "unknown subscription state" — we
- * return a soft `{ tier: "free", status: null }` and emit a warn so the
- * caller's smart routing can still default to checkout instead of dying.
+ * upstream failures return an explicit `{ tier: "unknown", status: null }`
+ * with a printed warn — callers MUST decide what to do with the unknown
+ * state rather than silently treating it as free.
  *
  * Background: the server-side `GET /subscription` proxies Spectrum, which
- * can be down or flaky; the user shouldn't be blocked from upgrading just
- * because we can't read their current state.
+ * can be down or flaky. Coercing a flaky response to "free" would
+ * silently route already-subscribed users back into Stripe Checkout
+ * (creating a duplicate subscription) — return the unknown state so the
+ * smart router can pick a safe fallback (and surface it to the user)
+ * instead of guessing.
  */
 export async function fetchSubscription(
   api: Api,
@@ -86,10 +89,10 @@ export async function fetchSubscription(
   if (error) {
     console.error(
       c.warn(
-        `Could not read subscription for project ${projectId}: ${formatApiError(error)}. Assuming free tier.`
+        `Could not read subscription for project ${projectId}: ${formatApiError(error)}. Subscription state unknown.`
       )
     );
-    return { tier: "free", status: null };
+    return { tier: "unknown", status: null };
   }
   return (data ?? {}) as Subscription;
 }

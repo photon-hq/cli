@@ -14,6 +14,7 @@ import {
   type Subscription,
   type TierName,
 } from "~/lib/billing-flow.ts";
+import { parsePositiveInt } from "~/lib/commander.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 
@@ -169,23 +170,41 @@ function registerCheckout(billing: Command): void {
       });
 
       let priceId: string;
-      let tierLabel: string | undefined = tier;
+      let tierLabel: string | undefined;
       if (opts.plan) {
+        // --plan is a raw Stripe price id; intentionally don't emit a
+        // tier in --json output because the price may not correspond to
+        // any of our advertised tiers.
         priceId = opts.plan;
       } else if (tier) {
         const plans = await fetchPlans(api, resolved.name);
         const matched = matchPlanTier(plans, tier);
-        if (!matched || !matched.prices?.[0]) {
+        const onlyPrice = matched?.prices?.length === 1 ? matched.prices[0] : undefined;
+        if (!matched || !matched.prices?.length) {
           die(`No plan matching tier "${tier}".`, {
             hint: "List options with `photon billing plans`.",
           });
         }
-        priceId = matched.prices[0].id;
+        // Multi-price tiers (typical for monthly + yearly) are
+        // ambiguous from a single positional. Fail fast rather than
+        // silently pick whichever price the backend returned first —
+        // wrong-frequency checkouts are hard to recover from.
+        if (!onlyPrice) {
+          die(`Tier "${tier}" has multiple billing intervals.`, {
+            hint: "Pass --plan <price-id> to choose, or omit the tier to use the interactive picker.",
+          });
+        }
+        priceId = onlyPrice.id;
+        tierLabel = tier;
       } else {
         const plans = await fetchPlans(api, resolved.name);
         const picked = await pickPlanInteractively(plans);
         priceId = picked.price.id;
-        tierLabel = picked.plan.name;
+        // Normalize the picker's plan name back to a canonical tier
+        // when possible (e.g. "Photon Pro" → "pro"), so the --json
+        // `tier` field is stable across CLI paths. If no tier matches
+        // (e.g. enterprise's "Contact Team"), leave tier unset.
+        tierLabel = canonicalTierFor(picked.plan.name);
       }
 
       await createCheckoutAndOpen({
@@ -210,23 +229,16 @@ function normalizeTier(s: string | undefined): TierName | undefined {
 }
 
 /**
- * commander argParser for `--qty`. Validates the input is a positive
- * integer; throws InvalidArgumentError on bad input so commander
- * shows a clean parse error instead of NaN reaching the API.
+ * Map a plan display name (from the API) back to the canonical tier
+ * name we expose to users. Substring match mirrors the web's tier
+ * detection (apps/web/.../plan-features.ts#matchPlanTier).
  */
-function parsePositiveInt(value: string): number {
-  if (!/^\d+$/.test(value)) {
-    throw new (require("commander").InvalidArgumentError as new (msg: string) => Error)(
-      `must be a non-negative integer (got "${value}")`
-    );
+function canonicalTierFor(planName: string): TierName | undefined {
+  const lower = planName.toLowerCase();
+  for (const t of TIER_NAMES) {
+    if (lower.includes(t)) return t;
   }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    throw new (require("commander").InvalidArgumentError as new (msg: string) => Error)(
-      `must be at least 1 (got "${value}")`
-    );
-  }
-  return parsed;
+  return undefined;
 }
 
 // ──────────────────────────── manage ────────────────────────────
