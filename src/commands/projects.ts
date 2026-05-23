@@ -2,7 +2,20 @@ import type { Command } from "@commander-js/extra-typings";
 import { intro, isCancel, log, outro, text, confirm as clackConfirm } from "@clack/prompts";
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
+import {
+  canonicalTierFor,
+  createCheckoutAndOpen,
+  fetchPlans,
+  fetchSubscription,
+  matchPlanTier,
+  openPortalAndOpen,
+  pickPlanInteractively,
+  resolveBrowserPolicy,
+  TIER_NAMES,
+  type TierName,
+} from "~/lib/billing-flow.ts";
 import { openInBrowser } from "~/lib/browser.ts";
+import { parsePositiveInt } from "~/lib/commander.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
@@ -22,6 +35,7 @@ export function registerProjectsCommand(program: Command): void {
   registerDeleteCommand(projects);
   registerRegenerateSecretCommand(projects);
   registerOpenCommand(projects);
+  registerUpgradeCommand(projects);
   registerCheckPhoneCommand(projects);
 }
 
@@ -496,6 +510,187 @@ function registerOpenCommand(projects: Command): void {
       const url = new URL(`/dashboard/${projectId}`, resolved.url).toString();
       await openInBrowser(url, { noBrowser: !opts.browser, label: "URL" });
     });
+}
+
+// ──────────────────────────── upgrade ────────────────────────────
+
+interface UpgradeOpts {
+  plan?: string;
+  qty?: number;
+  checkout?: boolean;
+  manage?: boolean;
+  project?: string;
+  apiHost?: string;
+  token?: string;
+  browser?: boolean;
+  json?: boolean;
+}
+
+/**
+ * Upgrade / pay for a project. Mirrors the web's billing page: free
+ * projects get the checkout flow (pick a plan → Stripe Checkout), already
+ * subscribed projects get the Stripe customer portal (manage / cancel /
+ * change plan).
+ *
+ * Signature follows Heroku `addons:upgrade ADDON [PLAN]` — both id and
+ * tier are positional, so the most common form is just
+ * `photon projects upgrade my-app pro`.
+ */
+function registerUpgradeCommand(projects: Command): void {
+  projects
+    .command("upgrade [id] [tier]")
+    .description(
+      "subscribe / pay for a project (smart-routes to Stripe checkout or billing portal)"
+    )
+    .option("--plan <price-id>", "Stripe price id (escape hatch; overrides tier picker)")
+    .option("--qty <n>", "quantity (default 1)", parsePositiveInt)
+    .option("--checkout", "force checkout flow (even if currently subscribed)")
+    .option("--manage", "force Stripe portal (downgrade / cancel / change card)")
+    .option("-p, --project <id>", "project id (overrides positional [id] and $PHOTON_PROJECT_ID)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
+    .option("-t, --token <token>", "API token (overrides stored creds)")
+    .option("--no-browser", "print the URL instead of launching a browser")
+    .option("--json", "output JSON ({action,url,tier?}) and skip browser open")
+    .action(async (idArg: string | undefined, tierArg: string | undefined, opts: UpgradeOpts) => {
+      if (opts.checkout && opts.manage) {
+        die("--checkout and --manage are mutually exclusive.");
+      }
+
+      // Positional [id] [tier] disambiguation: if only one positional was
+      // given and it matches a known tier name, treat it as tier (id then
+      // falls back to --project / $PHOTON_PROJECT_ID). This lets users run
+      // `photon projects upgrade pro` when PHOTON_PROJECT_ID is set,
+      // matching the Heroku-style ergonomics from the plan.
+      let positionalId = idArg;
+      let tier = normalizeTier(tierArg);
+      if (!tier && positionalId && isKnownTier(positionalId) && !tierArg) {
+        tier = normalizeTier(positionalId);
+        positionalId = undefined;
+      }
+      if (tierArg && !tier) {
+        die(`Unknown tier "${tierArg}".`, {
+          hint: `Use one of: ${TIER_NAMES.join(", ")} — or pass --plan <price-id>.`,
+        });
+      }
+
+      const { projectId, env: resolved } = await resolveProject({
+        flagProjectId: opts.project ?? positionalId,
+        apiHost: opts.apiHost,
+      });
+      const { api } = await getApi({
+        apiHost: resolved.url,
+        token: opts.token,
+        requireAuth: true,
+      });
+
+      const noBrowser = resolveBrowserPolicy({
+        explicitNoBrowser: opts.browser === false,
+        json: opts.json ?? false,
+      });
+
+      // Route precedence (most specific wins):
+      //   1. --manage explicitly requested portal
+      //   2. --checkout / --plan / [tier] explicitly requested checkout
+      //   3. smart routing based on current subscription status
+      let route: "checkout" | "manage";
+      if (opts.manage) {
+        route = "manage";
+      } else if (opts.checkout || opts.plan || tier) {
+        route = "checkout";
+      } else {
+        const sub = await fetchSubscription(api, projectId, resolved.name);
+        // When fetchSubscription couldn't reach the upstream, it returns
+        // tier=unknown. Refuse to guess at the route in that case — the
+        // user must pick --checkout or --manage explicitly, otherwise we
+        // risk creating a duplicate subscription on a project that's
+        // actually already paying. This matches fetchSubscription's
+        // docstring contract.
+        if (sub.tier === "unknown") {
+          die(
+            `Cannot determine the subscription state of project ${projectId}.`,
+            {
+              hint: "Re-run with --checkout to subscribe, or --manage to open the Stripe portal.",
+            }
+          );
+        }
+        const active = sub.status === "active" || sub.status === "past_due";
+        route = active ? "manage" : "checkout";
+        if (route === "manage" && !opts.json) {
+          console.log(
+            c.info(
+              `Project ${c.bold(projectId)} is on ${sub.tier ?? "—"} (${sub.status ?? "—"}). Opening Stripe portal…`
+            )
+          );
+          console.log(c.dim("  To pick a different plan instead, re-run with --checkout."));
+        }
+      }
+
+      if (route === "manage") {
+        await openPortalAndOpen({
+          api,
+          projectId,
+          envName: resolved.name,
+          json: opts.json ?? false,
+          noBrowser,
+        });
+        return;
+      }
+
+      // checkout path: resolve a priceId from --plan > tier > interactive
+      let priceId: string;
+      let tierLabel: string | undefined;
+      if (opts.plan) {
+        // --plan is a raw Stripe price id; intentionally don't claim a
+        // tier in --json output since the price may not map to one.
+        priceId = opts.plan;
+      } else if (tier) {
+        const plans = await fetchPlans(api, resolved.name);
+        const matched = matchPlanTier(plans, tier);
+        const onlyPrice = matched?.prices?.length === 1 ? matched.prices[0] : undefined;
+        if (!matched || !matched.prices?.length) {
+          die(`No plan matching tier "${tier}".`, {
+            hint: "List options with `photon billing plans`.",
+          });
+        }
+        if (!onlyPrice) {
+          die(`Tier "${tier}" has multiple billing intervals.`, {
+            hint: "Pass --plan <price-id> to choose, or omit the tier to use the interactive picker.",
+          });
+        }
+        priceId = onlyPrice.id;
+        tierLabel = tier;
+      } else {
+        const plans = await fetchPlans(api, resolved.name);
+        const picked = await pickPlanInteractively(plans);
+        priceId = picked.price.id;
+        // Normalize the picker's plan name back to a canonical tier
+        // when possible, so --json `tier` is stable across paths.
+        tierLabel = canonicalTierFor(picked.plan.name);
+      }
+
+      await createCheckoutAndOpen({
+        api,
+        projectId,
+        priceId,
+        quantity: opts.qty,
+        envName: resolved.name,
+        json: opts.json ?? false,
+        noBrowser,
+        tierLabel,
+      });
+    });
+}
+
+function isKnownTier(s: string): boolean {
+  return TIER_NAMES.includes(s.trim().toLowerCase() as TierName);
+}
+
+function normalizeTier(s: string | undefined): TierName | undefined {
+  if (!s) return undefined;
+  const lower = s.trim().toLowerCase();
+  return (TIER_NAMES as readonly string[]).includes(lower)
+    ? (lower as TierName)
+    : undefined;
 }
 
 // ──────────────────────────── check-phone ────────────────────────────

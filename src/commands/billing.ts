@@ -1,7 +1,21 @@
 import type { Command } from "@commander-js/extra-typings";
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
-import { openInBrowser } from "~/lib/browser.ts";
+import {
+  canonicalTierFor,
+  createCheckoutAndOpen,
+  fetchPlans,
+  matchPlanTier,
+  openPortalAndOpen,
+  pickPlanInteractively,
+  resolveBrowserPolicy,
+  TIER_NAMES,
+  type BillingPlan,
+  type BillingPrice,
+  type Subscription,
+  type TierName,
+} from "~/lib/billing-flow.ts";
+import { parsePositiveInt } from "~/lib/commander.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 
@@ -110,23 +124,37 @@ function registerShow(billing: Command): void {
 
 // ──────────────────────────── checkout ────────────────────────────
 
+interface CheckoutOpts {
+  plan?: string;
+  qty?: number;
+  project?: string;
+  apiHost?: string;
+  token?: string;
+  browser?: boolean;
+  json?: boolean;
+}
+
 function registerCheckout(billing: Command): void {
   billing
-    .command("checkout")
-    .description("start a subscription checkout (opens Stripe in browser)")
-    .option("--plan <price-id>", "Stripe price id from `photon billing plans`")
+    .command("checkout [tier]")
+    .description(
+      "start a subscription checkout (interactive picker when no tier / --plan)"
+    )
+    .option("--plan <price-id>", "Stripe price id (escape hatch; overrides tier picker)")
     .option("--qty <n>", "quantity", parsePositiveInt)
     .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--no-browser", "print the URL instead of launching a browser")
-    .option("--json", "output JSON ({url}) and skip browser open")
-    .action(async (opts) => {
-      if (!opts.plan) {
-        die("--plan <price-id> is required.", {
-          hint: "List options: `photon billing plans`. Pass the `price id` column.",
+    .option("--json", "output JSON ({action,url,tier?}) and skip browser open")
+    .action(async (tierArg: string | undefined, opts: CheckoutOpts) => {
+      const tier = normalizeTier(tierArg);
+      if (tierArg && !tier) {
+        die(`Unknown tier "${tierArg}".`, {
+          hint: `Use one of: ${TIER_NAMES.join(", ")} — or pass --plan <price-id>.`,
         });
       }
+
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
         apiHost: opts.apiHost,
@@ -137,49 +165,68 @@ function registerCheckout(billing: Command): void {
         requireAuth: true,
       });
 
-      const { data, error, status } = await api.api.billing.checkout.post({
-        projectId,
-        priceId: opts.plan,
-        quantity: opts.qty,
+      const noBrowser = resolveBrowserPolicy({
+        explicitNoBrowser: opts.browser === false,
+        json: opts.json ?? false,
       });
-      if (status === 401) throw new SessionExpiredError(resolved.name);
-      if (error) die(`Failed to start checkout: ${formatApiError(error)}`);
-      const result = data as { success?: true; url?: string; error?: string };
-      if (result.error) die(result.error);
-      if (!result.url) die("Server did not return a checkout URL.");
 
-      // --json: scriptable mode — emit only the URL and skip the
-      // browser launch so callers can pipe the URL elsewhere.
-      if (opts.json) return printJson({ url: result.url });
-
-      const outcome = await openInBrowser(result.url, {
-        noBrowser: !opts.browser,
-        label: "Stripe checkout",
-      });
-      if (outcome === "failed") {
-        console.log(c.warn("Could not open browser automatically — copy the URL above."));
+      let priceId: string;
+      let tierLabel: string | undefined;
+      if (opts.plan) {
+        // --plan is a raw Stripe price id; intentionally don't emit a
+        // tier in --json output because the price may not correspond to
+        // any of our advertised tiers.
+        priceId = opts.plan;
+      } else if (tier) {
+        const plans = await fetchPlans(api, resolved.name);
+        const matched = matchPlanTier(plans, tier);
+        const onlyPrice = matched?.prices?.length === 1 ? matched.prices[0] : undefined;
+        if (!matched || !matched.prices?.length) {
+          die(`No plan matching tier "${tier}".`, {
+            hint: "List options with `photon billing plans`.",
+          });
+        }
+        // Multi-price tiers (typical for monthly + yearly) are
+        // ambiguous from a single positional. Fail fast rather than
+        // silently pick whichever price the backend returned first —
+        // wrong-frequency checkouts are hard to recover from.
+        if (!onlyPrice) {
+          die(`Tier "${tier}" has multiple billing intervals.`, {
+            hint: "Pass --plan <price-id> to choose, or omit the tier to use the interactive picker.",
+          });
+        }
+        priceId = onlyPrice.id;
+        tierLabel = tier;
+      } else {
+        const plans = await fetchPlans(api, resolved.name);
+        const picked = await pickPlanInteractively(plans);
+        priceId = picked.price.id;
+        // Normalize the picker's plan name back to a canonical tier
+        // when possible (e.g. "Photon Pro" → "pro"), so the --json
+        // `tier` field is stable across CLI paths. If no tier matches
+        // (e.g. enterprise's "Contact Team"), leave tier unset.
+        tierLabel = canonicalTierFor(picked.plan.name);
       }
+
+      await createCheckoutAndOpen({
+        api,
+        projectId,
+        priceId,
+        quantity: opts.qty,
+        envName: resolved.name,
+        json: opts.json ?? false,
+        noBrowser,
+        tierLabel,
+      });
     });
 }
 
-/**
- * commander argParser for `--qty`. Validates the input is a positive
- * integer; throws InvalidArgumentError on bad input so commander
- * shows a clean parse error instead of NaN reaching the API.
- */
-function parsePositiveInt(value: string): number {
-  if (!/^\d+$/.test(value)) {
-    throw new (require("commander").InvalidArgumentError as new (msg: string) => Error)(
-      `must be a non-negative integer (got "${value}")`
-    );
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    throw new (require("commander").InvalidArgumentError as new (msg: string) => Error)(
-      `must be at least 1 (got "${value}")`
-    );
-  }
-  return parsed;
+function normalizeTier(s: string | undefined): TierName | undefined {
+  if (!s) return undefined;
+  const lower = s.trim().toLowerCase();
+  return (TIER_NAMES as readonly string[]).includes(lower)
+    ? (lower as TierName)
+    : undefined;
 }
 
 // ──────────────────────────── manage ────────────────────────────
@@ -193,7 +240,7 @@ function registerManage(billing: Command): void {
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--no-browser", "print the URL instead of launching a browser")
-    .option("--json", "output JSON ({url}) and skip browser open")
+    .option("--json", "output JSON ({action,url}) and skip browser open")
     .action(async (opts) => {
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
@@ -205,48 +252,22 @@ function registerManage(billing: Command): void {
         requireAuth: true,
       });
 
-      const { data, error, status } = await api.api
-        .projects({ id: projectId })
-        .subscription.manage.post();
-      if (status === 401) throw new SessionExpiredError(resolved.name);
-      if (error) die(`Failed to open portal: ${formatApiError(error)}`);
-      const result = data as { success?: true; url?: string; error?: string };
-      if (result.error) die(result.error);
-      if (!result.url) die("Server did not return a portal URL.");
-
-      if (opts.json) return printJson({ url: result.url });
-
-      const outcome = await openInBrowser(result.url, {
-        noBrowser: !opts.browser,
-        label: "Stripe portal",
+      const noBrowser = resolveBrowserPolicy({
+        explicitNoBrowser: opts.browser === false,
+        json: opts.json ?? false,
       });
-      if (outcome === "failed") {
-        console.log(c.warn("Could not open browser automatically — copy the URL above."));
-      }
+
+      await openPortalAndOpen({
+        api,
+        projectId,
+        envName: resolved.name,
+        json: opts.json ?? false,
+        noBrowser,
+      });
     });
 }
 
 // ──────────────────────────── helpers ────────────────────────────
-
-interface BillingPrice {
-  id: string;
-  unit_amount: number | null;
-  currency: string;
-  recurring: { interval?: string } | null;
-}
-
-interface BillingPlan {
-  id: string;
-  name: string;
-  description?: string;
-  prices?: BillingPrice[];
-}
-
-interface Subscription {
-  tier?: string;
-  status?: string | null;
-  subscriptionId?: string;
-}
 
 function formatPrice(price: BillingPrice): string {
   if (price.unit_amount == null) return c.dim("—");

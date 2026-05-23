@@ -30,5 +30,18 @@
         "recurring": { "interval": "year" }
       }
     ]
+  },
+  {
+    "id": "plan_business",
+    "name": "Business",
+    "description": "Production-grade SLA",
+    "prices": [
+      {
+        "id": "price_business_monthly",
+        "unit_amount": 19900,
+        "currency": "usd",
+        "recurring": { "interval": "month" }
+      }
+    ]
   }
 ]
