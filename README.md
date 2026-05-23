@@ -180,6 +180,7 @@ photon
 │   ├── delete [id] [-y]                                permanent delete
 │   ├── regenerate-secret [id] [-y]                     rotate Spectrum secret
 │   ├── open [id]                                       open dashboard in browser
+│   ├── upgrade [id] [tier]                             subscribe / open Stripe portal
 │   └── check-phone <number>                            availability check
 ├── profile show / init / update                        developer / org profile
 ├── spectrum
@@ -191,7 +192,7 @@ photon
 └── billing
     ├── plans                                           available plans
     ├── show                                            current subscription
-    ├── checkout --plan <price-id>                      Stripe Checkout (browser)
+    ├── checkout [tier] [--plan <price-id>]             Stripe Checkout (browser)
     └── manage                                          Stripe Customer Portal
 ```
 
