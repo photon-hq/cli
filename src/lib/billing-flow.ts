@@ -118,6 +118,21 @@ export function matchPlanTier(plans: BillingPlan[], tier: TierName): BillingPlan
 }
 
 /**
+ * Inverse of matchPlanTier: map a plan's display name (e.g. "Photon
+ * Pro") back to one of the canonical TIER_NAMES we expose to users.
+ * Returns undefined when no tier substring matches — used so the
+ * `--json tier` field stays stable across positional and interactive
+ * code paths, omitting itself rather than emitting a display name.
+ */
+export function canonicalTierFor(planName: string): TierName | undefined {
+  const lower = planName.toLowerCase();
+  for (const t of TIER_NAMES) {
+    if (lower.includes(t)) return t;
+  }
+  return undefined;
+}
+
+/**
  * Interactive plan picker. Uses @clack/prompts `select` to render the
  * plan list and return the chosen `{ plan, price }`.
  *

@@ -3,6 +3,7 @@ import { intro, isCancel, log, outro, text, confirm as clackConfirm } from "@cla
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
 import {
+  canonicalTierFor,
   createCheckoutAndOpen,
   fetchPlans,
   fetchSubscription,
@@ -679,19 +680,6 @@ function normalizeTier(s: string | undefined): TierName | undefined {
   return (TIER_NAMES as readonly string[]).includes(lower)
     ? (lower as TierName)
     : undefined;
-}
-
-/**
- * Map a plan display name back to the canonical tier we expose to
- * users. Substring match mirrors web's tier detection. Returns
- * undefined when the plan doesn't fit any of our advertised tiers.
- */
-function canonicalTierFor(planName: string): TierName | undefined {
-  const lower = planName.toLowerCase();
-  for (const t of TIER_NAMES) {
-    if (lower.includes(t)) return t;
-  }
-  return undefined;
 }
 
 // ──────────────────────────── check-phone ────────────────────────────

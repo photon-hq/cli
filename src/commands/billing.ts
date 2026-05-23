@@ -2,6 +2,7 @@ import type { Command } from "@commander-js/extra-typings";
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
 import {
+  canonicalTierFor,
   createCheckoutAndOpen,
   fetchPlans,
   matchPlanTier,
@@ -226,19 +227,6 @@ function normalizeTier(s: string | undefined): TierName | undefined {
   return (TIER_NAMES as readonly string[]).includes(lower)
     ? (lower as TierName)
     : undefined;
-}
-
-/**
- * Map a plan display name (from the API) back to the canonical tier
- * name we expose to users. Substring match mirrors the web's tier
- * detection (apps/web/.../plan-features.ts#matchPlanTier).
- */
-function canonicalTierFor(planName: string): TierName | undefined {
-  const lower = planName.toLowerCase();
-  for (const t of TIER_NAMES) {
-    if (lower.includes(t)) return t;
-  }
-  return undefined;
 }
 
 // ──────────────────────────── manage ────────────────────────────
