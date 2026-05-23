@@ -18,11 +18,11 @@ import { InvalidArgumentError } from "commander";
  */
 export function parsePositiveInt(value: string): number {
   if (!/^\d+$/.test(value)) {
-    throw new InvalidArgumentError(`must be a non-negative integer (got "${value}")`);
+    throw new InvalidArgumentError(`must be a positive integer (got "${value}")`);
   }
   const parsed = Number.parseInt(value, 10);
   if (!Number.isSafeInteger(parsed) || parsed < 1) {
-    throw new InvalidArgumentError(`must be a safe integer >= 1 (got "${value}")`);
+    throw new InvalidArgumentError(`must be a positive integer (got "${value}")`);
   }
   return parsed;
 }
