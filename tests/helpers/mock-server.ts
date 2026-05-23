@@ -118,6 +118,11 @@ const app = new Elysia()
   });
 
 export async function startMockServer(): Promise<string> {
+  // Reset on every start so test suites that don't explicitly call
+  // resetMockState() in beforeEach can't accidentally inherit state
+  // mutated by a prior suite. Defensive — the per-test reset is still
+  // the recommended pattern.
+  resetMockState();
   server = app.listen({ hostname: "127.0.0.1", port: 0 });
   const { hostname, port } = server!.server!;
   return `http://${hostname}:${port}`;

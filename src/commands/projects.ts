@@ -599,10 +599,21 @@ function registerUpgradeCommand(projects: Command): void {
         route = "checkout";
       } else {
         const sub = await fetchSubscription(api, projectId, resolved.name);
+        // When fetchSubscription couldn't reach the upstream, it returns
+        // tier=unknown. Refuse to guess at the route in that case — the
+        // user must pick --checkout or --manage explicitly, otherwise we
+        // risk creating a duplicate subscription on a project that's
+        // actually already paying. This matches fetchSubscription's
+        // docstring contract.
+        if (sub.tier === "unknown") {
+          die(
+            `Cannot determine the subscription state of project ${projectId}.`,
+            {
+              hint: "Re-run with --checkout to subscribe, or --manage to open the Stripe portal.",
+            }
+          );
+        }
         const active = sub.status === "active" || sub.status === "past_due";
-        // "unknown" comes from upstream failures in fetchSubscription —
-        // route to checkout (safe default) but the caller already
-        // printed a warn explaining the routing wasn't authoritative.
         route = active ? "manage" : "checkout";
         if (route === "manage" && !opts.json) {
           console.log(
