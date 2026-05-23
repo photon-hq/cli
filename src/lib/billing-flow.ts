@@ -67,17 +67,17 @@ export async function fetchPlans(api: Api, envName: string): Promise<BillingPlan
 }
 
 /**
- * Fetch the subscription for a project. 401 throws SessionExpired; other
- * upstream failures return an explicit `{ tier: "unknown", status: null }`
- * with a printed warn — callers MUST decide what to do with the unknown
- * state rather than silently treating it as free.
+ * Fetch the subscription for a project. Behavior by status:
+ *   - 401            → throws SessionExpiredError (caller catches centrally)
+ *   - 5xx / network  → returns `{ tier: "unknown", status: null }` + printed warn,
+ *                      so smart routers can refuse to guess instead of silently
+ *                      coercing to "free" and risking a duplicate Stripe sub
+ *   - other 4xx      → die() with the API error verbatim; "project not found"
+ *                      or a validation failure shouldn't be disguised as a
+ *                      flaky-upstream "unknown" state
  *
  * Background: the server-side `GET /subscription` proxies Spectrum, which
- * can be down or flaky. Coercing a flaky response to "free" would
- * silently route already-subscribed users back into Stripe Checkout
- * (creating a duplicate subscription) — return the unknown state so the
- * smart router can pick a safe fallback (and surface it to the user)
- * instead of guessing.
+ * can be flaky independently of the project's actual state.
  */
 export async function fetchSubscription(
   api: Api,
@@ -87,6 +87,14 @@ export async function fetchSubscription(
   const { data, error, status } = await api.api.projects({ id: projectId }).subscription.get();
   if (status === 401) throw new SessionExpiredError(envName);
   if (error) {
+    // 5xx and missing-status (network) failures are the "we couldn't
+    // tell" case — fall back to unknown. Other 4xx errors are definite
+    // and should surface verbatim so the user can act on them.
+    const code = typeof status === "number" ? status : 0;
+    const isUpstreamFlake = code === 0 || code >= 500;
+    if (!isUpstreamFlake) {
+      die(`Failed to fetch subscription: ${formatApiError(error)}`);
+    }
     console.error(
       c.warn(
         `Could not read subscription for project ${projectId}: ${formatApiError(error)}. Subscription state unknown.`
@@ -193,9 +201,13 @@ export interface BrowserPolicyInput {
  * Decide whether to skip the browser open. We skip when:
  *   - `--json` was passed (script-mode — caller is parsing stdout)
  *   - `--no-browser` was passed (explicit user opt-out)
- *   - stdout isn't a TTY (piped output, CI). Inspired by Vercel CLI's
- *     `vc buy pro --yes | cat` behavior — don't surprise users by
- *     launching their browser in non-interactive contexts.
+ *   - the shell isn't interactive — `isInteractive()` returns false
+ *     when stdout OR stdin isn't a TTY, or when a CI env var is set
+ *     (some CI runners fake a TTY on stdout)
+ *
+ * The non-interactive check is inspired by Vercel CLI's `vc buy pro
+ * --yes | cat` behavior — don't surprise users by launching their
+ * browser inside pipes, CI runs, or headless contexts.
  */
 export function resolveBrowserPolicy({ explicitNoBrowser, json }: BrowserPolicyInput): boolean {
   if (json || explicitNoBrowser) return true;

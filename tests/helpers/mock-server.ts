@@ -3,9 +3,11 @@
  * by the CLI. Listens on a kernel-assigned port on 127.0.0.1 so tests
  * never hit the network.
  *
- * Mutable state (per-test): subscription tier and Stripe URLs are stored
- * on a single `state` object so individual tests can flip the project
- * between free / active without restarting the server.
+ * Mutable state (per-test): a single `state` object holds the current
+ * subscription fixture and the `forceUnauthorized` 401 toggle, so
+ * individual tests can flip behavior without restarting the server.
+ * The Stripe URL fixtures (`checkoutResponse`, `manageResponse`) are
+ * static — if a test ever needs to vary those, lift them into `state`.
  */
 import { Elysia } from "elysia";
 import healthFixture from "../fixtures/health.json";
@@ -118,6 +120,14 @@ const app = new Elysia()
   });
 
 export async function startMockServer(): Promise<string> {
+  // Refuse to clobber an existing handle — a forgotten stopMockServer()
+  // would otherwise leak the prior listener AND leave resetMockState()
+  // racing against in-flight requests on the dangling instance.
+  if (server) {
+    throw new Error(
+      "Mock server already started; call stopMockServer() before starting a new one."
+    );
+  }
   // Reset on every start so test suites that don't explicitly call
   // resetMockState() in beforeEach can't accidentally inherit state
   // mutated by a prior suite. Defensive — the per-test reset is still
