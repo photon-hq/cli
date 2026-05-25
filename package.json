@@ -23,7 +23,8 @@
   },
   "type": "module",
   "bin": {
-    "photon": "./dist/photon.js"
+    "photon": "./dist/photon.js",
+    "pho": "./dist/photon.js"
   },
   "files": [
     "dist",

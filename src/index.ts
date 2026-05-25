@@ -6,11 +6,9 @@ import {
   SessionExpiredError,
 } from '~/lib/errors.ts';
 import { die } from '~/lib/output.ts';
-import { ensurePhoAlias } from '~/lib/pho-alias.ts';
 import { startUpdateNotifier } from '~/lib/update-check.ts';
 import { buildProgram } from '~/program.ts';
 
-ensurePhoAlias();
 startUpdateNotifier();
 
 const program = buildProgram();
