@@ -29,7 +29,7 @@ npm install -g @photon-ai/cli
 photon login
 ```
 
-After install, `photon` is on your `PATH`. The `pho` alias (see below) is created automatically the first time you run `photon`.
+After install, both `photon` and the shorter `pho` alias are on your `PATH`.
 
 Also works with other package managers:
 
@@ -104,14 +104,14 @@ photon billing show
 
 ### The `pho` alias
 
-`pho` is a shortcut for `photon`, useful for high-frequency commands. It's created automatically as a sibling symlink the first time you run `photon` after installing — so no setup needed for global installs:
+`pho` is a shortcut for `photon`, useful for high-frequency commands. Every global install (npm / pnpm / yarn / bun) wires up both `photon` and `pho` automatically — they're declared as sibling `bin` entries that point at the same binary, so no setup is needed:
 
 ```sh
 pho ls          # photon projects ls
 pho whoami
 ```
 
-(`npx` / `bunx` users don't get `pho` since they're already typing the full package name; the alias is only created when running through an installed `photon` binary.)
+For `npx` / `bunx`, the package name itself is what you type, so `npx @photon-ai/cli` runs `photon` (the first declared bin). To run `pho` explicitly through `npx`, use `npx --package=@photon-ai/cli pho`.
 
 ---
 
