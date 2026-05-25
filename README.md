@@ -3,60 +3,86 @@
 Typed terminal UI for the [Photon Dashboard](https://photon.codes). Replaces the web UI for everyday work — manage projects, Spectrum users / lines / platforms, billing, and your developer profile from a terminal.
 
 ```sh
-npx @photon-ai/cli login        # try it without installing
-bun add -g @photon-ai/cli       # or install for daily use
+npx @photon-ai/cli login          # try it without installing
+npm install -g @photon-ai/cli     # or install for daily use
 ```
+
+Runs on Node.js >= 18. Bun is also supported but not required.
 
 ---
 
 ## Install
 
-Four options. Pick whichever fits.
-
-### 1. Homebrew (macOS / Linux)
+### One-off — no install
 
 ```sh
-brew install photon-hq/photon/photon
-photon login
+npx @photon-ai/cli login
+npx @photon-ai/cli projects ls
 ```
 
-Auto-updates with `brew upgrade photon`. No runtime dependencies — the formula installs a self-contained binary.
+Each invocation pulls the latest release on demand. Good for scripts, throwaway machines, or trying the CLI before committing. Works with `npx`, `pnpx`, or `bunx`.
 
-### 2. One-off — no install (`npx` / `bunx`)
-
-```sh
-npx  @photon-ai/cli login
-bunx @photon-ai/cli projects ls
-```
-
-Each invocation pulls the latest release on demand. Good for scripts, throwaway machines, or trying the CLI before committing. Requires Bun on `PATH` (the bundle has a `#!/usr/bin/env bun` shebang) — install it once with:
+### Global install
 
 ```sh
-curl -fsSL https://bun.sh/install | bash
-```
-
-### 3. Global install — daily use (`bun add -g`)
-
-```sh
-bun add -g @photon-ai/cli
+npm install -g @photon-ai/cli
 photon login
 ```
 
 After install, `photon` is on your `PATH`. The `pho` alias (see below) is created automatically the first time you run `photon`.
 
-### 4. Standalone binary — no Bun, no Node
-
-For CI environments or systems where you don't want any runtime:
+Also works with other package managers:
 
 ```sh
-# pick your platform from https://github.com/photon-hq/cli/releases/latest
+pnpm add -g @photon-ai/cli
+yarn global add @photon-ai/cli
+bun add -g @photon-ai/cli
+```
+
+### Standalone binary
+
+For CI environments or systems where you don't want any runtime. Replace `<os>` and `<arch>` with your platform:
+
+```sh
+# <os>: darwin | linux    <arch>: arm64 | x64
 curl -L -o /usr/local/bin/photon \
-  https://github.com/photon-hq/cli/releases/latest/download/photon-darwin-arm64
+  https://github.com/photon-hq/cli/releases/latest/download/photon-<os>-<arch>
 chmod +x /usr/local/bin/photon
 photon --version
 ```
 
 Available for macOS (arm64 / x64) and Linux (x64 / arm64). Each binary ships with a corresponding `.sha256` checksum on the same release page.
+
+---
+
+## Update
+
+The CLI shows a notification when a new version is available. To update:
+
+```sh
+npm update -g @photon-ai/cli
+photon --version
+```
+
+Or with other package managers:
+
+```sh
+pnpm update -g @photon-ai/cli
+yarn global upgrade @photon-ai/cli
+bun update -g @photon-ai/cli
+```
+
+If you're using a standalone binary, re-download the latest release:
+
+```sh
+curl -L -o /usr/local/bin/photon \
+  https://github.com/photon-hq/cli/releases/latest/download/photon-<os>-<arch>
+chmod +x /usr/local/bin/photon
+```
+
+`npx` / `pnpx` / `bunx` users always get the latest release automatically — no manual update needed.
+
+To suppress the update notification, set `PHOTON_NO_UPDATE_NOTIFIER=1`.
 
 ---
 
