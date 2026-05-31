@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Keep GitHub Actions pinned-by-SHA references current. Dependabot bumps the
+  # commit SHA (and the trailing `# vX.Y.Z` comment) whenever a new release of
+  # a pinned action ships, so SHA-pinning stays secure without going stale.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "agent-flow"
+    groups:
+      # Batch all action bumps into a single PR to keep review noise low.
+      github-actions:
+        patterns:
+          - "*"
