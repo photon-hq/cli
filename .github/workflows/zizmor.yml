@@ -36,8 +36,10 @@ jobs:
         run: |
           set -o pipefail
           # pipx is preinstalled on GitHub-hosted ubuntu runners, so no extra
-          # third-party action is needed to fetch the auditor.
-          pipx run zizmor --persona=regular .github/workflows/ | tee /tmp/zizmor.txt
+          # third-party action is needed to fetch the auditor. Pin the auditor
+          # version for reproducible, supply-chain-stable audits (Dependabot's
+          # pip ecosystem is not enabled, so bump this manually).
+          pipx run "zizmor==1.25.2" --persona=regular .github/workflows/ | tee /tmp/zizmor.txt
 
       - name: Publish findings to job summary
         if: always()

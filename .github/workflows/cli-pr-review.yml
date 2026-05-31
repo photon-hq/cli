@@ -30,7 +30,7 @@ jobs:
     if: |
       (
         github.event_name == 'pull_request' &&
-        (github.event.pull_request.user.login == 'cursor[bot]' || github.actor == 'cursor[bot]')
+        github.event.pull_request.user.login == 'cursor[bot]'
       ) ||
       (
         github.event_name == 'issue_comment' &&
