@@ -119,6 +119,11 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Every real agent-flow event is bot-initiated (cursor[bot] opens/pushes,
+          # coderabbitai[bot]/copilot post reviews). claude-code-action refuses bot
+          # actors by default; the job-level `if:` above is the real allowlist, so
+          # allow all bots here to avoid double-gating.
+          allowed_bots: "*"
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ steps.scenario.outputs.pr_number }}
