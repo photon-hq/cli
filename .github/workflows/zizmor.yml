@@ -1,0 +1,51 @@
+name: zizmor
+
+# Static security analysis of our GitHub Actions workflows (supply-chain,
+# injection, permission and trigger hygiene).
+#
+# Non-blocking on purpose: zizmor surfaces some pre-existing / by-design items
+# (e.g. the agent steward's broad write permissions and templated `run:` steps),
+# so this audit reports findings to the run summary without failing CI. Flip the
+# `continue-on-error` step to blocking once the backlog has been triaged.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  zizmor:
+    name: zizmor (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor (non-blocking)
+        id: audit
+        continue-on-error: true
+        env:
+          # zizmor uses GH_TOKEN for its online audits (e.g. resolving action
+          # refs). The job only has read access to this repo's contents.
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          # pipx is preinstalled on GitHub-hosted ubuntu runners, so no extra
+          # third-party action is needed to fetch the auditor.
+          pipx run zizmor --persona=regular .github/workflows/ | tee /tmp/zizmor.txt
+
+      - name: Publish findings to job summary
+        if: always()
+        run: |
+          {
+            echo "## zizmor audit (advisory / non-blocking)"
+            echo ""
+            echo '```'
+            cat /tmp/zizmor.txt 2>/dev/null || echo "(no output captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
