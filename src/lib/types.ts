@@ -25,20 +25,22 @@ export interface Project {
   updatedAt: string;
 }
 
-export interface DeveloperProfile {
+/**
+ * Flat shape returned by `GET /api/profile` (the underlying
+ * `onboarding_profile` row, or `null` if onboarding hasn't been completed).
+ *
+ * Upstream collapsed the old developer/organization split into one table
+ * with an optional `type` discriminator and a single free-form `background`
+ * field. The legacy `role` / `companySize` / `website` columns are gone.
+ */
+export interface ProfileRow {
   id: string;
   userId: string;
-  // Server-side fields TBD; expand when we render them.
-  [key: string]: unknown;
+  type: "developer" | "organization";
+  referralSource: string | null;
+  platforms: string[] | null;
+  background: string | null;
+  companyName: string | null;
 }
 
-export interface OrganizationProfile {
-  id: string;
-  userId: string;
-  [key: string]: unknown;
-}
-
-export type ProfileResponse =
-  | { type: "developer"; profile: DeveloperProfile }
-  | { type: "organization"; profile: OrganizationProfile }
-  | null;
+export type ProfileResponse = ProfileRow | null;
