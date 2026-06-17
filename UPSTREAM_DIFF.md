@@ -1,44 +1,60 @@
 # Upstream API Diff
 
-> Old routes: 36 · New routes: 58
+> Old routes: 58 · New routes: 80
 
 ## Added Routes
 
 | Route | Method |
 |-------|--------|
-| `api.profile.spectrum-updates` | `PATCH` |
-| `api.projects.:id.members` | `GET` |
-| `api.projects.:id.members` | `POST` |
-| `api.projects.:id.members.:memberUserId` | `DELETE` |
-| `api.projects.:id.slack` | `DELETE` |
-| `api.projects.:id.slack` | `GET` |
-| `api.projects.:id.slack` | `PUT` |
-| `api.projects.:id.slack.installations` | `GET` |
-| `api.projects.:id.slack.installations.:teamId` | `DELETE` |
-| `api.projects.:id.spectrum.avatar` | `DELETE` |
-| `api.projects.:id.spectrum.avatar.commit` | `POST` |
-| `api.projects.:id.spectrum.avatar.upload` | `POST` |
-| `api.projects.:id.voice.imessage-enabled` | `PATCH` |
-| `api.projects.:id.voice.settings` | `GET` |
-| `api.projects.:id.voice.sip-inbound` | `DELETE` |
-| `api.projects.:id.voice.sip-inbound` | `PATCH` |
-| `api.projects.:id.webhooks` | `GET` |
-| `api.projects.:id.webhooks` | `POST` |
-| `api.projects.:id.webhooks.:webhookId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates` | `GET` |
-| `api.projects.:id.whatsapp.templates` | `POST` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `PATCH` |
+| `.well-known.openid-configuration.api.auth` | `GET` |
+| `api.account.set-password` | `POST` |
+| `api.billing.max-plan` | `GET` |
+| `api.invitations.:token` | `GET` |
+| `api.invitations.:token.accept` | `POST` |
+| `api.oauth-clients.:clientId.metadata` | `PATCH` |
+| `api.oauth-clients.:clientId.scope-tiers` | `GET` |
+| `api.oauth-clients.authorized` | `GET` |
+| `api.oauth-clients.authorized.:clientId` | `DELETE` |
+| `api.onboarding.details` | `POST` |
+| `api.onboarding.name` | `POST` |
+| `api.onboarding.referral` | `POST` |
+| `api.onboarding.state` | `GET` |
+| `api.posthog.identity-snapshot` | `GET` |
+| `api.privacy-requests` | `POST` |
+| `api.projects` | `GET` |
+| `api.projects.:id.imessage.auto-scale` | `PATCH` |
+| `api.projects.:id.imessage.settings` | `GET` |
+| `api.projects.:id.invitations` | `GET` |
+| `api.projects.:id.invitations.:invitationId` | `DELETE` |
+| `api.projects.:id.invitations.:invitationId.link` | `POST` |
+| `api.projects.:id.slack.setup` | `POST` |
+| `api.projects.:id.slack.support-channel` | `GET` |
+| `api.projects.:id.slack.support-channel.open` | `GET` |
+| `api.signup.abandon` | `POST` |
+| `api.slack.features` | `GET` |
+| `api.slack.oidc.callback` | `GET` |
+| `schema.standaloneSchema.macro.macroFn.parser.response..well-known.oauth-authorization-server.api.auth` | `GET` |
 
 ## Removed Routes
 
 | Route | Method |
 |-------|--------|
-| `api.projects.:id.spectrum.avatar-upload-url` | `GET` |
+| `api.otp.email.send` | `POST` |
+| `api.otp.email.verify` | `POST` |
+| `api.profile.developer` | `POST` |
+| `api.profile.organization` | `POST` |
+| `api.projects.:id.spectrum.toggle` | `POST` |
+| `schema.standaloneSchema.macro.macroFn.parser.response.api.projects` | `GET` |
+
+## Changed Routes
+
+| Route | Method | Detail |
+|-------|--------|--------|
+| `api.projects.:id.spectrum.users` | `GET` | response shape changed |
 
 ## Summary
 
-- **23** added
-- **1** removed
-- **0** changed
-- **35** unchanged
+- **28** added
+- **6** removed
+- **1** changed
+- **51** unchanged
