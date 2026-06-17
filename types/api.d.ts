@@ -20,6 +20,9 @@ declare const publicApp: Elysia<"", {
 } & {
     typebox: {};
     error: {};
+} & {
+    typebox: {};
+    error: {};
 }, {
     schema: {};
     standaloneSchema: {};
@@ -41,7 +44,54 @@ declare const publicApp: Elysia<"", {
     macroFn: {};
     parser: {};
     response: {};
+} & {
+    schema: {};
+    standaloneSchema: {};
+    macro: {};
+    macroFn: {};
+    parser: {};
+    response: {};
 }, {
+    ".well-known": {
+        "oauth-authorization-server": {
+            api: {
+                auth: {
+                    get: {
+                        body: any;
+                        params: any;
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    ".well-known": {
+        "openid-configuration": {
+            api: {
+                auth: {
+                    get: {
+                        body: any;
+                        params: any;
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
     api: {
         projects: {
             get: {
@@ -142,30 +192,6 @@ declare const publicApp: Elysia<"", {
                         [x: string]: any;
                         [x: number]: any;
                         [x: symbol]: any;
-                    };
-                };
-            };
-        };
-    };
-} & {
-    api: {
-        projects: {
-            ":id": {
-                spectrum: {
-                    toggle: {
-                        post: {
-                            body: any;
-                            params: {
-                                id: string;
-                            } & {};
-                            query: any;
-                            headers: any;
-                            response: {
-                                [x: string]: any;
-                                [x: number]: any;
-                                [x: symbol]: any;
-                            };
-                        };
                     };
                 };
             };
@@ -318,8 +344,10 @@ declare const publicApp: Elysia<"", {
                 spectrum: {
                     users: {
                         get: {
-                            body: any;
-                            params: any;
+                            body: unknown;
+                            params: {
+                                id: string;
+                            } & {};
                             query: any;
                             headers: any;
                             response: {
@@ -715,6 +743,52 @@ declare const publicApp: Elysia<"", {
     api: {
         projects: {
             ":id": {
+                imessage: {
+                    settings: {
+                        get: {
+                            body: any;
+                            params: any;
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                imessage: {
+                    "auto-scale": {
+                        patch: {
+                            body: any;
+                            params: {
+                                id: string;
+                            } & {};
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
                 voice: {
                     "sip-inbound": {
                         patch: {
@@ -869,6 +943,30 @@ declare const publicApp: Elysia<"", {
     api: {
         projects: {
             ":id": {
+                slack: {
+                    setup: {
+                        post: {
+                            body: any;
+                            params: {
+                                id: string;
+                            } & {};
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
                 webhooks: {
                     get: {
                         body: any;
@@ -995,6 +1093,110 @@ declare const publicApp: Elysia<"", {
     };
 } & {
     api: {
+        projects: {
+            ":id": {
+                invitations: {
+                    get: {
+                        body: any;
+                        params: any;
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                invitations: {
+                    ":invitationId": {
+                        delete: {
+                            body: any;
+                            params: any;
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                invitations: {
+                    ":invitationId": {
+                        link: {
+                            post: {
+                                body: any;
+                                params: any;
+                                query: any;
+                                headers: any;
+                                response: {
+                                    [x: string]: any;
+                                    [x: number]: any;
+                                    [x: symbol]: any;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        invitations: {
+            ":token": {
+                get: {
+                    body: any;
+                    params: any;
+                    query: any;
+                    headers: any;
+                    response: {
+                        [x: string]: any;
+                        [x: number]: any;
+                        [x: symbol]: any;
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        invitations: {
+            ":token": {
+                accept: {
+                    post: {
+                        body: any;
+                        params: any;
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
         billing: {
             plans: {
                 get: {
@@ -1018,6 +1220,24 @@ declare const publicApp: Elysia<"", {
                 post: {
                     body: any;
                     params: {};
+                    query: any;
+                    headers: any;
+                    response: {
+                        [x: string]: any;
+                        [x: number]: any;
+                        [x: symbol]: any;
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        billing: {
+            "max-plan": {
+                get: {
+                    body: any;
+                    params: any;
                     query: any;
                     headers: any;
                     response: {
@@ -1129,8 +1349,44 @@ declare const publicApp: Elysia<"", {
     };
 } & {
     api: {
-        profile: {
-            developer: {
+        posthog: {
+            "identity-snapshot": {
+                get: {
+                    body: any;
+                    params: any;
+                    query: any;
+                    headers: any;
+                    response: {
+                        [x: string]: any;
+                        [x: number]: any;
+                        [x: symbol]: any;
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        onboarding: {
+            state: {
+                get: {
+                    body: any;
+                    params: any;
+                    query: any;
+                    headers: any;
+                    response: {
+                        [x: string]: any;
+                        [x: number]: any;
+                        [x: symbol]: any;
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        onboarding: {
+            name: {
                 post: {
                     body: any;
                     params: {};
@@ -1147,8 +1403,8 @@ declare const publicApp: Elysia<"", {
     };
 } & {
     api: {
-        profile: {
-            organization: {
+        onboarding: {
+            referral: {
                 post: {
                     body: any;
                     params: {};
@@ -1165,18 +1421,56 @@ declare const publicApp: Elysia<"", {
     };
 } & {
     api: {
-        otp: {
-            email: {
-                send: {
-                    post: {
-                        body: any;
-                        params: {};
-                        query: any;
-                        headers: any;
-                        response: {
-                            [x: string]: any;
-                            [x: number]: any;
-                            [x: symbol]: any;
+        onboarding: {
+            details: {
+                post: {
+                    body: any;
+                    params: {};
+                    query: any;
+                    headers: any;
+                    response: {
+                        [x: string]: any;
+                        [x: number]: any;
+                        [x: symbol]: any;
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        slack: {
+            features: {
+                get: {
+                    body: any;
+                    params: any;
+                    query: any;
+                    headers: any;
+                    response: {
+                        [x: string]: any;
+                        [x: number]: any;
+                        [x: symbol]: any;
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        projects: {
+            ":id": {
+                slack: {
+                    "support-channel": {
+                        get: {
+                            body: any;
+                            params: any;
+                            query: any;
+                            headers: any;
+                            response: {
+                                [x: string]: any;
+                                [x: number]: any;
+                                [x: symbol]: any;
+                            };
                         };
                     };
                 };
@@ -1185,12 +1479,36 @@ declare const publicApp: Elysia<"", {
     };
 } & {
     api: {
-        otp: {
-            email: {
-                verify: {
-                    post: {
+        projects: {
+            ":id": {
+                slack: {
+                    "support-channel": {
+                        open: {
+                            get: {
+                                body: any;
+                                params: any;
+                                query: any;
+                                headers: any;
+                                response: {
+                                    [x: string]: any;
+                                    [x: number]: any;
+                                    [x: symbol]: any;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        slack: {
+            oidc: {
+                callback: {
+                    get: {
                         body: any;
-                        params: {};
+                        params: any;
                         query: any;
                         headers: any;
                         response: {
@@ -1231,6 +1549,136 @@ declare const publicApp: Elysia<"", {
                     post: {
                         body: any;
                         params: {};
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        account: {
+            "set-password": {
+                post: {
+                    body: any;
+                    params: {};
+                    query: any;
+                    headers: any;
+                    response: {
+                        [x: string]: any;
+                        [x: number]: any;
+                        [x: symbol]: any;
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        signup: {
+            abandon: {
+                post: {
+                    body: any;
+                    params: {};
+                    query: any;
+                    headers: any;
+                    response: {
+                        [x: string]: any;
+                        [x: number]: any;
+                        [x: symbol]: any;
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        "privacy-requests": {
+            post: {
+                body: any;
+                params: {};
+                query: any;
+                headers: any;
+                response: {
+                    [x: string]: any;
+                    [x: number]: any;
+                    [x: symbol]: any;
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        "oauth-clients": {
+            ":clientId": {
+                "scope-tiers": {
+                    get: {
+                        body: unknown;
+                        params: any;
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        "oauth-clients": {
+            ":clientId": {
+                metadata: {
+                    patch: {
+                        body: any;
+                        params: any;
+                        query: any;
+                        headers: any;
+                        response: {
+                            [x: string]: any;
+                            [x: number]: any;
+                            [x: symbol]: any;
+                        };
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        "oauth-clients": {
+            authorized: {
+                get: {
+                    body: any;
+                    params: any;
+                    query: any;
+                    headers: any;
+                    response: {
+                        [x: string]: any;
+                        [x: number]: any;
+                        [x: symbol]: any;
+                    };
+                };
+            };
+        };
+    };
+} & {
+    api: {
+        "oauth-clients": {
+            authorized: {
+                ":clientId": {
+                    delete: {
+                        body: unknown;
+                        params: any;
                         query: any;
                         headers: any;
                         response: {
