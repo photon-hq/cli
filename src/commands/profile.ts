@@ -58,16 +58,18 @@ function registerShowCommand(profile: Command): void {
       console.log();
 
       if (!profile) {
-        console.log(c.dim("No developer or organization profile yet."));
+        console.log(c.dim("No profile yet."));
         console.log(c.hint("Set one up: `photon profile init`."));
         return;
       }
 
       console.log(c.bold(`${profile.type} profile`));
-      const p = profile.profile as Record<string, unknown>;
-      const entries = Object.entries(p).filter(
-        ([k]) => !["id", "userId", "createdAt", "updatedAt"].includes(k)
-      );
+      const entries: Array<[string, unknown]> = [
+        ["background", profile.background],
+        ["companyName", profile.companyName],
+        ["platforms", profile.platforms],
+        ["referralSource", profile.referralSource],
+      ];
       const width = Math.max(...entries.map(([k]) => k.length));
       for (const [k, v] of entries) {
         console.log(`  ${c.dim(k.padEnd(width))}  ${formatValue(v)}`);
@@ -81,16 +83,10 @@ interface InitOpts {
   // commander returns the raw `--type <type>` value as `string`, so this
   // mirrors that — narrowing to the literal union happens after validation.
   type?: string;
-  // Developer fields
-  languages?: string;       // CSV
+  background?: string;
   referral?: string;
-  // Organization fields
   companyName?: string;
-  role?: string;
-  companySize?: string;
-  website?: string;
   platforms?: string;       // CSV
-  // Common
   apiHost?: string;
   token?: string;
   json?: boolean;
@@ -101,12 +97,9 @@ function registerInitCommand(profile: Command): void {
     .command("init")
     .description("set up your developer or organization profile")
     .option("--type <type>", "developer | organization")
-    .option("--languages <list>", "developer: comma-separated languages")
+    .option("--background <text>", "free-form background (e.g. languages, stack, role)")
     .option("--referral <text>", "how did you hear about us?")
     .option("--company-name <name>", "organization: company name")
-    .option("--role <role>", "organization: your role")
-    .option("--company-size <size>", "organization: company size (e.g. 1-10, 11-50)")
-    .option("--website <url>", "organization: company website")
     .option("--platforms <list>", "organization: comma-separated platforms")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
@@ -130,49 +123,43 @@ function registerInitCommand(profile: Command): void {
         });
       }
 
-      const { type, payload } = await fillInit(opts);
+      const { type, details, referral } = await fillInit(opts);
 
-      if (type === "developer") {
-        const result = await api.api.profile.developer.post(payload);
-        if (result.status === 401) throw new SessionExpiredError(env.name);
-        if (result.error) die(`Failed to save profile: ${formatApiError(result.error)}`);
-      } else {
-        const result = await api.api.profile.organization.post(payload);
-        if (result.status === 401) throw new SessionExpiredError(env.name);
-        if (result.error) die(`Failed to save profile: ${formatApiError(result.error)}`);
+      const r = await api.api.onboarding.details.post(details);
+      if (r.status === 401) throw new SessionExpiredError(env.name);
+      if (r.error) die(`Failed to save profile: ${formatApiError(r.error)}`);
+
+      if (referral !== undefined) {
+        const rr = await api.api.onboarding.referral.post({ referralSource: referral });
+        if (rr.status === 401) throw new SessionExpiredError(env.name);
+        if (rr.error) die(`Failed to save referral source: ${formatApiError(rr.error)}`);
       }
 
       if (opts.json) {
-        printJson({ type, profile: payload });
+        printJson({ type, details, referralSource: referral ?? null });
         return;
       }
       console.log(c.success(`Created ${type} profile.`));
     });
 }
 
-interface DeveloperPayload {
-  languages: string[];
-  referralSource: string;
-}
-
-interface OrganizationPayload {
+interface DetailsPayload {
+  type: "developer" | "organization";
+  background?: string;
   companyName?: string;
-  role?: string;
-  companySize?: string;
-  website?: string;
   platforms?: string[];
-  referralSource?: string;
 }
 
-type InitResult =
-  | { type: "developer"; payload: DeveloperPayload }
-  | { type: "organization"; payload: OrganizationPayload };
+interface InitResult {
+  type: "developer" | "organization";
+  details: DetailsPayload;
+  referral?: string;
+}
 
 async function fillInit(opts: InitOpts): Promise<InitResult> {
-  // Non-interactive: --type required, must be a known value, and
-  // at least one matching field flag must be present so we don't
-  // silently persist an empty profile (`languages: []`,
-  // `referralSource: ""`).
+  // Non-interactive: --type required, must be a known value, and at least one
+  // matching field flag must be present so we don't silently persist an empty
+  // profile.
   if (!isInteractive()) {
     if (!opts.type) {
       die("--type is required in non-interactive mode (developer | organization).");
@@ -181,43 +168,39 @@ async function fillInit(opts: InitOpts): Promise<InitResult> {
       die(`Unknown profile type "${opts.type}". Use "developer" or "organization".`);
     }
     if (opts.type === "developer") {
-      const hasField = opts.languages !== undefined || opts.referral !== undefined;
+      const hasField = opts.background !== undefined || opts.referral !== undefined;
       if (!hasField) {
-        die("At least one of --languages / --referral is required for a developer profile.", {
-          hint: "Pass `--languages typescript,python` and/or `--referral 'word of mouth'`.",
+        die("At least one of --background / --referral is required for a developer profile.", {
+          hint: "Pass `--background 'TypeScript, Python, infra'` and/or `--referral 'word of mouth'`.",
         });
       }
       return {
         type: "developer",
-        payload: {
-          languages: parseCsv(opts.languages ?? ""),
-          referralSource: opts.referral ?? "",
+        details: {
+          type: "developer",
+          background: opts.background,
         },
+        referral: opts.referral,
       };
     }
     // organization
     const hasOrgField =
       opts.companyName !== undefined ||
-      opts.role !== undefined ||
-      opts.companySize !== undefined ||
-      opts.website !== undefined ||
       opts.platforms !== undefined ||
       opts.referral !== undefined;
     if (!hasOrgField) {
       die(
-        "At least one organization field is required (--company-name, --role, --company-size, --website, --platforms, --referral)."
+        "At least one organization field is required (--company-name, --platforms, --referral)."
       );
     }
     return {
       type: "organization",
-      payload: {
+      details: {
+        type: "organization",
         companyName: opts.companyName,
-        role: opts.role,
-        companySize: opts.companySize,
-        website: opts.website,
         platforms: opts.platforms !== undefined ? parseCsv(opts.platforms) : undefined,
-        referralSource: opts.referral,
       },
+      referral: opts.referral,
     };
   }
 
@@ -244,29 +227,24 @@ async function fillInit(opts: InitOpts): Promise<InitResult> {
   }
 
   if (type === "developer") {
-    const languages = await promptCsv(
-      "Languages (comma-separated, e.g. typescript,python)",
-      opts.languages
+    const background = await promptOptionalText(
+      "Background (e.g. TypeScript, Python, infra)",
+      opts.background
     );
-    const referralSource = await promptText(
+    const referralSource = await promptOptionalText(
       "How did you hear about us?",
       opts.referral
     );
     outro(c.dim("Submitting…"));
     return {
       type: "developer",
-      payload: { languages, referralSource },
+      details: { type: "developer", background },
+      referral: referralSource,
     };
   }
 
   // organization
   const companyName = await promptOptionalText("Company name", opts.companyName);
-  const role = await promptOptionalText("Your role", opts.role);
-  const companySize = await promptOptionalText(
-    "Company size (e.g. 1-10, 11-50, 51-200)",
-    opts.companySize
-  );
-  const website = await promptOptionalText("Website URL", opts.website);
   const platforms =
     opts.platforms !== undefined
       ? parseCsv(opts.platforms)
@@ -278,22 +256,13 @@ async function fillInit(opts: InitOpts): Promise<InitResult> {
   outro(c.dim("Submitting…"));
   return {
     type: "organization",
-    payload: {
+    details: {
+      type: "organization",
       companyName,
-      role,
-      companySize,
-      website,
       platforms: platforms.length > 0 ? platforms : undefined,
-      referralSource,
     },
+    referral: referralSource,
   };
-}
-
-async function promptText(message: string, preset?: string): Promise<string> {
-  if (preset !== undefined) return preset;
-  const answer = await text({ message });
-  if (isCancel(answer)) die("Aborted.");
-  return answer ?? "";
 }
 
 async function promptOptionalText(
@@ -331,12 +300,9 @@ function parseCsv(value: string): string[] {
 // ──────────────────────────── update ────────────────────────────
 
 interface UpdateOpts {
-  languages?: string;
+  background?: string;
   referral?: string;
   companyName?: string;
-  role?: string;
-  companySize?: string;
-  website?: string;
   platforms?: string;
   apiHost?: string;
   token?: string;
@@ -348,24 +314,18 @@ function registerUpdateCommand(profile: Command): void {
     .command("update")
     .alias("edit")
     .description("update your existing profile (preserves unchanged fields)")
-    .option("--languages <list>", "developer: comma-separated languages")
+    .option("--background <text>", "developer: free-form background")
     .option("--referral <text>", "how did you hear about us?")
     .option("--company-name <name>", "organization: company name")
-    .option("--role <role>", "organization: your role")
-    .option("--company-size <size>", "organization: company size")
-    .option("--website <url>", "organization: company website")
     .option("--platforms <list>", "organization: comma-separated platforms")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts: UpdateOpts) => {
       const hasMutation =
-        opts.languages !== undefined ||
+        opts.background !== undefined ||
         opts.referral !== undefined ||
         opts.companyName !== undefined ||
-        opts.role !== undefined ||
-        opts.companySize !== undefined ||
-        opts.website !== undefined ||
         opts.platforms !== undefined;
       if (!hasMutation) {
         die("Nothing to update.", {
@@ -394,21 +354,12 @@ function registerUpdateCommand(profile: Command): void {
       // Reject flags that don't apply to this profile type — otherwise
       // running `update --company-name X` on a developer profile would
       // silently no-op and report "✓ Updated".
-      const developerOnly = ["--languages"];
-      const organizationOnly = [
-        "--company-name",
-        "--role",
-        "--company-size",
-        "--website",
-        "--platforms",
-      ];
+      const developerOnly = ["--background"];
+      const organizationOnly = ["--company-name", "--platforms"];
       const passedDeveloperFlags: string[] = [];
-      if (opts.languages !== undefined) passedDeveloperFlags.push("--languages");
+      if (opts.background !== undefined) passedDeveloperFlags.push("--background");
       const passedOrganizationFlags: string[] = [];
       if (opts.companyName !== undefined) passedOrganizationFlags.push("--company-name");
-      if (opts.role !== undefined) passedOrganizationFlags.push("--role");
-      if (opts.companySize !== undefined) passedOrganizationFlags.push("--company-size");
-      if (opts.website !== undefined) passedOrganizationFlags.push("--website");
       if (opts.platforms !== undefined) passedOrganizationFlags.push("--platforms");
       if (current.type === "developer" && passedOrganizationFlags.length > 0) {
         die(
@@ -424,39 +375,42 @@ function registerUpdateCommand(profile: Command): void {
       }
 
       // Server upsert overwrites every field with whatever we send,
-      // so fetch + overlay to preserve unchanged fields. Same pattern
-      // as projects update.
-      if (current.type === "developer") {
-        const cp = current.profile as { languages?: string[]; referralSource?: string };
-        const body: DeveloperPayload = {
-          languages:
-            opts.languages !== undefined ? parseCsv(opts.languages) : cp.languages ?? [],
-          referralSource: opts.referral ?? cp.referralSource ?? "",
-        };
-        const r = await api.api.profile.developer.post(body);
-        if (r.status === 401) throw new SessionExpiredError(env.name);
-        if (r.error) die(`Failed to update profile: ${formatApiError(r.error)}`);
-        if (opts.json) return printJson({ type: "developer", profile: body });
-        console.log(c.success("Developer profile updated."));
-      } else {
-        const cp = current.profile as Record<string, unknown>;
-        const body: OrganizationPayload = {
-          companyName: opts.companyName ?? (cp.companyName as string | undefined),
-          role: opts.role ?? (cp.role as string | undefined),
-          companySize: opts.companySize ?? (cp.companySize as string | undefined),
-          website: opts.website ?? (cp.website as string | undefined),
-          platforms:
-            opts.platforms !== undefined
-              ? parseCsv(opts.platforms)
-              : (cp.platforms as string[] | undefined),
-          referralSource: opts.referral ?? (cp.referralSource as string | undefined),
-        };
-        const r = await api.api.profile.organization.post(body);
-        if (r.status === 401) throw new SessionExpiredError(env.name);
-        if (r.error) die(`Failed to update profile: ${formatApiError(r.error)}`);
-        if (opts.json) return printJson({ type: "organization", profile: body });
-        console.log(c.success("Organization profile updated."));
+      // so fetch + overlay to preserve unchanged fields.
+      const details: DetailsPayload =
+        current.type === "developer"
+          ? {
+              type: "developer",
+              background: opts.background ?? current.background ?? undefined,
+            }
+          : {
+              type: "organization",
+              companyName: opts.companyName ?? current.companyName ?? undefined,
+              platforms:
+                opts.platforms !== undefined
+                  ? parseCsv(opts.platforms)
+                  : current.platforms ?? undefined,
+            };
+
+      const r = await api.api.onboarding.details.post(details);
+      if (r.status === 401) throw new SessionExpiredError(env.name);
+      if (r.error) die(`Failed to update profile: ${formatApiError(r.error)}`);
+
+      let referralSource: string | undefined;
+      if (opts.referral !== undefined) {
+        referralSource = opts.referral;
+        const rr = await api.api.onboarding.referral.post({ referralSource });
+        if (rr.status === 401) throw new SessionExpiredError(env.name);
+        if (rr.error) die(`Failed to update referral source: ${formatApiError(rr.error)}`);
       }
+
+      if (opts.json) {
+        return printJson({
+          type: current.type,
+          details,
+          referralSource: referralSource ?? current.referralSource ?? null,
+        });
+      }
+      console.log(c.success(`${capitalize(current.type)} profile updated.`));
     });
 }
 
@@ -466,6 +420,11 @@ function formatValue(v: unknown): string {
   if (v === null || v === undefined || v === "") return c.dim("—");
   if (typeof v === "boolean") return v ? c.green("yes") : c.dim("no");
   if (v instanceof Date) return v.toLocaleString();
+  if (Array.isArray(v)) return v.length === 0 ? c.dim("—") : v.join(", ");
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
+}
+
+function capitalize(s: string): string {
+  return s.length === 0 ? s : s[0]!.toUpperCase() + s.slice(1);
 }
