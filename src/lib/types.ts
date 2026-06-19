@@ -25,20 +25,22 @@ export interface Project {
   updatedAt: string;
 }
 
-export interface DeveloperProfile {
+/**
+ * Unified onboarding profile row returned by GET /api/profile.
+ *
+ * As of dashboard@v1.2.0 the per-type developer/organization split is
+ * collapsed into one `onboarding_profile` row whose `type` discriminates
+ * which optional fields apply. Legacy fields `languages`, `role`,
+ * `companySize`, and `website` no longer exist on the server.
+ */
+export interface OnboardingProfile {
   id: string;
   userId: string;
-  // Server-side fields TBD; expand when we render them.
-  [key: string]: unknown;
+  type: "developer" | "organization";
+  referralSource: string | null;
+  platforms: string[] | null;
+  background: string | null;
+  companyName: string | null;
 }
 
-export interface OrganizationProfile {
-  id: string;
-  userId: string;
-  [key: string]: unknown;
-}
-
-export type ProfileResponse =
-  | { type: "developer"; profile: DeveloperProfile }
-  | { type: "organization"; profile: OrganizationProfile }
-  | null;
+export type ProfileResponse = OnboardingProfile | null;
