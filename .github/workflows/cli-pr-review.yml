@@ -256,7 +256,7 @@ jobs:
             The PR is in DRAFT state. Verify against AGENTS.md hard rules:
 
             - Bun only (no Node/npm/pnpm/yarn introduced)
-            - `types/api.d.ts` only changed via `bun run sync:api` (additive Elysia intersections, no hand edits)
+            - API types changed only via a `@photon-ai/dashboard-api` version bump in `package.json`/`bun.lock`, never hand-edited
             - No forbidden deps in `package.json`: axios, chalk, zod, jest, vitest, ts-node, ws, express, dotenv, ioredis, pg, better-sqlite3
             - Every command uses `getApi()` + Eden treaty + `{ data, error, status }` destructure
             - 401 throws `SessionExpiredError`, no raw `fetch()` to Photon API
