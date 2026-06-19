@@ -1,7 +1,9 @@
 {
+  "id": "prof_00000000-0000-4000-a000-000000000001",
+  "userId": "usr_00000000-0000-4000-a000-000000000001",
   "type": "developer",
-  "profile": {
-    "id": "prof_00000000-0000-4000-a000-000000000001",
-    "userId": "usr_00000000-0000-4000-a000-000000000001"
-  }
+  "referralSource": null,
+  "platforms": null,
+  "background": null,
+  "companyName": null
 }
