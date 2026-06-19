@@ -256,7 +256,7 @@ The CLI's config root is resolved in this order:
 
 If a legacy `~/.config/photon-dashboard/` directory exists from a prior pre-rename install, it migrates automatically to the new path on first run.
 
-Other env vars: `PHOTON_TYPES_SRC` (maintainer-only, for `bun run sync:api`), `PHOTON_NO_UPDATE_NOTIFIER=1` (mute update prompt).
+Other env vars: `PHOTON_NO_UPDATE_NOTIFIER=1` (mute update prompt).
 
 ---
 
@@ -278,12 +278,9 @@ bun run typecheck
 
 # Build (produces dist/photon.js)
 bun run build
-
-# Sync API types from a sibling `dashboard` checkout (maintainer)
-bun run sync:api
 ```
 
-The CLI's API contract comes from the `@photon-ai/api-public` type bundle, vendored at `types/api.d.ts`. To refresh after the dashboard's API surface changes, run `bun run sync:api` (looks for the sibling checkout by default; set `PHOTON_TYPES_SRC` to override).
+The CLI's API contract comes from the [`@photon-ai/dashboard-api`](https://www.npmjs.com/package/@photon-ai/dashboard-api) package, a types-only bundle of the dashboard's public API (the `PublicApp` Elysia type, used with `@elysiajs/eden` treaty). To pick up dashboard API changes, bump that dependency — its version tracks the dashboard release tag.
 
 See [`docs/cli-design.md`](docs/cli-design.md) and [`docs/cli-build-plan.md`](docs/cli-build-plan.md) for the full architecture notes.
 
