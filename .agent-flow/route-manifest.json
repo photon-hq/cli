@@ -1,11 +1,6 @@
 {
-  "generated_at": "2026-05-15T15:22:47.810Z",
+  "generated_at": "2026-06-19T21:13:56.842Z",
   "routes": [
-    {
-      "path": "api.billing.checkout",
-      "method": "post",
-      "used_by": "src/commands/billing.ts"
-    },
     {
       "path": "api.billing.plans",
       "method": "get",
@@ -17,6 +12,11 @@
       "used_by": "src/commands/ping.ts"
     },
     {
+      "path": "api.onboarding.details",
+      "method": "post",
+      "used_by": "src/commands/profile.ts"
+    },
+    {
       "path": "api.profile",
       "method": "get",
       "used_by": "src/commands/whoami.ts"
@@ -24,16 +24,6 @@
     {
       "path": "api.profile",
       "method": "get",
-      "used_by": "src/commands/profile.ts"
-    },
-    {
-      "path": "api.profile.developer",
-      "method": "post",
-      "used_by": "src/commands/profile.ts"
-    },
-    {
-      "path": "api.profile.organization",
-      "method": "post",
       "used_by": "src/commands/profile.ts"
     },
     {
@@ -92,8 +82,13 @@
       "used_by": "src/commands/projects.ts"
     },
     {
-      "path": "api.projects.:param.spectrum.avatar-upload-url",
-      "method": "get",
+      "path": "api.projects.:param.spectrum.avatar.commit",
+      "method": "post",
+      "used_by": "src/commands/spectrum/avatar.ts"
+    },
+    {
+      "path": "api.projects.:param.spectrum.avatar.upload",
+      "method": "post",
       "used_by": "src/commands/spectrum/avatar.ts"
     },
     {
@@ -129,11 +124,6 @@
     {
       "path": "api.projects.:param.subscription",
       "method": "get",
-      "used_by": "src/commands/billing.ts"
-    },
-    {
-      "path": "api.projects.:param.subscription.manage",
-      "method": "post",
       "used_by": "src/commands/billing.ts"
     },
     {

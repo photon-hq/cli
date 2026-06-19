@@ -45,11 +45,11 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "check": "bun run typecheck && bun test && bun run build",
-    "sync:api": "bun run scripts/sync-api-types.ts",
     "manifest": "bun run scripts/generate-route-manifest.ts",
     "prepublishOnly": "bun run typecheck && bun run build"
   },
   "devDependencies": {
+    "@photon-ai/dashboard-api": "1.2.0",
     "@types/bun": "latest",
     "@types/node": "^25.6.2",
     "@types/update-notifier": "^6.0.8",
