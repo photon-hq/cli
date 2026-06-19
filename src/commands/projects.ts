@@ -20,7 +20,10 @@ import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 import { isInteractive } from "~/lib/tty.ts";
-import type { Project } from "~/lib/types.ts";
+
+/** Platforms accepted by `projects create` (mirrors the API's create body). */
+const PLATFORMS = ["imessage", "whatsapp_business", "voice"] as const;
+type Platform = (typeof PLATFORMS)[number];
 
 export function registerProjectsCommand(program: Command): void {
   const projects = program
@@ -61,7 +64,7 @@ function registerListCommand(projects: Command): void {
         die(`Failed to list projects: ${formatApiError(error)}`);
       }
 
-      const list = (data ?? []) as Project[];
+      const list = data ?? [];
       if (opts.json) {
         printJson(list);
         return;
@@ -77,10 +80,10 @@ function registerListCommand(projects: Command): void {
         p.name,
         p.location,
         formatStatus(p.status),
-        p.spectrum ? c.green("on") : c.dim("off"),
+        p.platforms.length > 0 ? p.platforms.join(", ") : c.dim("—"),
         new Date(p.updatedAt).toLocaleDateString(),
       ]);
-      printTable(["id", "name", "location", "status", "spectrum", "updated"], rows);
+      printTable(["id", "name", "location", "status", "platforms", "updated"], rows);
     });
 }
 
@@ -121,17 +124,19 @@ function registerShowCommand(projects: Command): void {
         return;
       }
 
-      const p = data as Project;
+      // The 404 / no-data case is handled above; this narrows for TS.
+      if (!data) return;
+      const p = data;
       console.log(c.bold(p.name) + c.dim(`  (${p.id})`));
       console.log();
       printKv([
         ["status", formatStatus(p.status)],
         ["location", p.location],
-        ["spectrum", p.spectrum ? c.green("enabled") : c.dim("disabled")],
-        ["spectrumProjectId", p.spectrumProjectId ?? c.dim("—")],
+        ["owner", p.isOwner ? c.green("yes") : c.dim("no")],
         ["template", p.template ? "yes" : "no"],
         ["observability", p.observability ? "yes" : "no"],
-        ["subscription", p.subscriptionStatus ?? c.dim("—")],
+        ["slackChannelId", p.slackChannelId ?? c.dim("—")],
+        ["slackTeamId", p.slackTeamId ?? c.dim("—")],
         ["createdAt", new Date(p.createdAt).toLocaleString()],
         ["updatedAt", new Date(p.updatedAt).toLocaleString()],
       ]);
@@ -143,7 +148,7 @@ function registerShowCommand(projects: Command): void {
 interface CreateOpts {
   name?: string;
   location?: string;
-  spectrum?: boolean;
+  platforms?: string;
   template?: boolean;
   observability?: boolean;
   apiHost?: string;
@@ -158,8 +163,7 @@ function registerCreateCommand(projects: Command): void {
     .description("create a new project")
     .option("-n, --name <name>", "project name")
     .option("-l, --location <location>", 'location (default: "United States")')
-    .option("--spectrum", "enable Spectrum")
-    .option("--no-spectrum", "disable Spectrum")
+    .option("--platforms <list>", `comma-separated platforms (${PLATFORMS.join(", ")})`)
     .option("--template", "use as template")
     .option("--observability", "enable observability")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
@@ -176,7 +180,7 @@ function registerCreateCommand(projects: Command): void {
       const { data, error, status } = await api.api.projects.post({
         name: filled.name,
         location: filled.location,
-        spectrum: filled.spectrum,
+        platforms: filled.platforms,
         template: filled.template,
         observability: filled.observability,
       });
@@ -211,9 +215,28 @@ function registerCreateCommand(projects: Command): void {
 interface FilledCreate {
   name: string;
   location: string;
-  spectrum: boolean;
+  platforms: Platform[];
   template: boolean;
   observability: boolean;
+}
+
+/**
+ * Parse a comma-separated --platforms value into the API's platform union,
+ * rejecting unknown values up front so the server doesn't 422 us.
+ */
+function parsePlatforms(value: string): Platform[] {
+  const parsed = value
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const invalid = parsed.filter((p) => !PLATFORMS.includes(p as Platform));
+  if (invalid.length > 0) {
+    die(`Unknown platform(s): ${invalid.join(", ")}.`, {
+      hint: `Valid platforms: ${PLATFORMS.join(", ")}.`,
+    });
+  }
+  // Dedupe while preserving order.
+  return [...new Set(parsed)] as Platform[];
 }
 
 async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
@@ -227,7 +250,7 @@ async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     return {
       name: opts.name.trim(),
       location: opts.location ?? "United States",
-      spectrum: opts.spectrum ?? false,
+      platforms: opts.platforms !== undefined ? parsePlatforms(opts.platforms) : [],
       template: opts.template ?? false,
       observability: opts.observability ?? false,
     };
@@ -261,13 +284,40 @@ async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     location = answer || "United States";
   }
 
-  const spectrum = opts.spectrum ?? (await promptBool("Enable Spectrum?", false));
+  const platforms =
+    opts.platforms !== undefined
+      ? parsePlatforms(opts.platforms)
+      : parsePlatforms(
+          await promptText(
+            `Platforms (comma-separated: ${PLATFORMS.join(", ")})`,
+            undefined,
+            true
+          )
+        );
   const template = opts.template ?? (await promptBool("Use as template?", false));
   const observability =
     opts.observability ?? (await promptBool("Enable observability?", false));
 
   outro(c.dim("Submitting…"));
-  return { name, location, spectrum, template, observability };
+  return { name, location, platforms, template, observability };
+}
+
+/**
+ * Free-text prompt. When `optional`, an empty answer is allowed and
+ * returns "". Aborts on cancel.
+ */
+async function promptText(
+  message: string,
+  preset?: string,
+  optional = false
+): Promise<string> {
+  if (preset !== undefined) return preset;
+  const answer = await text({
+    message,
+    placeholder: optional ? "(skip)" : undefined,
+  });
+  if (isCancel(answer)) die("Aborted.");
+  return answer ?? "";
 }
 
 async function promptBool(message: string, initial: boolean): Promise<boolean> {
@@ -280,9 +330,6 @@ async function promptBool(message: string, initial: boolean): Promise<boolean> {
 
 interface UpdateOpts {
   name?: string;
-  spectrum?: boolean;
-  template?: boolean;
-  observability?: boolean;
   project?: string;
   apiHost?: string;
   token?: string;
@@ -293,40 +340,22 @@ function registerUpdateCommand(projects: Command): void {
   projects
     .command("update [id]")
     .alias("edit")
-    .alias("set")
-    .description("update an existing project (defaults to $PHOTON_PROJECT_ID)")
+    .alias("rename")
+    .description("rename a project (defaults to $PHOTON_PROJECT_ID)")
     .option("-n, --name <name>", "new name")
-    .option("--spectrum", "enable Spectrum")
-    .option("--no-spectrum", "disable Spectrum")
-    .option("--template", "use as template")
-    .option("--no-template", "stop using as template")
-    .option("--observability", "enable observability")
-    .option("--no-observability", "disable observability")
     .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (idArg: string | undefined, opts: UpdateOpts) => {
-      // At least one mutation flag is required so we don't accidentally
-      // PATCH with the same values (server treats unspecified booleans as
-      // false, so blindly re-sending current state could RESET them).
-      // An empty/whitespace-only --name is also "no mutation" — without
-      // this check, the rename would silently fall back to current.name
-      // and the user would get a "✓ Updated" with nothing changed.
+      // The API's PATCH only accepts a new name — spectrum/template/
+      // observability are no longer mutable via this route. Require a
+      // non-empty --name so a whitespace-only value doesn't silently
+      // "succeed" with no change.
       const trimmedName = opts.name?.trim();
-      if (opts.name !== undefined && !trimmedName) {
-        die("--name must not be empty.", {
-          hint: "Either pass a non-empty name or omit --name to keep the current one.",
-        });
-      }
-      const hasMutation =
-        trimmedName !== undefined ||
-        opts.spectrum !== undefined ||
-        opts.template !== undefined ||
-        opts.observability !== undefined;
-      if (!hasMutation) {
-        die("Nothing to update.", {
-          hint: "Pass at least one of --name / --spectrum / --template / --observability.",
+      if (!trimmedName) {
+        die("--name is required.", {
+          hint: "Pass a non-empty name, e.g. `photon projects update --name 'New Name'`.",
         });
       }
 
@@ -340,41 +369,19 @@ function registerUpdateCommand(projects: Command): void {
         requireAuth: true,
       });
 
-      // Server's PATCH requires the full payload (name + boolean flags).
-      // Fetch current state and overlay the user's mutations so we don't
-      // reset spectrum/template/observability to false silently.
-      const fetched = await api.api.projects({ id: projectId }).get();
-      if (fetched.status === 401) throw new SessionExpiredError(resolved.name);
-      if (fetched.status === 404 || (!fetched.error && !fetched.data)) {
-        die(`Project not found: ${projectId}`, {
-          hint: "List your projects with `photon projects ls`.",
-        });
-      }
-      if (fetched.error || !fetched.data) {
-        die(`Failed to load current project: ${formatApiError(fetched.error)}`);
-      }
-      const current = fetched.data as Project;
-
-      const body = {
-        name: trimmedName ?? current.name,
-        spectrum: opts.spectrum ?? current.spectrum,
-        template: opts.template ?? current.template,
-        observability: opts.observability ?? current.observability,
-      };
-
       const { error, status, data } = await api.api
         .projects({ id: projectId })
-        .patch(body);
+        .patch({ name: trimmedName });
       if (status === 401) throw new SessionExpiredError(resolved.name);
       if (error) die(`Failed to update project: ${formatApiError(error)}`);
       const result = data as { success?: true; error?: string };
       if (result.error) die(result.error);
 
       if (opts.json) {
-        printJson({ id: projectId, ...body });
+        printJson({ id: projectId, name: trimmedName });
         return;
       }
-      console.log(c.success(`Updated ${c.bold(body.name)} ${c.dim(`(${projectId})`)}`));
+      console.log(c.success(`Updated ${c.bold(trimmedName)} ${c.dim(`(${projectId})`)}`));
     });
 }
 
@@ -415,7 +422,9 @@ function registerDeleteCommand(projects: Command): void {
       if (fetched.error) {
         die(`Failed to look up project: ${formatApiError(fetched.error)}`);
       }
-      const project = fetched.data as Project;
+      // The not-found case is handled above; this narrows for TS.
+      if (!fetched.data) return;
+      const project = fetched.data;
 
       await confirmDestructive({
         message: `Delete project ${c.bold(project.name)} (${projectId})? This cannot be undone.`,

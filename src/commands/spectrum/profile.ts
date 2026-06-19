@@ -38,9 +38,9 @@ export function registerSpectrumProfile(spectrum: Command): void {
         console.log(c.dim("No Spectrum profile."));
         return;
       }
-      const entries = Object.entries(data as Record<string, unknown>).filter(
-        ([k]) => !["id"].includes(k)
-      );
+      const entries = Object.entries(
+        data as unknown as Record<string, unknown>
+      ).filter(([k]) => !["id", "projectId"].includes(k));
       if (entries.length === 0) {
         console.log(c.dim("Empty Spectrum profile."));
         return;
