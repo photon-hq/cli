@@ -53,9 +53,8 @@ export function registerWhoamiCommand(program: Command): void {
 /**
  * The /api/profile endpoint returns either:
  *   - `null` (no profile yet)
- *   - `{ type: "developer", profile: {...} }`
- *   - `{ type: "organization", profile: {...} }`
- * Match that shape; `developer`/`organization` are not top-level keys.
+ *   - a flat onboarding-profile row whose `type` discriminator is
+ *     `"developer"` or `"organization"`.
  */
 function summarizeProfile(profile: unknown): string | null {
   if (!profile || typeof profile !== "object") return null;

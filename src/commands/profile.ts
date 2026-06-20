@@ -10,12 +10,12 @@ import { getApi } from "~/lib/api.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson } from "~/lib/output.ts";
 import { isInteractive } from "~/lib/tty.ts";
-import type { ProfileResponse } from "~/lib/types.ts";
+import type { ProfileResponse, ProfileRow } from "~/lib/types.ts";
 
 export function registerProfileCommand(program: Command): void {
   const profile = program
     .command("profile")
-    .description("view or manage your developer / organization profile");
+    .description("view or manage your onboarding profile");
 
   registerShowCommand(profile);
   registerInitCommand(profile);
@@ -58,21 +58,24 @@ function registerShowCommand(profile: Command): void {
       console.log();
 
       if (!profile) {
-        console.log(c.dim("No developer or organization profile yet."));
+        console.log(c.dim("No onboarding profile yet."));
         console.log(c.hint("Set one up: `photon profile init`."));
         return;
       }
 
       console.log(c.bold(`${profile.type} profile`));
-      const p = profile.profile as Record<string, unknown>;
-      const entries = Object.entries(p).filter(
-        ([k]) => !["id", "userId", "createdAt", "updatedAt"].includes(k)
-      );
+      const entries = visibleEntries(profile);
       const width = Math.max(...entries.map(([k]) => k.length));
       for (const [k, v] of entries) {
         console.log(`  ${c.dim(k.padEnd(width))}  ${formatValue(v)}`);
       }
     });
+}
+
+function visibleEntries(profile: ProfileRow): Array<[string, unknown]> {
+  return Object.entries(profile).filter(
+    ([k]) => !["id", "userId", "createdAt", "updatedAt"].includes(k)
+  );
 }
 
 // ──────────────────────────── init ────────────────────────────
@@ -81,16 +84,10 @@ interface InitOpts {
   // commander returns the raw `--type <type>` value as `string`, so this
   // mirrors that — narrowing to the literal union happens after validation.
   type?: string;
-  // Developer fields
-  languages?: string;       // CSV
+  background?: string;
   referral?: string;
-  // Organization fields
   companyName?: string;
-  role?: string;
-  companySize?: string;
-  website?: string;
   platforms?: string;       // CSV
-  // Common
   apiHost?: string;
   token?: string;
   json?: boolean;
@@ -99,15 +96,12 @@ interface InitOpts {
 function registerInitCommand(profile: Command): void {
   profile
     .command("init")
-    .description("set up your developer or organization profile")
+    .description("set up your onboarding profile")
     .option("--type <type>", "developer | organization")
-    .option("--languages <list>", "developer: comma-separated languages")
+    .option("--background <text>", "developer: free-form background / focus areas")
     .option("--referral <text>", "how did you hear about us?")
     .option("--company-name <name>", "organization: company name")
-    .option("--role <role>", "organization: your role")
-    .option("--company-size <size>", "organization: company size (e.g. 1-10, 11-50)")
-    .option("--website <url>", "organization: company website")
-    .option("--platforms <list>", "organization: comma-separated platforms")
+    .option("--platforms <list>", "comma-separated platforms (e.g. ios,android,web)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
@@ -130,49 +124,47 @@ function registerInitCommand(profile: Command): void {
         });
       }
 
-      const { type, payload } = await fillInit(opts);
+      const { type, details, referralSource } = await fillInit(opts);
 
-      if (type === "developer") {
-        const result = await api.api.profile.developer.post(payload);
-        if (result.status === 401) throw new SessionExpiredError(env.name);
-        if (result.error) die(`Failed to save profile: ${formatApiError(result.error)}`);
-      } else {
-        const result = await api.api.profile.organization.post(payload);
-        if (result.status === 401) throw new SessionExpiredError(env.name);
-        if (result.error) die(`Failed to save profile: ${formatApiError(result.error)}`);
+      const detailsRes = await api.api.onboarding.details.post(details);
+      if (detailsRes.status === 401) throw new SessionExpiredError(env.name);
+      if (detailsRes.error) {
+        die(`Failed to save profile: ${formatApiError(detailsRes.error)}`);
+      }
+
+      if (referralSource) {
+        const refRes = await api.api.onboarding.referral.post({ referralSource });
+        if (refRes.status === 401) throw new SessionExpiredError(env.name);
+        if (refRes.error) {
+          die(`Failed to save referral: ${formatApiError(refRes.error)}`);
+        }
       }
 
       if (opts.json) {
-        printJson({ type, profile: payload });
+        printJson({ type, details, referralSource });
         return;
       }
       console.log(c.success(`Created ${type} profile.`));
     });
 }
 
-interface DeveloperPayload {
-  languages: string[];
-  referralSource: string;
+interface DetailsPayload {
+  type: "developer" | "organization";
+  background?: string;
+  companyName?: string;
+  platforms?: string[];
 }
 
-interface OrganizationPayload {
-  companyName?: string;
-  role?: string;
-  companySize?: string;
-  website?: string;
-  platforms?: string[];
+interface InitResult {
+  type: "developer" | "organization";
+  details: DetailsPayload;
   referralSource?: string;
 }
-
-type InitResult =
-  | { type: "developer"; payload: DeveloperPayload }
-  | { type: "organization"; payload: OrganizationPayload };
 
 async function fillInit(opts: InitOpts): Promise<InitResult> {
   // Non-interactive: --type required, must be a known value, and
   // at least one matching field flag must be present so we don't
-  // silently persist an empty profile (`languages: []`,
-  // `referralSource: ""`).
+  // silently persist an empty profile.
   if (!isInteractive()) {
     if (!opts.type) {
       die("--type is required in non-interactive mode (developer | organization).");
@@ -181,43 +173,43 @@ async function fillInit(opts: InitOpts): Promise<InitResult> {
       die(`Unknown profile type "${opts.type}". Use "developer" or "organization".`);
     }
     if (opts.type === "developer") {
-      const hasField = opts.languages !== undefined || opts.referral !== undefined;
+      const hasField =
+        opts.background !== undefined ||
+        opts.platforms !== undefined ||
+        opts.referral !== undefined;
       if (!hasField) {
-        die("At least one of --languages / --referral is required for a developer profile.", {
-          hint: "Pass `--languages typescript,python` and/or `--referral 'word of mouth'`.",
+        die("At least one of --background / --platforms / --referral is required for a developer profile.", {
+          hint: "Pass `--background 'building agents'` and/or `--referral 'word of mouth'`.",
         });
       }
       return {
         type: "developer",
-        payload: {
-          languages: parseCsv(opts.languages ?? ""),
-          referralSource: opts.referral ?? "",
+        details: {
+          type: "developer",
+          background: opts.background,
+          platforms: opts.platforms !== undefined ? parseCsv(opts.platforms) : undefined,
         },
+        referralSource: opts.referral,
       };
     }
     // organization
     const hasOrgField =
       opts.companyName !== undefined ||
-      opts.role !== undefined ||
-      opts.companySize !== undefined ||
-      opts.website !== undefined ||
       opts.platforms !== undefined ||
       opts.referral !== undefined;
     if (!hasOrgField) {
       die(
-        "At least one organization field is required (--company-name, --role, --company-size, --website, --platforms, --referral)."
+        "At least one organization field is required (--company-name, --platforms, --referral)."
       );
     }
     return {
       type: "organization",
-      payload: {
+      details: {
+        type: "organization",
         companyName: opts.companyName,
-        role: opts.role,
-        companySize: opts.companySize,
-        website: opts.website,
         platforms: opts.platforms !== undefined ? parseCsv(opts.platforms) : undefined,
-        referralSource: opts.referral,
       },
+      referralSource: opts.referral,
     };
   }
 
@@ -244,29 +236,32 @@ async function fillInit(opts: InitOpts): Promise<InitResult> {
   }
 
   if (type === "developer") {
-    const languages = await promptCsv(
-      "Languages (comma-separated, e.g. typescript,python)",
-      opts.languages
+    const background = await promptOptionalText(
+      "Background (e.g. building agents, mobile apps)",
+      opts.background
     );
-    const referralSource = await promptText(
+    const platforms =
+      opts.platforms !== undefined
+        ? parseCsv(opts.platforms)
+        : await promptCsv("Platforms (comma-separated, e.g. ios,android,web)", undefined, true);
+    const referralSource = await promptOptionalText(
       "How did you hear about us?",
       opts.referral
     );
     outro(c.dim("Submitting…"));
     return {
       type: "developer",
-      payload: { languages, referralSource },
+      details: {
+        type: "developer",
+        background,
+        platforms: platforms.length > 0 ? platforms : undefined,
+      },
+      referralSource,
     };
   }
 
   // organization
   const companyName = await promptOptionalText("Company name", opts.companyName);
-  const role = await promptOptionalText("Your role", opts.role);
-  const companySize = await promptOptionalText(
-    "Company size (e.g. 1-10, 11-50, 51-200)",
-    opts.companySize
-  );
-  const website = await promptOptionalText("Website URL", opts.website);
   const platforms =
     opts.platforms !== undefined
       ? parseCsv(opts.platforms)
@@ -278,22 +273,13 @@ async function fillInit(opts: InitOpts): Promise<InitResult> {
   outro(c.dim("Submitting…"));
   return {
     type: "organization",
-    payload: {
+    details: {
+      type: "organization",
       companyName,
-      role,
-      companySize,
-      website,
       platforms: platforms.length > 0 ? platforms : undefined,
-      referralSource,
     },
+    referralSource,
   };
-}
-
-async function promptText(message: string, preset?: string): Promise<string> {
-  if (preset !== undefined) return preset;
-  const answer = await text({ message });
-  if (isCancel(answer)) die("Aborted.");
-  return answer ?? "";
 }
 
 async function promptOptionalText(
@@ -331,12 +317,9 @@ function parseCsv(value: string): string[] {
 // ──────────────────────────── update ────────────────────────────
 
 interface UpdateOpts {
-  languages?: string;
+  background?: string;
   referral?: string;
   companyName?: string;
-  role?: string;
-  companySize?: string;
-  website?: string;
   platforms?: string;
   apiHost?: string;
   token?: string;
@@ -348,24 +331,18 @@ function registerUpdateCommand(profile: Command): void {
     .command("update")
     .alias("edit")
     .description("update your existing profile (preserves unchanged fields)")
-    .option("--languages <list>", "developer: comma-separated languages")
+    .option("--background <text>", "developer: free-form background")
     .option("--referral <text>", "how did you hear about us?")
     .option("--company-name <name>", "organization: company name")
-    .option("--role <role>", "organization: your role")
-    .option("--company-size <size>", "organization: company size")
-    .option("--website <url>", "organization: company website")
-    .option("--platforms <list>", "organization: comma-separated platforms")
+    .option("--platforms <list>", "comma-separated platforms")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts: UpdateOpts) => {
       const hasMutation =
-        opts.languages !== undefined ||
+        opts.background !== undefined ||
         opts.referral !== undefined ||
         opts.companyName !== undefined ||
-        opts.role !== undefined ||
-        opts.companySize !== undefined ||
-        opts.website !== undefined ||
         opts.platforms !== undefined;
       if (!hasMutation) {
         die("Nothing to update.", {
@@ -394,73 +371,71 @@ function registerUpdateCommand(profile: Command): void {
       // Reject flags that don't apply to this profile type — otherwise
       // running `update --company-name X` on a developer profile would
       // silently no-op and report "✓ Updated".
-      const developerOnly = ["--languages"];
-      const organizationOnly = [
-        "--company-name",
-        "--role",
-        "--company-size",
-        "--website",
-        "--platforms",
-      ];
+      const developerOnly = ["--background"];
+      const organizationOnly = ["--company-name"];
       const passedDeveloperFlags: string[] = [];
-      if (opts.languages !== undefined) passedDeveloperFlags.push("--languages");
+      if (opts.background !== undefined) passedDeveloperFlags.push("--background");
       const passedOrganizationFlags: string[] = [];
       if (opts.companyName !== undefined) passedOrganizationFlags.push("--company-name");
-      if (opts.role !== undefined) passedOrganizationFlags.push("--role");
-      if (opts.companySize !== undefined) passedOrganizationFlags.push("--company-size");
-      if (opts.website !== undefined) passedOrganizationFlags.push("--website");
-      if (opts.platforms !== undefined) passedOrganizationFlags.push("--platforms");
       if (current.type === "developer" && passedOrganizationFlags.length > 0) {
         die(
           `Flags ${passedOrganizationFlags.join(", ")} apply to organization profiles, but yours is a developer profile.`,
-          { hint: `Valid flags for developer: ${developerOnly.join(", ")}, --referral.` }
+          { hint: `Valid flags for developer: ${developerOnly.join(", ")}, --platforms, --referral.` }
         );
       }
       if (current.type === "organization" && passedDeveloperFlags.length > 0) {
         die(
           `Flags ${passedDeveloperFlags.join(", ")} apply to developer profiles, but yours is an organization profile.`,
-          { hint: `Valid flags for organization: ${organizationOnly.join(", ")}, --referral.` }
+          { hint: `Valid flags for organization: ${organizationOnly.join(", ")}, --platforms, --referral.` }
         );
       }
 
       // Server upsert overwrites every field with whatever we send,
-      // so fetch + overlay to preserve unchanged fields. Same pattern
-      // as projects update.
-      if (current.type === "developer") {
-        const cp = current.profile as { languages?: string[]; referralSource?: string };
-        const body: DeveloperPayload = {
-          languages:
-            opts.languages !== undefined ? parseCsv(opts.languages) : cp.languages ?? [],
-          referralSource: opts.referral ?? cp.referralSource ?? "",
-        };
-        const r = await api.api.profile.developer.post(body);
-        if (r.status === 401) throw new SessionExpiredError(env.name);
-        if (r.error) die(`Failed to update profile: ${formatApiError(r.error)}`);
-        if (opts.json) return printJson({ type: "developer", profile: body });
-        console.log(c.success("Developer profile updated."));
-      } else {
-        const cp = current.profile as Record<string, unknown>;
-        const body: OrganizationPayload = {
-          companyName: opts.companyName ?? (cp.companyName as string | undefined),
-          role: opts.role ?? (cp.role as string | undefined),
-          companySize: opts.companySize ?? (cp.companySize as string | undefined),
-          website: opts.website ?? (cp.website as string | undefined),
-          platforms:
-            opts.platforms !== undefined
-              ? parseCsv(opts.platforms)
-              : (cp.platforms as string[] | undefined),
-          referralSource: opts.referral ?? (cp.referralSource as string | undefined),
-        };
-        const r = await api.api.profile.organization.post(body);
-        if (r.status === 401) throw new SessionExpiredError(env.name);
-        if (r.error) die(`Failed to update profile: ${formatApiError(r.error)}`);
-        if (opts.json) return printJson({ type: "organization", profile: body });
-        console.log(c.success("Organization profile updated."));
+      // so fetch + overlay to preserve unchanged fields.
+      const details: DetailsPayload = {
+        type: current.type,
+        background:
+          current.type === "developer"
+            ? (opts.background ?? current.background ?? undefined)
+            : undefined,
+        companyName:
+          current.type === "organization"
+            ? (opts.companyName ?? current.companyName ?? undefined)
+            : undefined,
+        platforms:
+          opts.platforms !== undefined
+            ? parseCsv(opts.platforms)
+            : (current.platforms ?? undefined),
+      };
+
+      const detailsRes = await api.api.onboarding.details.post(details);
+      if (detailsRes.status === 401) throw new SessionExpiredError(env.name);
+      if (detailsRes.error) {
+        die(`Failed to update profile: ${formatApiError(detailsRes.error)}`);
       }
+
+      const referralSource = opts.referral ?? current.referralSource ?? undefined;
+      if (opts.referral !== undefined && referralSource) {
+        const refRes = await api.api.onboarding.referral.post({ referralSource });
+        if (refRes.status === 401) throw new SessionExpiredError(env.name);
+        if (refRes.error) {
+          die(`Failed to update referral: ${formatApiError(refRes.error)}`);
+        }
+      }
+
+      if (opts.json) {
+        printJson({ type: current.type, details, referralSource });
+        return;
+      }
+      console.log(c.success(`${capitalize(current.type)} profile updated.`));
     });
 }
 
 // ──────────────────────────── helpers ────────────────────────────
+
+function capitalize(s: string): string {
+  return s.length > 0 ? s[0]!.toUpperCase() + s.slice(1) : s;
+}
 
 function formatValue(v: unknown): string {
   if (v === null || v === undefined || v === "") return c.dim("—");
