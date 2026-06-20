@@ -107,11 +107,27 @@ photon billing show
 `pho` is a shortcut for `photon`, useful for high-frequency commands. Every global install (npm / pnpm / yarn / bun) wires up both `photon` and `pho` automatically — they're declared as sibling `bin` entries that point at the same binary, so no setup is needed:
 
 ```sh
-pho ls          # photon projects ls
-pho whoami
+pho projects ls   # same as: photon projects ls
+pho whoami        # same as: photon whoami
 ```
 
+`pho` is a drop-in alias — it accepts the exact same commands and flags as `photon`, just fewer keystrokes to type. There's no top-level `ls` shortcut; list projects with the full `projects ls` path (`pho projects ls`).
+
 For `npx` / `bunx`, the package name itself is what you type, so `npx @photon-ai/cli` runs `photon` (the first declared bin). To run `pho` explicitly through `npx`, use `npx --package=@photon-ai/cli pho`.
+
+---
+
+## Use with AI agents
+
+There's a `photon-cli` [Agent Skill](https://skills.sh/) that teaches AI agents (Claude Code, Cursor, Copilot, OpenCode, and [25+ others](https://skills.sh/)) how to drive this CLI — the login flow, project bootstrapping, billing/upgrades, Spectrum resources, and config/environment resolution. Install it from [`photon-hq/skills`](https://github.com/photon-hq/skills):
+
+```sh
+npx skills add photon-hq/skills --skill photon-cli
+```
+
+Once installed, supported agents pick it up automatically — try *"log in to Photon, create a project, and tell me its id and secret"* or *"how many Spectrum lines does my project have, and how do I upgrade it to a business line?"*
+
+The same collection ships skills for Photon's other SDKs — [`imessage`](https://github.com/photon-hq/skills/tree/main/skills/imessage), [`spectrum`](https://github.com/photon-hq/skills/tree/main/skills/spectrum), [`chat-adapter-imessage`](https://github.com/photon-hq/skills/tree/main/skills/chat-adapter-imessage), and [`buildspace-ci-cd`](https://github.com/photon-hq/skills/tree/main/skills/buildspace-ci-cd). Browse them all at [photon-hq/skills](https://github.com/photon-hq/skills).
 
 ---
 
