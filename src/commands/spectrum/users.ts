@@ -37,7 +37,7 @@ export function registerSpectrumUsers(spectrum: Command): void {
       if (status === 401) throw new SessionExpiredError(resolved.name);
       if (error) die(`Failed to list users: ${formatApiError(error)}`);
 
-      const list = (data ?? []) as SpectrumUser[];
+      const list = data?.users ?? [];
       if (opts.json) return printJson(list);
       if (list.length === 0) {
         console.log(c.dim("No Spectrum users yet."));

@@ -12,7 +12,6 @@
   ],
   "forbidden": [
     ".github/workflows/**",
-    "types/api.d.ts",
     "bun.lock",
     "scripts/**",
     ".env*",

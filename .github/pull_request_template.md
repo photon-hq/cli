@@ -13,7 +13,7 @@
 - (none)
 
 ## Checklist
-- [ ] No edits to `types/api.d.ts`
+- [ ] API type changes come from a `@photon-ai/dashboard-api` version bump, not hand edits
 - [ ] No new runtime deps (or justified above)
 - [ ] All snapshot diffs explained above
 - [ ] `bun run check` passes locally

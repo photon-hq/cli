@@ -1,11 +1,11 @@
 # Agent Guide for @photon-ai/cli
 
 ## Mission
-You're updating this CLI in response to upstream API changes in `@photon-dashboard/api-public`. The fresh `types/api.d.ts` is in your working tree. Your job: make `bun run check` pass.
+You're updating this CLI in response to upstream API changes in `@photon-ai/dashboard-api`. The API type contract arrives as a version bump of that dependency (in `package.json`/`bun.lock`). Your job: make `bun run check` pass.
 
 ## Hard Rules (CI will fail if violated)
 1. Use Bun exclusively — never Node, npm, pnpm, yarn
-2. Never edit `types/api.d.ts` by hand — it's vendored via `bun run sync:api`
+2. Never hand-edit API types — they come from the `@photon-ai/dashboard-api` dependency; update them by bumping its version
 3. Never add forbidden dependencies: axios, chalk, zod, jest, vitest, ts-node, ws, express, dotenv, ioredis, pg, better-sqlite3
 4. Every command must use `getApi()` from `~/lib/api.ts` + Eden treaty pattern — never raw `fetch()`
 5. Destructure Eden responses as `{ data, error, status }` — check error before using data

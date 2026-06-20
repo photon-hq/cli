@@ -3,11 +3,12 @@
   "name": "Acme Agent",
   "location": "United States",
   "status": "running",
-  "spectrum": true,
-  "spectrumProjectId": "sp-00000001",
+  "isOwner": true,
+  "projectSecret": null,
   "template": false,
   "observability": true,
-  "subscriptionStatus": "active",
+  "slackChannelId": null,
+  "slackTeamId": null,
   "createdAt": "2025-01-15T12:00:00.000Z",
   "updatedAt": "2025-06-01T09:30:00.000Z"
 }

@@ -27,11 +27,10 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
 
-    // Path aliases — `~/*` resolves to `src/*`, plus a sibling
-    // `~/types/*` for the vendored API type bundle.
+    // Path alias — `~/*` resolves to `src/*`. The API type contract
+    // comes from the `@photon-ai/dashboard-api` package, not a vendored file.
     "baseUrl": ".",
     "paths": {
-      "~/types/*": ["types/*"],
       "~/*": ["src/*"]
     }
   }

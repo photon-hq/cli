@@ -749,7 +749,7 @@ Manual + automated. Until we have a CI test harness, manual is the pragmatic cho
 | Eden treaty types degrade for new endpoints we add (Drizzle inference) | Continue using `src/lib/types.ts` DTO casts at the boundary. If it gets unwieldy, push for `response: t.Object(...)` schemas server-side. |
 | better-auth device tokens default 7d expiry; CI breakage when tokens silently expire | Document in README. Plan apiKey plugin server-side for v2. |
 | `photon` npm package name collision | Verify `npm view photon` early. Fallback names: `@photon/cli`, `@photon-codes/cli`. |
-| Spectrum endpoint shapes shift while we're integrating | Vendored types (`types/api.d.ts`) is a snapshot — `bun run sync:api` rebuilds. Add a CI check that fails if the shape changed without a matching CLI fix. |
+| Spectrum endpoint shapes shift while we're integrating | API types come from the `@photon-ai/dashboard-api` package — bump its version to pick up changes. CI (`bun run check`) fails if the new shape no longer matches the CLI. |
 | Commander.js becomes a constraint as command count grows | If we hit a wall (custom help formatting, dynamic completions), migrate to `clipanion` or `@oclif`. Not v1 concern. |
 | Rate limiting on staging during heavy test cycles | Already handled via 429 → slow_down. Document. |
 
@@ -813,6 +813,6 @@ That's ~1 dev-week of focused work, or 2-3 weeks part-time.
 - [ ] `bun install -g @photon/cli && photon login` works on a clean machine
 - [ ] `update-notifier` shows on outdated versions
 - [ ] All known E2E paths verified against production env (not just staging)
-- [ ] CI check that runs `bun run sync:api` and fails if `types/api.d.ts` would change (forces explicit sync commits)
+- [ ] CI check that fails if a `@photon-ai/dashboard-api` version bump breaks the CLI build (forces matching CLI fixes)
 
 When all 10 are checked, ship the announcement.

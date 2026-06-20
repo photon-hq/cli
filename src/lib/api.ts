@@ -1,5 +1,5 @@
 import { treaty } from "@elysiajs/eden";
-import type { PublicApp } from "~/types/api";
+import type { PublicApp } from "@photon-ai/dashboard-api";
 import { resolveEnv } from "~/lib/config.ts";
 import { loadCredentials } from "~/lib/credentials.ts";
 import type { Credentials } from "~/lib/credentials.ts";

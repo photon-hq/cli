@@ -448,7 +448,7 @@ src/
 
 ### 5.3 Type strategy
 
-The vendored `types/api.d.ts` from `@photon-dashboard/api-public` gives us Eden treaty types. But many endpoints' response types degrade to `Record<string, any>` because handlers infer from Drizzle. Today we work around with hand-rolled DTOs in `src/lib/types.ts`. Two paths to upgrade:
+The `@photon-ai/dashboard-api` package gives us Eden treaty types. Some endpoints' response types may degrade to `Record<string, any>` when handlers infer from Drizzle; when that happens we work around it with hand-rolled DTOs in `src/lib/types.ts`. Two paths to upgrade:
 
 1. **Server adds `response: t.Object(...)` schemas** (tracked at apps/api side, low priority).
 2. **CLI keeps growing `lib/types.ts`** as new endpoints are integrated.
