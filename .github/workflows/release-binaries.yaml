@@ -2,9 +2,8 @@ name: Release Binaries
 
 # Build standalone `photon` binaries (no Bun runtime required) and
 # attach them to the GitHub Release that the `release.yaml` workflow
-# created, then update the Homebrew tap formula with new checksums.
-# Triggers automatically via workflow_run when Release completes, or
-# manually via workflow_dispatch for ad-hoc rebuilds.
+# created. Triggers automatically via workflow_run when Release
+# completes, or manually via workflow_dispatch for ad-hoc rebuilds.
 
 on:
   # Triggered automatically when the Release workflow finishes.
@@ -108,104 +107,3 @@ jobs:
             "dist/${{ matrix.asset }}" \
             "dist/${{ matrix.asset }}.sha256" \
             --clobber
-
-  update-tap:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Resolve release tag
-        id: tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            TAG=$(gh release view --repo "${{ github.repository }}" --json tagName -q .tagName)
-            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Download SHA256 files
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ steps.tag.outputs.tag }}"
-          for asset in photon-darwin-arm64 photon-darwin-x64 photon-linux-x64 photon-linux-arm64; do
-            gh release download "$TAG" --repo ${{ github.repository }} \
-              --pattern "${asset}.sha256" --output "${asset}.sha256"
-          done
-
-      - name: Extract version and checksums
-        id: meta
-        run: |
-          TAG="${{ steps.tag.outputs.tag }}"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-          for asset in photon-darwin-arm64 photon-darwin-x64 photon-linux-x64 photon-linux-arm64; do
-            key=$(echo "$asset" | tr '-' '_')
-            sha=$(awk '{print $1}' "${asset}.sha256")
-            echo "${key}=${sha}" >> "$GITHUB_OUTPUT"
-          done
-
-      - name: Checkout tap
-        uses: actions/checkout@v6
-        with:
-          repository: photon-hq/homebrew-photon
-          token: ${{ secrets.TAP_GITHUB_TOKEN }}
-
-      - name: Generate formula
-        run: |
-          cat > Formula/photon.rb << 'EOF'
-          class Photon < Formula
-            desc "Typed terminal UI for the Photon Dashboard"
-            homepage "https://github.com/photon-hq/cli"
-            version "VERSION_PLACEHOLDER"
-            license "MIT"
-
-            on_macos do
-              on_arm do
-                url "https://github.com/photon-hq/cli/releases/download/v#{version}/photon-darwin-arm64"
-                sha256 "SHA_DARWIN_ARM64_PLACEHOLDER"
-              end
-              on_intel do
-                url "https://github.com/photon-hq/cli/releases/download/v#{version}/photon-darwin-x64"
-                sha256 "SHA_DARWIN_X64_PLACEHOLDER"
-              end
-            end
-
-            on_linux do
-              on_intel do
-                url "https://github.com/photon-hq/cli/releases/download/v#{version}/photon-linux-x64"
-                sha256 "SHA_LINUX_X64_PLACEHOLDER"
-              end
-              on_arm do
-                url "https://github.com/photon-hq/cli/releases/download/v#{version}/photon-linux-arm64"
-                sha256 "SHA_LINUX_ARM64_PLACEHOLDER"
-              end
-            end
-
-            def install
-              bin.install Dir.glob("photon*").first => "photon"
-            end
-
-            test do
-              assert_match version.to_s, shell_output("#{bin}/photon --version")
-            end
-          end
-          EOF
-          # Strip leading whitespace from heredoc
-          sed -i 's/^          //' Formula/photon.rb
-          # Substitute placeholders
-          sed -i "s/VERSION_PLACEHOLDER/${{ steps.meta.outputs.version }}/" Formula/photon.rb
-          sed -i "s/SHA_DARWIN_ARM64_PLACEHOLDER/${{ steps.meta.outputs.photon_darwin_arm64 }}/" Formula/photon.rb
-          sed -i "s/SHA_DARWIN_X64_PLACEHOLDER/${{ steps.meta.outputs.photon_darwin_x64 }}/" Formula/photon.rb
-          sed -i "s/SHA_LINUX_X64_PLACEHOLDER/${{ steps.meta.outputs.photon_linux_x64 }}/" Formula/photon.rb
-          sed -i "s/SHA_LINUX_ARM64_PLACEHOLDER/${{ steps.meta.outputs.photon_linux_arm64 }}/" Formula/photon.rb
-
-      - name: Commit and push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/photon.rb
-          git diff --cached --quiet && exit 0
-          git commit -m "photon ${{ steps.meta.outputs.version }}"
-          git push
