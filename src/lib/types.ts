@@ -25,20 +25,19 @@ export interface Project {
   updatedAt: string;
 }
 
-export interface DeveloperProfile {
+/**
+ * `GET /api/profile` returns the user's onboarding profile row (or null).
+ * Replaces the pre-v1.1.0 `{ type, profile }` envelope; the server now
+ * returns a single flat record sourced from the `onboarding_profile` table.
+ */
+export interface ProfileRow {
   id: string;
   userId: string;
-  // Server-side fields TBD; expand when we render them.
-  [key: string]: unknown;
+  type: "developer" | "organization";
+  referralSource: string | null;
+  platforms: string[] | null;
+  background: string | null;
+  companyName: string | null;
 }
 
-export interface OrganizationProfile {
-  id: string;
-  userId: string;
-  [key: string]: unknown;
-}
-
-export type ProfileResponse =
-  | { type: "developer"; profile: DeveloperProfile }
-  | { type: "organization"; profile: OrganizationProfile }
-  | null;
+export type ProfileResponse = ProfileRow | null;
