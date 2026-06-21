@@ -64,7 +64,7 @@ function registerListCommand(projects: Command): void {
         die(`Failed to list projects: ${formatApiError(error)}`);
       }
 
-      const list = data ?? [];
+      const list = (data ?? []) as ProjectListItem[];
       if (opts.json) {
         printJson(list);
         return;
@@ -762,4 +762,13 @@ function printKv(pairs: [string, string][]): void {
   for (const [k, v] of pairs) {
     console.log(`  ${c.dim(k.padEnd(width))}  ${v}`);
   }
+}
+
+interface ProjectListItem {
+  id: string;
+  name: string;
+  location: string;
+  status: string;
+  platforms: string[];
+  updatedAt: string | Date;
 }
