@@ -1,44 +1,42 @@
 # Upstream API Diff
 
-> Old routes: 36 · New routes: 58
+> `@photon-ai/dashboard-api` `1.2.0` → `1.2.3` (dashboard@v1.2.3)
+> Old routes: 80 · New routes: 82
 
 ## Added Routes
 
 | Route | Method |
 |-------|--------|
-| `api.profile.spectrum-updates` | `PATCH` |
-| `api.projects.:id.members` | `GET` |
-| `api.projects.:id.members` | `POST` |
-| `api.projects.:id.members.:memberUserId` | `DELETE` |
-| `api.projects.:id.slack` | `DELETE` |
-| `api.projects.:id.slack` | `GET` |
-| `api.projects.:id.slack` | `PUT` |
-| `api.projects.:id.slack.installations` | `GET` |
-| `api.projects.:id.slack.installations.:teamId` | `DELETE` |
-| `api.projects.:id.spectrum.avatar` | `DELETE` |
-| `api.projects.:id.spectrum.avatar.commit` | `POST` |
-| `api.projects.:id.spectrum.avatar.upload` | `POST` |
-| `api.projects.:id.voice.imessage-enabled` | `PATCH` |
-| `api.projects.:id.voice.settings` | `GET` |
-| `api.projects.:id.voice.sip-inbound` | `DELETE` |
-| `api.projects.:id.voice.sip-inbound` | `PATCH` |
-| `api.projects.:id.webhooks` | `GET` |
-| `api.projects.:id.webhooks` | `POST` |
-| `api.projects.:id.webhooks.:webhookId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates` | `GET` |
-| `api.projects.:id.whatsapp.templates` | `POST` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `PATCH` |
+| `api.profile.promotional-emails` | `PATCH` |
+| `api.profile.promotional-status` | `GET` |
 
 ## Removed Routes
 
-| Route | Method |
-|-------|--------|
-| `api.projects.:id.spectrum.avatar-upload-url` | `GET` |
+_(none)_
 
 ## Summary
 
-- **23** added
-- **1** removed
-- **0** changed
-- **35** unchanged
+- **2** added
+- **0** removed
+- **80** unchanged
+
+## Type-level notes
+
+The bundled `.d.ts` shipped in `1.2.3` widens many response/body shapes to
+`{ [x: string]: any }` (the rolldown / dts-bundler can no longer carry
+Drizzle-inferred shapes through). Runtime behaviour is unchanged, but TS
+inference at `.map()` / `.filter()` callbacks now falls through to `any`.
+
+We compensate by casting at the API boundary to local DTOs (the same
+pattern already in `src/commands/spectrum/lines.ts`), per the rule in
+`AGENTS.md` ("New DTOs go in `src/lib/types.ts`, cast at the API
+boundary").
+
+Files touched for the `1.2.3` sync:
+
+- `src/commands/projects.ts` — cast `data ?? []` to `ProjectListItem[]`
+  in `projects list` so the row builder keeps its types.
+- `src/commands/spectrum/users.ts` — cast `data?.users ?? []` to the
+  existing inline `SpectrumUser[]` for the same reason.
+
+No command logic, routes, or surface area changed.
