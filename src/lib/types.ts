@@ -9,4 +9,37 @@
  * in command logic.
  */
 
-export {};
+/**
+ * Subset of fields the CLI reads from a project. Mirrors what the dashboard
+ * returns from `GET /api/projects` (list) and `GET /api/projects/:id` (show).
+ * Kept as one shared shape so list/show/delete don't drift apart.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  status: string;
+  location: string;
+  platforms: string[];
+  template: boolean;
+  observability: boolean;
+  slackChannelId: string | null;
+  slackTeamId: string | null;
+  isOwner?: boolean;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+/** A Spectrum user as returned by `GET /api/projects/:id/spectrum/users`. */
+export interface SpectrumUser {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+}
+
+/** Response envelope for the Spectrum users list route. */
+export interface SpectrumUsersPage {
+  total: number;
+  users: SpectrumUser[];
+}

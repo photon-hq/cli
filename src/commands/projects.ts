@@ -20,6 +20,7 @@ import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 import { isInteractive } from "~/lib/tty.ts";
+import type { Project } from "~/lib/types.ts";
 
 /** Platforms accepted by `projects create` (mirrors the API's create body). */
 const PLATFORMS = ["imessage", "whatsapp_business", "voice"] as const;
@@ -64,7 +65,7 @@ function registerListCommand(projects: Command): void {
         die(`Failed to list projects: ${formatApiError(error)}`);
       }
 
-      const list = data ?? [];
+      const list = (data as Project[] | null | undefined) ?? [];
       if (opts.json) {
         printJson(list);
         return;
