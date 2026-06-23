@@ -1,44 +1,34 @@
 # Upstream API Diff
 
-> Old routes: 36 · New routes: 58
+> `@photon-ai/dashboard-api` `1.2.0` → `1.3.0` (dashboard `v1.3.0`)
 
 ## Added Routes
 
 | Route | Method |
 |-------|--------|
-| `api.profile.spectrum-updates` | `PATCH` |
-| `api.projects.:id.members` | `GET` |
-| `api.projects.:id.members` | `POST` |
-| `api.projects.:id.members.:memberUserId` | `DELETE` |
-| `api.projects.:id.slack` | `DELETE` |
-| `api.projects.:id.slack` | `GET` |
-| `api.projects.:id.slack` | `PUT` |
-| `api.projects.:id.slack.installations` | `GET` |
-| `api.projects.:id.slack.installations.:teamId` | `DELETE` |
-| `api.projects.:id.spectrum.avatar` | `DELETE` |
-| `api.projects.:id.spectrum.avatar.commit` | `POST` |
-| `api.projects.:id.spectrum.avatar.upload` | `POST` |
-| `api.projects.:id.voice.imessage-enabled` | `PATCH` |
-| `api.projects.:id.voice.settings` | `GET` |
-| `api.projects.:id.voice.sip-inbound` | `DELETE` |
-| `api.projects.:id.voice.sip-inbound` | `PATCH` |
-| `api.projects.:id.webhooks` | `GET` |
-| `api.projects.:id.webhooks` | `POST` |
-| `api.projects.:id.webhooks.:webhookId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates` | `GET` |
-| `api.projects.:id.whatsapp.templates` | `POST` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `PATCH` |
+| `api.profile.promotional-status` | `GET` |
+| `api.profile.promotional-emails` | `PATCH` |
 
 ## Removed Routes
 
-| Route | Method |
-|-------|--------|
-| `api.projects.:id.spectrum.avatar-upload-url` | `GET` |
+_(none)_
+
+## Schema Changes
+
+The 1.3.0 type-contract drop dropped every named response interface
+(`SpectrumUser`, `WhatsAppTemplate`, etc.) and degraded most route response
+bodies to opaque records (`{ [x: string]: any; ... }`). Two CLI list commands
+relied on the previously inferred Eden treaty types and now need explicit
+casts at the API boundary:
+
+- `src/commands/projects.ts` — `GET /api/projects` (list)
+- `src/commands/spectrum/users.ts` — `GET /api/projects/:id/spectrum/users`
+
+DTOs added in `src/lib/types.ts`: `Project`, `SpectrumUser`, `SpectrumUsersPage`.
 
 ## Summary
 
-- **23** added
-- **1** removed
-- **0** changed
-- **35** unchanged
+- **2** added
+- **0** removed
+- **0** otherwise changed
+- All other routes unchanged at the route level; response typing degraded across the board (see Schema Changes)

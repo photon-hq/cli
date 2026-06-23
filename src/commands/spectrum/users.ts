@@ -6,6 +6,7 @@ import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 import { isInteractive } from "~/lib/tty.ts";
+import type { SpectrumUser, SpectrumUsersPage } from "~/lib/types.ts";
 
 export function registerSpectrumUsers(spectrum: Command): void {
   const users = spectrum
@@ -37,7 +38,8 @@ export function registerSpectrumUsers(spectrum: Command): void {
       if (status === 401) throw new SessionExpiredError(resolved.name);
       if (error) die(`Failed to list users: ${formatApiError(error)}`);
 
-      const list = data?.users ?? [];
+      const page = data as SpectrumUsersPage | null | undefined;
+      const list = page?.users ?? [];
       if (opts.json) return printJson(list);
       if (list.length === 0) {
         console.log(c.dim("No Spectrum users yet."));
@@ -140,14 +142,6 @@ export function registerSpectrumUsers(spectrum: Command): void {
 
       console.log(c.success(`Removed user ${userId}`));
     });
-}
-
-interface SpectrumUser {
-  id: string;
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
-  phoneNumber?: string | null;
 }
 
 interface FilledAdd {
