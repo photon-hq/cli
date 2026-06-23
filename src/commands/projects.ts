@@ -25,6 +25,20 @@ import { isInteractive } from "~/lib/tty.ts";
 const PLATFORMS = ["imessage", "whatsapp_business", "voice"] as const;
 type Platform = (typeof PLATFORMS)[number];
 
+/**
+ * Local DTO for projects list/show. The published `@photon-ai/dashboard-api`
+ * contract erases response payloads to `any`, so we cast at the API boundary
+ * to recover field-level types for the fields this CLI actually reads.
+ */
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+  location: string;
+  platforms: string[];
+  updatedAt: string;
+}
+
 export function registerProjectsCommand(program: Command): void {
   const projects = program
     .command("projects")
@@ -64,7 +78,7 @@ function registerListCommand(projects: Command): void {
         die(`Failed to list projects: ${formatApiError(error)}`);
       }
 
-      const list = data ?? [];
+      const list = (data ?? []) as Project[];
       if (opts.json) {
         printJson(list);
         return;
