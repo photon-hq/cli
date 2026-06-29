@@ -33,6 +33,7 @@ export function registerProjectsCommand(program: Command): void {
 
   registerListCommand(projects);
   registerShowCommand(projects);
+  registerSecretCommand(projects);
   registerCreateCommand(projects);
   registerUpdateCommand(projects);
   registerDeleteCommand(projects);
@@ -140,6 +141,57 @@ function registerShowCommand(projects: Command): void {
         ["createdAt", new Date(p.createdAt).toLocaleString()],
         ["updatedAt", new Date(p.updatedAt).toLocaleString()],
       ]);
+    });
+}
+
+// ──────────────────────────── secret ────────────────────────────
+
+function registerSecretCommand(projects: Command): void {
+  projects
+    .command("secret [id]")
+    .alias("get-secret")
+    .description("print the project's Spectrum API secret (defaults to $PHOTON_PROJECT_ID)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
+    .option("-t, --token <token>", "API token (overrides stored creds)")
+    .option("--json", "output JSON")
+    .action(async (idArg, opts) => {
+      const { projectId, env: resolved } = await resolveProject({
+        flagProjectId: idArg ?? opts.project,
+        apiHost: opts.apiHost,
+      });
+      const { api } = await getApi({
+        apiHost: resolved.url,
+        token: opts.token,
+        requireAuth: true,
+      });
+      const { data, error, status } = await api.api.projects({ id: projectId }).get();
+      if (status === 401) throw new SessionExpiredError(resolved.name);
+      if (status === 404 || (!error && !data)) {
+        die(`Project not found: ${projectId}`, {
+          hint: "List your projects with `photon projects ls`.",
+        });
+      }
+      if (error) {
+        die(`Failed to fetch project: ${formatApiError(error)}`);
+      }
+      // The 404 / no-data case is handled above; this narrows for TS.
+      if (!data) return;
+
+      if (!data.projectSecret) {
+        die("This project has no API secret yet.", {
+          hint: `Generate one with \`photon projects regenerate-secret ${projectId}\`.`,
+        });
+      }
+
+      if (opts.json) {
+        printJson({ id: projectId, projectSecret: data.projectSecret });
+        return;
+      }
+
+      // Bare value on stdout so it's pipe-friendly:
+      //   export PHOTON_SECRET="$(photon projects secret)"
+      console.log(data.projectSecret);
     });
 }
 

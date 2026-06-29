@@ -4,7 +4,7 @@
   "location": "United States",
   "status": "running",
   "isOwner": true,
-  "projectSecret": null,
+  "projectSecret": "sk_test_acme_0123456789abcdef",
   "template": false,
   "observability": true,
   "slackChannelId": null,
