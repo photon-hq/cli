@@ -85,3 +85,58 @@ describe("photon projects show", () => {
     expect(parsed.id).toBe("00000000-0000-4000-a000-000000000001");
   });
 });
+
+describe("photon projects secret", () => {
+  // Unknown id falls through to the project.show.json fixture, which carries
+  // a non-null projectSecret.
+  const idWithSecret = "00000000-0000-4000-a000-000000000009";
+  // The list fixture's first project has projectSecret: null.
+  const idWithoutSecret = "00000000-0000-4000-a000-000000000001";
+
+  test("prints the bare secret on stdout", async () => {
+    const { stdout, exitCode } = await runCommand(
+      ["projects", "secret", idWithSecret],
+      {
+        env: {
+          PHOTON_TOKEN: "test-token",
+          PHOTON_API_HOST: baseUrl,
+        },
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stdout.trim()).toBe("sk_test_acme_0123456789abcdef");
+  });
+
+  test("--json returns id and secret", async () => {
+    const { stdout, exitCode } = await runCommand(
+      ["projects", "secret", idWithSecret, "--json"],
+      {
+        env: {
+          PHOTON_TOKEN: "test-token",
+          PHOTON_API_HOST: baseUrl,
+        },
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.id).toBe(idWithSecret);
+    expect(parsed.projectSecret).toBe("sk_test_acme_0123456789abcdef");
+  });
+
+  test("fails clearly when the project has no secret yet", async () => {
+    const { stderr, exitCode } = await runCommand(
+      ["projects", "secret", idWithoutSecret],
+      {
+        env: {
+          PHOTON_TOKEN: "test-token",
+          PHOTON_API_HOST: baseUrl,
+        },
+      },
+    );
+
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain("no API secret");
+  });
+});
