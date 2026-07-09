@@ -1,44 +1,41 @@
 # Upstream API Diff
 
-> Old routes: 36 · New routes: 58
+Comparing `@photon-ai/dashboard-api` **1.2.0 → 1.6.1** (packaged for
+`photon-hq/dashboard@v1.6.3`, sha `e2655b8`).
+
+> Old routes: 80 · New routes: 87
 
 ## Added Routes
 
 | Route | Method |
 |-------|--------|
-| `api.profile.spectrum-updates` | `PATCH` |
-| `api.projects.:id.members` | `GET` |
-| `api.projects.:id.members` | `POST` |
-| `api.projects.:id.members.:memberUserId` | `DELETE` |
-| `api.projects.:id.slack` | `DELETE` |
-| `api.projects.:id.slack` | `GET` |
-| `api.projects.:id.slack` | `PUT` |
-| `api.projects.:id.slack.installations` | `GET` |
-| `api.projects.:id.slack.installations.:teamId` | `DELETE` |
-| `api.projects.:id.spectrum.avatar` | `DELETE` |
-| `api.projects.:id.spectrum.avatar.commit` | `POST` |
-| `api.projects.:id.spectrum.avatar.upload` | `POST` |
-| `api.projects.:id.voice.imessage-enabled` | `PATCH` |
-| `api.projects.:id.voice.settings` | `GET` |
-| `api.projects.:id.voice.sip-inbound` | `DELETE` |
-| `api.projects.:id.voice.sip-inbound` | `PATCH` |
-| `api.projects.:id.webhooks` | `GET` |
-| `api.projects.:id.webhooks` | `POST` |
-| `api.projects.:id.webhooks.:webhookId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates` | `GET` |
-| `api.projects.:id.whatsapp.templates` | `POST` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `PATCH` |
+| `api.profile.promotional-emails` | `PATCH` |
+| `api.profile.promotional-status` | `GET` |
+| `api.projects.:id.call-registry.profile` | `GET` |
+| `api.projects.:id.call-registry.profile` | `PATCH` |
+| `api.projects.:id.call-registry.profile` | `PUT` |
+| `api.projects.:id.call-registry.registrations` | `GET` |
+| `api.projects.:id.call-registry.registrations` | `POST` |
 
 ## Removed Routes
 
-| Route | Method |
-|-------|--------|
-| `api.projects.:id.spectrum.avatar-upload-url` | `GET` |
+_(none)_
+
+## Response-shape Changes
+
+All route response bodies in the 1.6.x bundled `.d.ts` are exposed as
+`Record<string, any>` (index-signature only) rather than the concrete
+per-status objects that shipped in 1.2.0. Commands that previously read
+strongly-typed fields off `data` still compile (index access is permitted),
+but `Array.prototype.map` callbacks lose their inferred element type, which
+is the concrete typecheck fallout addressed in this PR (see
+`src/commands/projects.ts` list command and `src/commands/spectrum/users.ts`
+list command — both now cast `data` to a `Project[]` / `SpectrumUser[]` DTO
+at the API boundary).
 
 ## Summary
 
-- **23** added
-- **1** removed
-- **0** changed
-- **35** unchanged
+- **7** added
+- **0** removed
+- **0** route paths changed
+- **80** unchanged paths (all with degraded response typing)
