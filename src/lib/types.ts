@@ -9,4 +9,29 @@
  * in command logic.
  */
 
-export {};
+/**
+ * Row shape returned by `GET /api/projects` (and the singular
+ * `GET /api/projects/:id`). The published contract degrades this to
+ * `Record<string, any>`, so we cast at the API boundary.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  location: string;
+  status: string;
+  platforms: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Row shape returned by `GET /api/projects/:id/spectrum/users`
+ * (as `data.users[]`). Same rationale as {@link Project}.
+ */
+export interface SpectrumUser {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+}
