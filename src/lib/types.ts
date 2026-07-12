@@ -9,4 +9,37 @@
  * in command logic.
  */
 
-export {};
+/**
+ * Project row as returned by `GET /api/projects` and `GET /api/projects/:id`.
+ * The upstream `.d.ts` for 1.6.x publishes these bodies as `Record<string, any>`
+ * (index-signature only), so we cast to this shape at the boundary to get typed
+ * field access in list/show/delete commands.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  location: string;
+  status: string;
+  platforms: string[];
+  isOwner: boolean;
+  template: boolean;
+  observability: boolean;
+  slackChannelId?: string | null;
+  slackTeamId?: string | null;
+  projectSecret?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Spectrum user row as returned by `GET /api/projects/:id/spectrum/users`
+ * and echoed back by `POST` on the same route. Same rationale as `Project`:
+ * the 1.6.x published response type is a bare index signature.
+ */
+export interface SpectrumUser {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+}
