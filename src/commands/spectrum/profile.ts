@@ -196,11 +196,6 @@ async function triggerProfileSync(
     .spectrum.profile.sync.post();
 
   if (status === 401) throw new SessionExpiredError(envName);
-  if (status === 409) {
-    die(
-      "A Spectrum profile sync is already in progress (PROFILE_SYNC_IN_PROGRESS)."
-    );
-  }
   if (error) {
     die(`Failed to trigger Spectrum profile sync: ${formatApiError(error)}`);
   }

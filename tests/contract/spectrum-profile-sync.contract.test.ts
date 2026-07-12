@@ -12,7 +12,6 @@ import {
   getMockProfileSyncRequests,
   makeMockProfileSyncAggregate,
   resetMockState,
-  setMockProfileSyncConflict,
   setMockProfileSyncSequence,
   setMockUnauthorized,
   startMockServer,
@@ -218,23 +217,6 @@ describe("photon spectrum profile sync", () => {
     expect(parsed.status).toBe("failed");
     expect(parsed.failed).toBe(3);
     expect(parsed.errors).toHaveLength(3);
-  });
-
-  test("preserves the structured HTTP 409 conflict as a normal CLI failure", async () => {
-    setMockProfileSyncConflict(true);
-
-    const result = await runCommand(
-      ["spectrum", "profile", "sync", "--no-wait", "--json"],
-      { env: commandEnv() }
-    );
-
-    expect(result.exitCode).toBe(1);
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toContain("PROFILE_SYNC_IN_PROGRESS");
-    expect(result.stderr.toLowerCase()).toContain("already in progress");
-    expect(getMockProfileSyncRequests().map(({ method }) => method)).toEqual([
-      "POST",
-    ]);
   });
 });
 

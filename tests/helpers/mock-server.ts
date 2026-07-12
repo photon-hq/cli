@@ -31,7 +31,6 @@ interface MockState {
    *  exercise SessionExpiredError flows without having to manipulate
    *  the test's PHOTON_TOKEN. */
   forceUnauthorized: boolean;
-  profileSyncConflict: boolean;
   profileSyncSequence: MockProfileSyncAggregate[];
   profileSyncSequenceIndex: number;
   profileSyncRequests: MockProfileSyncRequest[];
@@ -94,7 +93,6 @@ function defaultProfileSyncSequence(): MockProfileSyncAggregate[] {
 const state: MockState = {
   subscription: subscriptionFree,
   forceUnauthorized: false,
-  profileSyncConflict: false,
   profileSyncSequence: defaultProfileSyncSequence(),
   profileSyncSequenceIndex: 0,
   profileSyncRequests: [],
@@ -124,11 +122,6 @@ export function setMockProfileSyncSequence(
     errors: aggregate.errors.map((error) => ({ ...error })),
   }));
   state.profileSyncSequenceIndex = 0;
-  state.profileSyncConflict = false;
-}
-
-export function setMockProfileSyncConflict(force: boolean): void {
-  state.profileSyncConflict = force;
 }
 
 export function getMockProfileSyncRequests(): MockProfileSyncRequest[] {
@@ -138,7 +131,6 @@ export function getMockProfileSyncRequests(): MockProfileSyncRequest[] {
 export function resetMockState(): void {
   state.subscription = subscriptionFree;
   state.forceUnauthorized = false;
-  state.profileSyncConflict = false;
   state.profileSyncSequence = defaultProfileSyncSequence();
   state.profileSyncSequenceIndex = 0;
   state.profileSyncRequests = [];
@@ -156,18 +148,6 @@ function requireAuth(headers: Record<string, string | undefined>) {
 }
 
 function profileSyncResponse(method: "GET" | "POST"): Response {
-  if (method === "POST" && state.profileSyncConflict) {
-    return Response.json(
-      {
-        succeed: false,
-        data: null,
-        code: "PROFILE_SYNC_IN_PROGRESS",
-        message: "A profile sync is already in progress for this project",
-      },
-      { status: 409 }
-    );
-  }
-
   const index = Math.min(
     state.profileSyncSequenceIndex,
     state.profileSyncSequence.length - 1
