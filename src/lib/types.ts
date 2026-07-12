@@ -9,4 +9,25 @@
  * in command logic.
  */
 
-export {};
+export interface Project {
+  id: string;
+  name: string;
+  location: string;
+  status: string;
+  platforms: string[];
+  isOwner: boolean;
+  template: boolean;
+  observability: boolean;
+  slackChannelId?: string | null;
+  slackTeamId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SpectrumUser {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+}
