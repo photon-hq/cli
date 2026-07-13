@@ -106,11 +106,8 @@ export function setMockUnauthorized(force: boolean): void {
   state.forceUnauthorized = force;
 }
 
-/**
- * Configure the trigger response followed by successive status responses.
- * Once exhausted, the mock keeps returning the final aggregate so polling is
- * deterministic even if a client performs one extra GET.
- */
+/** Configure successive status responses returned by GET. Once exhausted, the
+ * mock keeps returning the final aggregate for repeated status reads. */
 export function setMockProfileSyncSequence(
   sequence: MockProfileSyncAggregate[]
 ): void {
@@ -153,11 +150,18 @@ function profileSyncResponse(method: "GET" | "POST"): Response {
     state.profileSyncSequence.length - 1
   );
   const aggregate = state.profileSyncSequence[index]!;
+  if (method === "POST") {
+    return Response.json({
+      succeed: true,
+      data: {
+        projectId: aggregate.projectId,
+        syncedLineCount: aggregate.total,
+      },
+    });
+  }
+
   state.profileSyncSequenceIndex += 1;
-  return Response.json(
-    { succeed: true, data: aggregate },
-    { status: method === "POST" ? 202 : 200 }
-  );
+  return Response.json({ succeed: true, data: aggregate });
 }
 
 const app = new Elysia()

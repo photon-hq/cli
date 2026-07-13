@@ -1,15 +1,8 @@
 import type { Command } from "@commander-js/extra-typings";
-import { InvalidArgumentError } from "commander";
 import { getApi, type ApiContext } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson } from "~/lib/output.ts";
-
-export const DEFAULT_PROFILE_SYNC_TIMEOUT_MS = 10 * 60 * 1000;
-
-const DEFAULT_PROFILE_SYNC_POLL_INTERVAL_MS = 1000;
-const PROFILE_SYNC_POLL_INTERVAL_ENV =
-  "PHOTON_PROFILE_SYNC_POLL_INTERVAL_MS";
 
 export function registerSpectrumProfile(spectrum: Command): void {
   const profile = spectrum
@@ -113,13 +106,6 @@ export function registerSpectrumProfile(spectrum: Command): void {
     .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
-    .option("--no-wait", "return after the sync is accepted")
-    .option(
-      "--timeout <duration>",
-      "client-side polling timeout (default: 10m)",
-      parseProfileSyncTimeout,
-      DEFAULT_PROFILE_SYNC_TIMEOUT_MS
-    )
     .option("--json", "output JSON")
     .action(async (opts) => {
       const { projectId, env: resolved } = await resolveProject({
@@ -132,31 +118,12 @@ export function registerSpectrumProfile(spectrum: Command): void {
         requireAuth: true,
       });
 
-      const initial = await triggerProfileSync(
+      const triggerResult = await triggerProfileSync(
         api,
         projectId,
         resolved.name
       );
-
-      if (opts.wait === false) {
-        if (!opts.json) console.log(c.success("Spectrum profile sync queued."));
-        printProfileSyncAggregate(initial, opts.json ?? false);
-        return;
-      }
-
-      if (!opts.json && initial.status === "in_progress") {
-        console.log(c.info("Spectrum profile sync queued; waiting for completion."));
-      }
-
-      const result = await pollProfileSync({
-        api,
-        projectId,
-        envName: resolved.name,
-        initial,
-        timeoutMs: opts.timeout,
-        json: opts.json ?? false,
-      });
-      finishProfileSync(result, opts.json ?? false);
+      printProfileSyncTriggerResult(triggerResult, opts.json ?? false);
     });
 
   profile
@@ -228,48 +195,7 @@ type ProfileSyncAggregate = Awaited<
   ReturnType<typeof getProfileSyncStatus>
 >;
 
-interface PollProfileSyncOptions {
-  api: ApiContext["api"];
-  projectId: string;
-  envName: string;
-  initial: ProfileSyncAggregate;
-  timeoutMs: number;
-  json: boolean;
-}
-
-async function pollProfileSync(
-  opts: PollProfileSyncOptions
-): Promise<ProfileSyncAggregate> {
-  let latest = opts.initial;
-  if (isTerminalProfileSyncStatus(latest.status)) return latest;
-
-  const deadline = Date.now() + opts.timeoutMs;
-  const pollIntervalMs = resolveProfileSyncPollInterval();
-
-  while (true) {
-    const remainingMs = deadline - Date.now();
-    if (remainingMs <= 0) {
-      exitProfileSyncTimeout(latest, opts);
-    }
-
-    const next = await settleBeforeDeadline(
-      getProfileSyncStatus(opts.api, opts.projectId, opts.envName),
-      remainingMs
-    );
-    if (next === PROFILE_SYNC_TIMED_OUT) {
-      exitProfileSyncTimeout(latest, opts);
-    }
-
-    latest = next;
-    if (isTerminalProfileSyncStatus(latest.status)) return latest;
-
-    const delayMs = Math.min(pollIntervalMs, deadline - Date.now());
-    if (delayMs <= 0) {
-      exitProfileSyncTimeout(latest, opts);
-    }
-    await delay(delayMs);
-  }
-}
+type ProfileSyncTriggerResult = Awaited<ReturnType<typeof triggerProfileSync>>;
 
 function finishProfileSync(
   result: ProfileSyncAggregate,
@@ -287,6 +213,22 @@ function finishProfileSync(
       hint: "Run `photon spectrum profile sync-status` to inspect the current aggregate.",
     });
   }
+}
+
+function printProfileSyncTriggerResult(
+  result: ProfileSyncTriggerResult,
+  json: boolean
+): void {
+  if (json) {
+    printJson(result);
+    return;
+  }
+
+  console.log(
+    c.success(
+      `Spectrum profile updated on ${result.syncedLineCount} dedicated iMessage Lines.`
+    )
+  );
 }
 
 function printProfileSyncAggregate(
@@ -323,89 +265,6 @@ function formatSyncStatus(status: ProfileSyncAggregate["status"]): string {
       return c.cyan(status);
   }
   return status;
-}
-
-function isTerminalProfileSyncStatus(
-  status: ProfileSyncAggregate["status"]
-): boolean {
-  return status !== "in_progress";
-}
-
-function parseProfileSyncTimeout(value: string): number {
-  const match = /^(\d+(?:\.\d+)?)(ms|s|m|h)?$/i.exec(value.trim());
-  if (!match) throw invalidTimeout(value);
-
-  const amount = Number(match[1]);
-  const unit = match[2]?.toLowerCase() ?? "s";
-  const multiplier =
-    unit === "ms" ? 1 : unit === "s" ? 1000 : unit === "m" ? 60_000 : 3_600_000;
-  const milliseconds = amount * multiplier;
-
-  if (
-    !Number.isFinite(milliseconds) ||
-    milliseconds < 1 ||
-    !Number.isSafeInteger(milliseconds)
-  ) {
-    throw invalidTimeout(value);
-  }
-  return milliseconds;
-}
-
-function invalidTimeout(value: string): InvalidArgumentError {
-  return new InvalidArgumentError(
-    `must be a positive duration such as 500ms, 30s, 10m, or 1h (got "${value}")`
-  );
-}
-
-function resolveProfileSyncPollInterval(): number {
-  const raw = process.env[PROFILE_SYNC_POLL_INTERVAL_ENV];
-  if (!raw) return DEFAULT_PROFILE_SYNC_POLL_INTERVAL_MS;
-
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed >= 1
-    ? Math.floor(parsed)
-    : DEFAULT_PROFILE_SYNC_POLL_INTERVAL_MS;
-}
-
-const PROFILE_SYNC_TIMED_OUT = Symbol("profile-sync-timed-out");
-
-function settleBeforeDeadline<T>(
-  operation: Promise<T>,
-  timeoutMs: number
-): Promise<T | typeof PROFILE_SYNC_TIMED_OUT> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => resolve(PROFILE_SYNC_TIMED_OUT), timeoutMs);
-    operation.then(
-      (result) => {
-        clearTimeout(timer);
-        resolve(result);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      }
-    );
-  });
-}
-
-function exitProfileSyncTimeout(
-  latest: ProfileSyncAggregate,
-  opts: Pick<PollProfileSyncOptions, "json" | "timeoutMs">
-): never {
-  printProfileSyncAggregate(latest, opts.json);
-  die(`Spectrum profile sync polling timed out after ${formatDuration(opts.timeoutMs)}.`, {
-    hint: "The server-side sync continues. Run `photon spectrum profile sync-status` to check it.",
-  });
-}
-
-function formatDuration(milliseconds: number): string {
-  if (milliseconds % 60_000 === 0) return `${milliseconds / 60_000}m`;
-  if (milliseconds % 1000 === 0) return `${milliseconds / 1000}s`;
-  return `${milliseconds}ms`;
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function formatValue(v: unknown): string {
