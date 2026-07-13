@@ -1,7 +1,6 @@
 import type { Command } from "@commander-js/extra-typings";
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
-import { PRODUCTION_URL } from "~/lib/env.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError } from "~/lib/output.ts";
 import { putPresignedUpload, readLocalUploadFile } from "~/lib/presigned-upload.ts";
@@ -12,7 +11,6 @@ export function registerSpectrumAvatar(spectrum: Command): void {
   avatar
     .command("upload <file>")
     .description("upload an image as the Spectrum avatar")
-    .option("--no-update-profile", "only upload, don't update the profile to use the new avatar")
     .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
@@ -72,60 +70,7 @@ export function registerSpectrumAvatar(spectrum: Command): void {
       }
       const avatarUrl = commitResult.avatarUrl;
 
-      // 4) Optionally update the Spectrum profile to point at the new URL.
-      if (opts.updateProfile !== false) {
-        const patch = await api.api
-          .projects({ id: projectId })
-          .spectrum.profile.patch({ avatarUrl });
-        if (patch.status === 401) throw new SessionExpiredError(resolved.name);
-        if (patch.error) {
-          // Upload + commit succeeded; surface the patch failure but don't
-          // undo. Build the recovery command with the same --project /
-          // --api-host / --token context the user originally passed, and
-          // quote the URL so shell-significant chars don't break copy-paste.
-          const recovery = buildRecoveryCommand({
-            projectId,
-            apiHost: resolved.url,
-            token: opts.token,
-            avatarUrl,
-          });
-          die(`Uploaded, but failed to update profile: ${formatApiError(patch.error)}`, {
-            hint: `Update manually: ${recovery}`,
-            context: `Avatar URL: ${avatarUrl}`,
-          });
-        }
-      }
-
       console.log(c.success(`Uploaded avatar from ${file}`));
       console.log(c.dim(`  URL: ${avatarUrl}`));
     });
-}
-
-function buildRecoveryCommand(opts: {
-  projectId: string;
-  apiHost: string;
-  token?: string;
-  avatarUrl: string;
-}): string {
-  const parts: string[] = ["photon spectrum profile update"];
-  parts.push(`--project ${shellQuote(opts.projectId)}`);
-  // Only include --api-host if it differs from the default production URL,
-  // so the recovery command stays minimal in the common case.
-  if (opts.apiHost !== PRODUCTION_URL) {
-    parts.push(`--api-host ${shellQuote(opts.apiHost)}`);
-  }
-  if (opts.token !== undefined) {
-    parts.push(`--token ${shellQuote(opts.token)}`);
-  }
-  parts.push(`--avatar-url ${shellQuote(opts.avatarUrl)}`);
-  return parts.join(" ");
-}
-
-/**
- * Single-quote a value for safe shell copy-paste. Escapes embedded
- * single quotes via the standard `'\''` trick. Avoids shell injection
- * vectors in URLs that contain `&`, `?`, `;`, `|`, etc.
- */
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
