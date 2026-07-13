@@ -1,19 +1,10 @@
 import type { Command } from "@commander-js/extra-typings";
-import { readFile, stat } from "node:fs/promises";
-import { extname } from "node:path";
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
 import { PRODUCTION_URL } from "~/lib/env.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError } from "~/lib/output.ts";
-
-const MIME_TYPES: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".gif": "image/gif",
-};
+import { putPresignedUpload, readLocalUploadFile } from "~/lib/presigned-upload.ts";
 
 export function registerSpectrumAvatar(spectrum: Command): void {
   const avatar = spectrum.command("avatar").description("manage the Spectrum avatar image");
@@ -26,13 +17,7 @@ export function registerSpectrumAvatar(spectrum: Command): void {
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .action(async (file, opts) => {
-      const stats = await stat(file).catch(() => null);
-      if (!stats) {
-        die(`File not found: ${file}`);
-      }
-      const body = await readFile(file);
-      const size = stats.size;
-      const mime = MIME_TYPES[extname(file).toLowerCase()] || "application/octet-stream";
+      const uploadFile = await readLocalUploadFile(file);
 
       const { projectId, env: resolved } = await resolveProject({
         flagProjectId: opts.project,
@@ -50,7 +35,7 @@ export function registerSpectrumAvatar(spectrum: Command): void {
       // spectrum/avatar/commit` finalizes the upload using that key.
       const urlResp = await api.api
         .projects({ id: projectId })
-        .spectrum.avatar.upload.post({ contentType: mime });
+        .spectrum.avatar.upload.post({ contentType: uploadFile.contentType });
       if (urlResp.status === 401) throw new SessionExpiredError(resolved.name);
       if (urlResp.error)
         die(`Failed to get upload URL: ${formatApiError(urlResp.error)}`);
@@ -66,17 +51,7 @@ export function registerSpectrumAvatar(spectrum: Command): void {
 
       // 2) PUT the file body to the presigned URL. Spectrum returns a
       // simple PUT-style URL (per services/spectrum.ts), not multipart.
-      console.log(c.dim(`Uploading ${file} (${(size / 1024).toFixed(1)} KB)…`));
-      const putResp = await fetch(uploadResult.uploadUrl, {
-        method: "PUT",
-        body,
-        headers: {
-          "Content-Type": mime,
-        },
-      });
-      if (!putResp.ok) {
-        die(`Upload failed: ${putResp.status} ${putResp.statusText}`);
-      }
+      await putPresignedUpload(file, uploadResult.uploadUrl, uploadFile);
 
       // 3) Commit the upload so Spectrum verifies the object and returns the
       // canonical avatar URL.

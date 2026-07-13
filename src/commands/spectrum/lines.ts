@@ -1,4 +1,5 @@
 import type { Command } from "@commander-js/extra-typings";
+import { registerSpectrumLineProfile } from "~/commands/spectrum/line-profile.ts";
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
@@ -9,6 +10,8 @@ export function registerSpectrumLines(spectrum: Command): void {
   const lines = spectrum
     .command("lines")
     .description("manage Spectrum phone lines on a project");
+
+  registerSpectrumLineProfile(lines);
 
   lines
     .command("list", { isDefault: true })
