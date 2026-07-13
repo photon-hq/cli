@@ -65,7 +65,7 @@ function registerListCommand(projects: Command): void {
         die(`Failed to list projects: ${formatApiError(error)}`);
       }
 
-      const list = data ?? [];
+      const list = (data ?? []) as Project[];
       if (opts.json) {
         printJson(list);
         return;
@@ -814,4 +814,20 @@ function printKv(pairs: [string, string][]): void {
   for (const [k, v] of pairs) {
     console.log(`  ${c.dim(k.padEnd(width))}  ${v}`);
   }
+}
+
+interface Project {
+  id: string;
+  name: string;
+  location: string;
+  status: string;
+  platforms: string[];
+  updatedAt: string;
+  createdAt: string;
+  isOwner?: boolean;
+  template?: boolean;
+  observability?: boolean;
+  slackChannelId?: string | null;
+  slackTeamId?: string | null;
+  projectSecret?: string | null;
 }
