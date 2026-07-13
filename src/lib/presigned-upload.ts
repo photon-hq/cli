@@ -1,5 +1,3 @@
-import { readFile, stat } from "node:fs/promises";
-import { extname } from "node:path";
 import { c, die } from "~/lib/output.ts";
 
 const MIME_TYPES: Record<string, string> = {
@@ -10,23 +8,52 @@ const MIME_TYPES: Record<string, string> = {
   ".gif": "image/gif",
 };
 
+const SVG_EXTENSIONS = new Set([".svg", ".svgz"]);
+const SVG_PREFIX_PATTERN =
+  /^\s*(?:<\?xml[\s\S]*?\?>\s*)?(?:<!--[\s\S]*?-->\s*)*<svg(?:\s|>)/i;
+const SVG_SIGNATURE_BYTES = 4100;
+
+const fileExtension = (file: string): string => {
+  const fileName = file.replaceAll("\\", "/").split("/").at(-1) ?? file;
+  const dot = fileName.lastIndexOf(".");
+  return dot === -1 ? "" : fileName.slice(dot).toLowerCase();
+};
+
+const isSvgContent = (body: Uint8Array): boolean =>
+  SVG_PREFIX_PATTERN.test(
+    new TextDecoder().decode(body.subarray(0, SVG_SIGNATURE_BYTES))
+  );
+
+const rejectSvg = (extension: string, body?: Uint8Array): void => {
+  if (SVG_EXTENSIONS.has(extension) || (body && isSvgContent(body))) {
+    die("SVG avatars are not supported.", {
+      hint: "Convert the image to PNG, JPEG, or WebP before uploading.",
+    });
+  }
+};
+
 export interface LocalUploadFile {
-  body: Buffer;
+  body: Uint8Array;
   contentType: string;
   size: number;
 }
 
 export async function readLocalUploadFile(file: string): Promise<LocalUploadFile> {
-  const stats = await stat(file).catch(() => null);
-  if (!stats) {
+  const extension = fileExtension(file);
+  rejectSvg(extension);
+
+  const localFile = Bun.file(file);
+  if (!(await localFile.exists())) {
     die(`File not found: ${file}`);
   }
 
+  const body = new Uint8Array(await localFile.arrayBuffer());
+  rejectSvg(extension, body);
+
   return {
-    body: await readFile(file),
-    contentType:
-      MIME_TYPES[extname(file).toLowerCase()] ?? "application/octet-stream",
-    size: stats.size,
+    body,
+    contentType: MIME_TYPES[extension] ?? "application/octet-stream",
+    size: body.byteLength,
   };
 }
 

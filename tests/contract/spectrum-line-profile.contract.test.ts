@@ -134,4 +134,43 @@ describe("single iMessage Line profile commands", () => {
       },
     ]);
   });
+
+  test("rejects SVG project and Line avatars before calling the API", async () => {
+    const imagePath = join(tempDirectory, "avatar.SVG");
+    await writeFile(
+      imagePath,
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" />'
+    );
+
+    for (const args of [
+      ["spectrum", "avatar", "upload", imagePath],
+      ["spectrum", "lines", "avatar", "upload", LINE_ID, imagePath],
+    ]) {
+      const result = await runCommand(args, { env: commandEnv() });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("SVG avatars are not supported");
+      expect(result.stderr).toContain(
+        "Convert the image to PNG, JPEG, or WebP"
+      );
+    }
+    expect(getMockLineProfileRequests()).toEqual([]);
+  });
+
+  test("rejects SVG content hidden behind a raster extension", async () => {
+    const imagePath = join(tempDirectory, "renamed.png");
+    await writeFile(
+      imagePath,
+      '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" />'
+    );
+
+    const result = await runCommand(
+      ["spectrum", "lines", "avatar", "upload", LINE_ID, imagePath],
+      { env: commandEnv() }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("SVG avatars are not supported");
+    expect(getMockLineProfileRequests()).toEqual([]);
+  });
 });
