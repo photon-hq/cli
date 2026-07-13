@@ -31,32 +31,17 @@ interface MockState {
    *  exercise SessionExpiredError flows without having to manipulate
    *  the test's PHOTON_TOKEN. */
   forceUnauthorized: boolean;
-  profileSyncSequence: MockProfileSyncAggregate[];
-  profileSyncSequenceIndex: number;
+  profileSyncResult: MockProfileSyncResult;
   profileSyncRequests: MockProfileSyncRequest[];
 }
 
-export type MockProfileSyncStatus =
-  | "in_progress"
-  | "completed"
-  | "partial_failed"
-  | "failed";
-
-export interface MockProfileSyncAggregate {
+export interface MockProfileSyncResult {
   projectId: string;
-  status: MockProfileSyncStatus;
-  total: number;
-  pending: number;
-  synced: number;
-  failed: number;
-  errors: Array<{
-    lineId: string;
-    reason: string;
-  }>;
+  syncedLineCount: number;
 }
 
 export interface MockProfileSyncRequest {
-  method: "GET" | "POST";
+  method: "POST";
   projectId: string;
   authorization: string | null;
 }
@@ -64,37 +49,17 @@ export interface MockProfileSyncRequest {
 const DEFAULT_PROFILE_SYNC_PROJECT_ID =
   "00000000-0000-4000-a000-000000000001";
 
-export function makeMockProfileSyncAggregate(
-  overrides: Partial<MockProfileSyncAggregate> = {}
-): MockProfileSyncAggregate {
+function defaultProfileSyncResult(): MockProfileSyncResult {
   return {
     projectId: DEFAULT_PROFILE_SYNC_PROJECT_ID,
-    status: "in_progress",
-    total: 3,
-    pending: 2,
-    synced: 1,
-    failed: 0,
-    errors: [],
-    ...overrides,
+    syncedLineCount: 3,
   };
-}
-
-function defaultProfileSyncSequence(): MockProfileSyncAggregate[] {
-  return [
-    makeMockProfileSyncAggregate(),
-    makeMockProfileSyncAggregate({
-      status: "completed",
-      pending: 0,
-      synced: 3,
-    }),
-  ];
 }
 
 const state: MockState = {
   subscription: subscriptionFree,
   forceUnauthorized: false,
-  profileSyncSequence: defaultProfileSyncSequence(),
-  profileSyncSequenceIndex: 0,
+  profileSyncResult: defaultProfileSyncResult(),
   profileSyncRequests: [],
 };
 
@@ -106,19 +71,10 @@ export function setMockUnauthorized(force: boolean): void {
   state.forceUnauthorized = force;
 }
 
-/** Configure successive status responses returned by GET. Once exhausted, the
- * mock keeps returning the final aggregate for repeated status reads. */
-export function setMockProfileSyncSequence(
-  sequence: MockProfileSyncAggregate[]
+export function setMockProfileSyncResult(
+  overrides: Partial<MockProfileSyncResult>
 ): void {
-  if (sequence.length === 0) {
-    throw new Error("Profile sync sequence must contain at least one response.");
-  }
-  state.profileSyncSequence = sequence.map((aggregate) => ({
-    ...aggregate,
-    errors: aggregate.errors.map((error) => ({ ...error })),
-  }));
-  state.profileSyncSequenceIndex = 0;
+  state.profileSyncResult = { ...defaultProfileSyncResult(), ...overrides };
 }
 
 export function getMockProfileSyncRequests(): MockProfileSyncRequest[] {
@@ -128,8 +84,7 @@ export function getMockProfileSyncRequests(): MockProfileSyncRequest[] {
 export function resetMockState(): void {
   state.subscription = subscriptionFree;
   state.forceUnauthorized = false;
-  state.profileSyncSequence = defaultProfileSyncSequence();
-  state.profileSyncSequenceIndex = 0;
+  state.profileSyncResult = defaultProfileSyncResult();
   state.profileSyncRequests = [];
 }
 
@@ -144,24 +99,8 @@ function requireAuth(headers: Record<string, string | undefined>) {
   return null;
 }
 
-function profileSyncResponse(method: "GET" | "POST"): Response {
-  const index = Math.min(
-    state.profileSyncSequenceIndex,
-    state.profileSyncSequence.length - 1
-  );
-  const aggregate = state.profileSyncSequence[index]!;
-  if (method === "POST") {
-    return Response.json({
-      succeed: true,
-      data: {
-        projectId: aggregate.projectId,
-        syncedLineCount: aggregate.total,
-      },
-    });
-  }
-
-  state.profileSyncSequenceIndex += 1;
-  return Response.json({ succeed: true, data: aggregate });
+function profileSyncResponse(): Response {
+  return Response.json({ succeed: true, data: state.profileSyncResult });
 }
 
 const app = new Elysia()
@@ -187,17 +126,7 @@ const app = new Elysia()
     });
     const denied = requireAuth(headers as Record<string, string | undefined>);
     if (denied) return denied;
-    return profileSyncResponse("POST");
-  })
-  .get("/api/projects/:id/spectrum/profile/sync", ({ headers, params }) => {
-    state.profileSyncRequests.push({
-      method: "GET",
-      projectId: params.id,
-      authorization: headers.authorization ?? null,
-    });
-    const denied = requireAuth(headers as Record<string, string | undefined>);
-    if (denied) return denied;
-    return profileSyncResponse("GET");
+    return profileSyncResponse();
   })
   .get("/api/projects/:id", ({ headers, params }) => {
     const denied = requireAuth(headers as Record<string, string | undefined>);
