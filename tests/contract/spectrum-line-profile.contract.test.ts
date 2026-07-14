@@ -13,6 +13,7 @@ import { runCommand } from "../helpers/cli-runner.ts";
 import {
   getMockLineProfileRequests,
   resetMockState,
+  setMockLineAvatarResponseFault,
   startMockServer,
   stopMockServer,
 } from "../helpers/mock-server.ts";
@@ -132,6 +133,44 @@ describe("single iMessage Line profile commands", () => {
           key: `avatars/${PROJECT_ID}/lines/${LINE_ID}/avatar.png`,
         },
       },
+    ]);
+  });
+
+  test("rejects an incomplete Line avatar upload response", async () => {
+    const imagePath = join(tempDirectory, "missing-key.png");
+    await writeFile(imagePath, new Uint8Array([137, 80, 78, 71]));
+    setMockLineAvatarResponseFault("missing-upload-key");
+
+    const result = await runCommand(
+      ["spectrum", "lines", "avatar", "upload", LINE_ID, imagePath],
+      { env: commandEnv() }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Server did not return uploadUrl + key");
+    expect(getMockLineProfileRequests().map(({ operation }) => operation)).toEqual([
+      "avatar-upload",
+    ]);
+  });
+
+  test("rejects a Line avatar commit response without an avatar URL", async () => {
+    const imagePath = join(tempDirectory, "missing-avatar-url.png");
+    await writeFile(imagePath, new Uint8Array([137, 80, 78, 71]));
+    setMockLineAvatarResponseFault("missing-avatar-url");
+
+    const result = await runCommand(
+      ["spectrum", "lines", "avatar", "upload", LINE_ID, imagePath],
+      { env: commandEnv() }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "Server did not return an avatar URL after commit"
+    );
+    expect(getMockLineProfileRequests().map(({ operation }) => operation)).toEqual([
+      "avatar-upload",
+      "avatar-put",
+      "avatar-commit",
     ]);
   });
 

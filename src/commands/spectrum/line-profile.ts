@@ -104,14 +104,18 @@ export function registerSpectrumLineProfile(lines: Command): void {
       if (!upload.data?.succeed) {
         die("Failed to get line avatar upload URL: empty API response.");
       }
+      const uploadResult = upload.data.data;
+      if (!uploadResult.uploadUrl || !uploadResult.key) {
+        die("Server did not return uploadUrl + key.");
+      }
 
       // This PUT targets the presigned object URL; API calls stay on Eden.
-      await putPresignedUpload(file, upload.data.data.uploadUrl, uploadFile);
+      await putPresignedUpload(file, uploadResult.uploadUrl, uploadFile);
 
       const commit = await api.api
         .projects({ id: projectId })
         .lines({ lineId })
-        .profile.avatar.commit.post({ key: upload.data.data.key });
+        .profile.avatar.commit.post({ key: uploadResult.key });
       if (commit.status === 401) {
         throw new SessionExpiredError(resolved.name);
       }
@@ -121,8 +125,12 @@ export function registerSpectrumLineProfile(lines: Command): void {
       if (!commit.data?.succeed) {
         die("Uploaded, but commit failed: empty API response.");
       }
+      const avatarUrl = commit.data.data.avatarUrl;
+      if (!avatarUrl) {
+        die("Server did not return an avatar URL after commit.");
+      }
 
       console.log(c.success(`Uploaded avatar for line ${lineId}.`));
-      console.log(c.dim(`  URL: ${commit.data.data.avatarUrl}`));
+      console.log(c.dim(`  URL: ${avatarUrl}`));
     });
 }

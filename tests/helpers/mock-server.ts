@@ -31,6 +31,7 @@ interface MockState {
    *  exercise SessionExpiredError flows without having to manipulate
    *  the test's PHOTON_TOKEN. */
   forceUnauthorized: boolean;
+  lineAvatarResponseFault: "missing-avatar-url" | "missing-upload-key" | null;
   lineProfileRequests: MockLineProfileRequest[];
   profileSyncRequests: MockProfileSyncRequest[];
 }
@@ -53,6 +54,7 @@ export interface MockProfileSyncRequest {
 const state: MockState = {
   subscription: subscriptionFree,
   forceUnauthorized: false,
+  lineAvatarResponseFault: null,
   lineProfileRequests: [],
   profileSyncRequests: [],
 };
@@ -63,6 +65,12 @@ export function setMockSubscription(sub: "free" | "active"): void {
 
 export function setMockUnauthorized(force: boolean): void {
   state.forceUnauthorized = force;
+}
+
+export function setMockLineAvatarResponseFault(
+  fault: MockState["lineAvatarResponseFault"]
+): void {
+  state.lineAvatarResponseFault = fault;
 }
 
 export function getMockProfileSyncRequests(): MockProfileSyncRequest[] {
@@ -76,6 +84,7 @@ export function getMockLineProfileRequests(): MockLineProfileRequest[] {
 export function resetMockState(): void {
   state.subscription = subscriptionFree;
   state.forceUnauthorized = false;
+  state.lineAvatarResponseFault = null;
   state.lineProfileRequests = [];
   state.profileSyncRequests = [];
 }
@@ -164,12 +173,15 @@ const app = new Elysia()
       const origin = new URL(request.url).origin;
       return {
         succeed: true as const,
-        data: {
-          projectId: params.id,
-          lineId: params.lineId,
-          uploadUrl: `${origin}/mock-line-avatar/${params.id}/${params.lineId}`,
-          key: `avatars/${params.id}/lines/${params.lineId}/avatar.png`,
-        },
+        data:
+          state.lineAvatarResponseFault === "missing-upload-key"
+            ? { uploadUrl: `${origin}/unused` }
+            : {
+                projectId: params.id,
+                lineId: params.lineId,
+                uploadUrl: `${origin}/mock-line-avatar/${params.id}/${params.lineId}`,
+                key: `avatars/${params.id}/lines/${params.lineId}/avatar.png`,
+              },
       };
     }
   )
@@ -203,7 +215,10 @@ const app = new Elysia()
           phoneNumber: "+14155550101",
           firstName: "Existing",
           lastName: "Line",
-          avatarUrl: `https://cdn.example.test/${params.lineId}.png`,
+          avatarUrl:
+            state.lineAvatarResponseFault === "missing-avatar-url"
+              ? null
+              : `https://cdn.example.test/${params.lineId}.png`,
         },
       };
     }
