@@ -10,7 +10,6 @@ import { runCommand } from "../helpers/cli-runner.ts";
 import {
   getMockProfileSyncRequests,
   resetMockState,
-  setMockProfileSyncResult,
   startMockServer,
   stopMockServer,
 } from "../helpers/mock-server.ts";
@@ -40,9 +39,7 @@ function commandEnv() {
 }
 
 describe("photon spectrum profile sync", () => {
-  test("updates Line Profiles once without polling", async () => {
-    setMockProfileSyncResult({ syncedLineCount: 3 });
-
+  test("requests Line Profile application once without polling", async () => {
     const result = await runCommand(
       ["spectrum", "profile", "sync", "--json"],
       { env: commandEnv() }
@@ -52,22 +49,19 @@ describe("photon spectrum profile sync", () => {
     expect(result.stderr).toBe("");
     expect(JSON.parse(result.stdout)).toEqual({
       projectId: PROJECT_ID,
-      syncedLineCount: 3,
     });
     expect(getMockProfileSyncRequests().map(({ method }) => method)).toEqual([
       "POST",
     ]);
   });
 
-  test("prints the synchronized Line count in human output", async () => {
-    setMockProfileSyncResult({ syncedLineCount: 2 });
-
+  test("prints a request confirmation in human output", async () => {
     const result = await runCommand(["spectrum", "profile", "sync"], {
       env: commandEnv(),
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("2 dedicated iMessage Lines");
+    expect(result.stdout).toContain("Spectrum profile apply requested.");
     expect(getMockProfileSyncRequests().map(({ method }) => method)).toEqual([
       "POST",
     ]);

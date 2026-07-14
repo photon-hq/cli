@@ -32,7 +32,6 @@ interface MockState {
    *  the test's PHOTON_TOKEN. */
   forceUnauthorized: boolean;
   lineProfileRequests: MockLineProfileRequest[];
-  profileSyncResult: MockProfileSyncResult;
   profileSyncRequests: MockProfileSyncRequest[];
 }
 
@@ -45,32 +44,16 @@ export interface MockLineProfileRequest {
   projectId: string;
 }
 
-export interface MockProfileSyncResult {
-  projectId: string;
-  syncedLineCount: number;
-}
-
 export interface MockProfileSyncRequest {
   method: "POST";
   projectId: string;
   authorization: string | null;
 }
 
-const DEFAULT_PROFILE_SYNC_PROJECT_ID =
-  "00000000-0000-4000-a000-000000000001";
-
-function defaultProfileSyncResult(): MockProfileSyncResult {
-  return {
-    projectId: DEFAULT_PROFILE_SYNC_PROJECT_ID,
-    syncedLineCount: 3,
-  };
-}
-
 const state: MockState = {
   subscription: subscriptionFree,
   forceUnauthorized: false,
   lineProfileRequests: [],
-  profileSyncResult: defaultProfileSyncResult(),
   profileSyncRequests: [],
 };
 
@@ -80,12 +63,6 @@ export function setMockSubscription(sub: "free" | "active"): void {
 
 export function setMockUnauthorized(force: boolean): void {
   state.forceUnauthorized = force;
-}
-
-export function setMockProfileSyncResult(
-  overrides: Partial<MockProfileSyncResult>
-): void {
-  state.profileSyncResult = { ...defaultProfileSyncResult(), ...overrides };
 }
 
 export function getMockProfileSyncRequests(): MockProfileSyncRequest[] {
@@ -100,7 +77,6 @@ export function resetMockState(): void {
   state.subscription = subscriptionFree;
   state.forceUnauthorized = false;
   state.lineProfileRequests = [];
-  state.profileSyncResult = defaultProfileSyncResult();
   state.profileSyncRequests = [];
 }
 
@@ -115,8 +91,11 @@ function requireAuth(headers: Record<string, string | undefined>) {
   return null;
 }
 
-function profileSyncResponse(): Response {
-  return Response.json({ succeed: true, data: state.profileSyncResult });
+function profileSyncResponse(projectId: string): Response {
+  return Response.json({
+    succeed: true,
+    data: { projectId, targetedLineCount: 3 },
+  });
 }
 
 const app = new Elysia()
@@ -142,7 +121,7 @@ const app = new Elysia()
     });
     const denied = requireAuth(headers as Record<string, string | undefined>);
     if (denied) return denied;
-    return profileSyncResponse();
+    return profileSyncResponse(params.id);
   })
   .patch(
     "/api/projects/:id/lines/:lineId/profile",

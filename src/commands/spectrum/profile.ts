@@ -114,12 +114,12 @@ export function registerSpectrumProfile(spectrum: Command): void {
         requireAuth: true,
       });
 
-      const triggerResult = await triggerProfileSync(
-        api,
-        projectId,
-        resolved.name
-      );
-      printProfileSyncTriggerResult(triggerResult, opts.json ?? false);
+      await triggerProfileSync(api, projectId, resolved.name);
+      if (opts.json) {
+        printJson({ projectId });
+        return;
+      }
+      console.log(c.success("Spectrum profile apply requested."));
     });
 
 }
@@ -128,7 +128,7 @@ async function triggerProfileSync(
   api: ApiContext["api"],
   projectId: string,
   envName: string
-) {
+): Promise<void> {
   const { data, error, status } = await api.api
     .projects({ id: projectId })
     .spectrum.profile.sync.post();
@@ -140,25 +140,6 @@ async function triggerProfileSync(
   if (!data?.succeed) {
     die("Failed to trigger Spectrum profile sync: empty API response.");
   }
-  return data.data;
-}
-
-type ProfileSyncTriggerResult = Awaited<ReturnType<typeof triggerProfileSync>>;
-
-function printProfileSyncTriggerResult(
-  result: ProfileSyncTriggerResult,
-  json: boolean
-): void {
-  if (json) {
-    printJson(result);
-    return;
-  }
-
-  console.log(
-    c.success(
-      `Spectrum profile updated on ${result.syncedLineCount} dedicated iMessage Lines.`
-    )
-  );
 }
 
 function formatValue(v: unknown): string {
