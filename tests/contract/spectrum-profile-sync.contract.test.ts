@@ -39,7 +39,7 @@ function commandEnv() {
 }
 
 describe("photon spectrum profile sync", () => {
-  test("requests Line Profile application once without polling", async () => {
+  test("returns the Dashboard targeted Line count without polling", async () => {
     const result = await runCommand(
       ["spectrum", "profile", "sync", "--json"],
       { env: commandEnv() }
@@ -49,19 +49,20 @@ describe("photon spectrum profile sync", () => {
     expect(result.stderr).toBe("");
     expect(JSON.parse(result.stdout)).toEqual({
       projectId: PROJECT_ID,
+      targetedLineCount: 3,
     });
     expect(getMockProfileSyncRequests().map(({ method }) => method)).toEqual([
       "POST",
     ]);
   });
 
-  test("prints a request confirmation in human output", async () => {
+  test("prints the targeted Line count in human output", async () => {
     const result = await runCommand(["spectrum", "profile", "sync"], {
       env: commandEnv(),
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Spectrum profile apply requested.");
+    expect(result.stdout).toContain("Profile synced. 3 lines updated.");
     expect(getMockProfileSyncRequests().map(({ method }) => method)).toEqual([
       "POST",
     ]);

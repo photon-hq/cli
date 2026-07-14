@@ -127,10 +127,15 @@ export function registerSpectrumProfile(spectrum: Command): void {
       }
 
       if (opts.json) {
-        printJson({ projectId });
+        printJson(data.data);
         return;
       }
-      console.log(c.success("Spectrum profile apply requested."));
+      const { targetedLineCount } = data.data;
+      console.log(
+        c.success(
+          `Profile synced. ${targetedLineCount} ${targetedLineCount === 1 ? "line" : "lines"} updated.`
+        )
+      );
     });
 
 }
