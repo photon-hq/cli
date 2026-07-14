@@ -1,4 +1,5 @@
 import type { Command } from "@commander-js/extra-typings";
+import { registerSpectrumLineProfile } from "~/commands/spectrum/line-profile.ts";
 import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
@@ -9,6 +10,8 @@ export function registerSpectrumLines(spectrum: Command): void {
   const lines = spectrum
     .command("lines")
     .description("manage Spectrum phone lines on a project");
+
+  registerSpectrumLineProfile(lines);
 
   lines
     .command("list", { isDefault: true })
@@ -35,7 +38,7 @@ export function registerSpectrumLines(spectrum: Command): void {
       if (status === 401) throw new SessionExpiredError(resolved.name);
       if (error) die(`Failed to list lines: ${formatApiError(error)}`);
 
-      const list = (data ?? []) as SpectrumLine[];
+      const list = data?.lines ?? [];
       if (opts.json) return printJson(list);
       if (list.length === 0) {
         console.log(c.dim("No lines yet."));
@@ -45,7 +48,8 @@ export function registerSpectrumLines(spectrum: Command): void {
       const rows = list.map((l) => [
         truncate(l.id, 10),
         l.platform ?? "—",
-        l.phoneNumber ?? c.dim("—"),
+        ("phoneNumber" in l ? l.phoneNumber : l.displayPhoneNumber) ??
+          c.dim("—"),
         l.status ?? c.dim("—"),
       ]);
       printTable(["id", "platform", "number", "status"], rows);

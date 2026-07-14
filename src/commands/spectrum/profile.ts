@@ -7,7 +7,7 @@ import { c, die, formatApiError, printJson } from "~/lib/output.ts";
 export function registerSpectrumProfile(spectrum: Command): void {
   const profile = spectrum
     .command("profile")
-    .description("view or update the Spectrum profile (display name, avatar)");
+    .description("view or update the Spectrum profile");
 
   profile
     .command("show", { isDefault: true })
@@ -57,19 +57,16 @@ export function registerSpectrumProfile(spectrum: Command): void {
     .description("update the Spectrum profile (preserves unset fields)")
     .option("--first-name <name>")
     .option("--last-name <name>")
-    .option("--avatar-url <url>", "avatar image URL (use `spectrum avatar upload` instead)")
     .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
     .option("-t, --token <token>", "API token (overrides stored creds)")
     .option("--json", "output JSON")
     .action(async (opts) => {
       const hasMutation =
-        opts.firstName !== undefined ||
-        opts.lastName !== undefined ||
-        opts.avatarUrl !== undefined;
+        opts.firstName !== undefined || opts.lastName !== undefined;
       if (!hasMutation) {
         die("Nothing to update.", {
-          hint: "Pass at least one of --first-name / --last-name / --avatar-url.",
+          hint: "Pass at least one of --first-name / --last-name.",
         });
       }
 
@@ -86,7 +83,6 @@ export function registerSpectrumProfile(spectrum: Command): void {
       const body: Record<string, string> = {};
       if (opts.firstName !== undefined) body.firstName = opts.firstName;
       if (opts.lastName !== undefined) body.lastName = opts.lastName;
-      if (opts.avatarUrl !== undefined) body.avatarUrl = opts.avatarUrl;
 
       const { data, error, status } = await api.api
         .projects({ id: projectId })
@@ -99,6 +95,49 @@ export function registerSpectrumProfile(spectrum: Command): void {
       if (opts.json) return printJson(result.profile ?? {});
       console.log(c.success("Spectrum profile updated."));
     });
+
+  profile
+    .command("sync")
+    .description("sync the project profile to every dedicated iMessage line")
+    .option("-p, --project <id>", "project id (overrides $PHOTON_PROJECT_ID)")
+    .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
+    .option("-t, --token <token>", "API token (overrides stored creds)")
+    .option("--json", "output JSON")
+    .action(async (opts) => {
+      const { projectId, env: resolved } = await resolveProject({
+        flagProjectId: opts.project,
+        apiHost: opts.apiHost,
+      });
+      const { api } = await getApi({
+        apiHost: resolved.url,
+        token: opts.token,
+        requireAuth: true,
+      });
+
+      const { data, error, status } = await api.api
+        .projects({ id: projectId })
+        .spectrum.profile.sync.post();
+
+      if (status === 401) throw new SessionExpiredError(resolved.name);
+      if (error) {
+        die(`Failed to trigger Spectrum profile sync: ${formatApiError(error)}`);
+      }
+      if (!data?.succeed) {
+        die("Failed to trigger Spectrum profile sync: empty API response.");
+      }
+
+      if (opts.json) {
+        printJson(data.data);
+        return;
+      }
+      const { targetedLineCount } = data.data;
+      console.log(
+        c.success(
+          `Profile synced. ${targetedLineCount} ${targetedLineCount === 1 ? "line" : "lines"} updated.`
+        )
+      );
+    });
+
 }
 
 function formatValue(v: unknown): string {

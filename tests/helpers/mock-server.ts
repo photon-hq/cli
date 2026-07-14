@@ -31,11 +31,32 @@ interface MockState {
    *  exercise SessionExpiredError flows without having to manipulate
    *  the test's PHOTON_TOKEN. */
   forceUnauthorized: boolean;
+  lineAvatarResponseFault: "missing-avatar-url" | "missing-upload-key" | null;
+  lineProfileRequests: MockLineProfileRequest[];
+  profileSyncRequests: MockProfileSyncRequest[];
+}
+
+export interface MockLineProfileRequest {
+  body?: unknown;
+  contentType?: string | null;
+  lineId: string;
+  method: "PATCH" | "POST" | "PUT";
+  operation: "profile" | "avatar-upload" | "avatar-put" | "avatar-commit";
+  projectId: string;
+}
+
+export interface MockProfileSyncRequest {
+  method: "POST";
+  projectId: string;
+  authorization: string | null;
 }
 
 const state: MockState = {
   subscription: subscriptionFree,
   forceUnauthorized: false,
+  lineAvatarResponseFault: null,
+  lineProfileRequests: [],
+  profileSyncRequests: [],
 };
 
 export function setMockSubscription(sub: "free" | "active"): void {
@@ -46,9 +67,26 @@ export function setMockUnauthorized(force: boolean): void {
   state.forceUnauthorized = force;
 }
 
+export function setMockLineAvatarResponseFault(
+  fault: MockState["lineAvatarResponseFault"]
+): void {
+  state.lineAvatarResponseFault = fault;
+}
+
+export function getMockProfileSyncRequests(): MockProfileSyncRequest[] {
+  return state.profileSyncRequests.map((request) => ({ ...request }));
+}
+
+export function getMockLineProfileRequests(): MockLineProfileRequest[] {
+  return state.lineProfileRequests.map((request) => ({ ...request }));
+}
+
 export function resetMockState(): void {
   state.subscription = subscriptionFree;
   state.forceUnauthorized = false;
+  state.lineAvatarResponseFault = null;
+  state.lineProfileRequests = [];
+  state.profileSyncRequests = [];
 }
 
 function requireAuth(headers: Record<string, string | undefined>) {
@@ -60,6 +98,13 @@ function requireAuth(headers: Record<string, string | undefined>) {
     });
   }
   return null;
+}
+
+function profileSyncResponse(projectId: string): Response {
+  return Response.json({
+    succeed: true,
+    data: { projectId, targetedLineCount: 3 },
+  });
 }
 
 const app = new Elysia()
@@ -77,6 +122,107 @@ const app = new Elysia()
     if (denied) return denied;
     return { available: true };
   })
+  .post("/api/projects/:id/spectrum/profile/sync", ({ headers, params }) => {
+    state.profileSyncRequests.push({
+      method: "POST",
+      projectId: params.id,
+      authorization: headers.authorization ?? null,
+    });
+    const denied = requireAuth(headers as Record<string, string | undefined>);
+    if (denied) return denied;
+    return profileSyncResponse(params.id);
+  })
+  .patch(
+    "/api/projects/:id/lines/:lineId/profile",
+    ({ body, headers, params }) => {
+      state.lineProfileRequests.push({
+        operation: "profile",
+        method: "PATCH",
+        projectId: params.id,
+        lineId: params.lineId,
+        body,
+      });
+      const denied = requireAuth(headers as Record<string, string | undefined>);
+      if (denied) return denied;
+      const patch = body as { firstName?: string; lastName?: string };
+      return {
+        succeed: true as const,
+        data: {
+          projectId: params.id,
+          lineId: params.lineId,
+          phoneNumber: "+14155550101",
+          firstName: patch.firstName ?? "Existing",
+          lastName: patch.lastName ?? "Line",
+          avatarUrl: null,
+        },
+      };
+    }
+  )
+  .post(
+    "/api/projects/:id/lines/:lineId/profile/avatar/upload",
+    ({ body, headers, params, request }) => {
+      state.lineProfileRequests.push({
+        operation: "avatar-upload",
+        method: "POST",
+        projectId: params.id,
+        lineId: params.lineId,
+        body,
+      });
+      const denied = requireAuth(headers as Record<string, string | undefined>);
+      if (denied) return denied;
+      const origin = new URL(request.url).origin;
+      return {
+        succeed: true as const,
+        data:
+          state.lineAvatarResponseFault === "missing-upload-key"
+            ? { uploadUrl: `${origin}/unused` }
+            : {
+                projectId: params.id,
+                lineId: params.lineId,
+                uploadUrl: `${origin}/mock-line-avatar/${params.id}/${params.lineId}`,
+                key: `avatars/${params.id}/lines/${params.lineId}/avatar.png`,
+              },
+      };
+    }
+  )
+  .put("/mock-line-avatar/:id/:lineId", ({ headers, params }) => {
+    state.lineProfileRequests.push({
+      operation: "avatar-put",
+      method: "PUT",
+      projectId: params.id,
+      lineId: params.lineId,
+      contentType: headers["content-type"] ?? null,
+    });
+    return new Response(null, { status: 200 });
+  })
+  .post(
+    "/api/projects/:id/lines/:lineId/profile/avatar/commit",
+    ({ body, headers, params }) => {
+      state.lineProfileRequests.push({
+        operation: "avatar-commit",
+        method: "POST",
+        projectId: params.id,
+        lineId: params.lineId,
+        body,
+      });
+      const denied = requireAuth(headers as Record<string, string | undefined>);
+      if (denied) return denied;
+      return {
+        succeed: true as const,
+        data: {
+          projectId: params.id,
+          lineId: params.lineId,
+          phoneNumber: "+14155550101",
+          firstName: "Existing",
+          lastName: "Line",
+          avatarUrl:
+            state.lineAvatarResponseFault === "missing-avatar-url"
+              ? null
+              : `https://cdn.example.test/${params.lineId}.png`,
+        },
+      };
+    }
+  )
   .get("/api/projects/:id", ({ headers, params }) => {
     const denied = requireAuth(headers as Record<string, string | undefined>);
     if (denied) return denied;
