@@ -36,9 +36,16 @@
 |-------|--------|
 | `api.projects.:id.spectrum.avatar-upload-url` | `GET` |
 
+## Changed Routes
+
+| Route | Method | Change |
+|-------|--------|--------|
+| `api.projects.:id.spectrum.profile` | `PATCH` | body no longer accepts `avatarUrl` (only `firstName` / `lastName`); avatar URL is set server-side by `spectrum/avatar/commit` |
+| `api.projects.:id.lines` | `GET` | response is now `{ lines, pendingRegistrations }` instead of a bare `SpectrumLine[]` array |
+
 ## Summary
 
 - **23** added
 - **1** removed
-- **0** changed
-- **35** unchanged
+- **2** changed
+- **33** unchanged
