@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "dashboard-cli",
@@ -15,7 +16,7 @@
         "update-notifier": "^7.3.1",
       },
       "devDependencies": {
-        "@photon-ai/dashboard-api": "1.7.0",
+        "@photon-ai/dashboard-api": "1.6.12",
         "@types/bun": "latest",
         "@types/node": "^25.6.2",
         "@types/update-notifier": "^6.0.8",
@@ -49,7 +50,7 @@
 
     "@noble/hashes": ["@noble/hashes@2.2.0", "", {}, "sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg=="],
 
-    "@photon-ai/dashboard-api": ["@photon-ai/dashboard-api@1.7.0", "", { "peerDependencies": { "@elysiajs/eden": "^1.4.9", "elysia": "^1.4.28" } }, ""],
+    "@photon-ai/dashboard-api": ["@photon-ai/dashboard-api@1.6.12", "", { "peerDependencies": { "@elysiajs/eden": "^1.4.9", "elysia": "^1.4.28" } }, "sha512-CxUyvSpJmi5dn3razikiD8xw6l1YN3dflRlBghukV/fYIQaSL25UNJpaBYjdX8Qj0ka4+/RLJoloBdQdUTstmA=="],
 
     "@pnpm/config.env-replace": ["@pnpm/config.env-replace@1.1.0", "", {}, "sha512-htyl8TWnKL7K/ESFa1oW2UB5lVDxuF5DpM7tBi6Hu2LNL3mWkIzNLG6N4zoCUP1lCKNxWy/3iu8mS8MvToGd6w=="],
 
