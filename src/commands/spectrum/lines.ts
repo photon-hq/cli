@@ -35,7 +35,7 @@ export function registerSpectrumLines(spectrum: Command): void {
       if (status === 401) throw new SessionExpiredError(resolved.name);
       if (error) die(`Failed to list lines: ${formatApiError(error)}`);
 
-      const list = (data ?? []) as SpectrumLine[];
+      const list = (data?.lines ?? []) as SpectrumLine[];
       if (opts.json) return printJson(list);
       if (list.length === 0) {
         console.log(c.dim("No lines yet."));
