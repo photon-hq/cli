@@ -1,5 +1,5 @@
 import type { Command } from "@commander-js/extra-typings";
-import { getApi, type ApiContext } from "~/lib/api.ts";
+import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson } from "~/lib/output.ts";
@@ -114,7 +114,18 @@ export function registerSpectrumProfile(spectrum: Command): void {
         requireAuth: true,
       });
 
-      await triggerProfileSync(api, projectId, resolved.name);
+      const { data, error, status } = await api.api
+        .projects({ id: projectId })
+        .spectrum.profile.sync.post();
+
+      if (status === 401) throw new SessionExpiredError(resolved.name);
+      if (error) {
+        die(`Failed to trigger Spectrum profile sync: ${formatApiError(error)}`);
+      }
+      if (!data?.succeed) {
+        die("Failed to trigger Spectrum profile sync: empty API response.");
+      }
+
       if (opts.json) {
         printJson({ projectId });
         return;
@@ -122,24 +133,6 @@ export function registerSpectrumProfile(spectrum: Command): void {
       console.log(c.success("Spectrum profile apply requested."));
     });
 
-}
-
-async function triggerProfileSync(
-  api: ApiContext["api"],
-  projectId: string,
-  envName: string
-): Promise<void> {
-  const { data, error, status } = await api.api
-    .projects({ id: projectId })
-    .spectrum.profile.sync.post();
-
-  if (status === 401) throw new SessionExpiredError(envName);
-  if (error) {
-    die(`Failed to trigger Spectrum profile sync: ${formatApiError(error)}`);
-  }
-  if (!data?.succeed) {
-    die("Failed to trigger Spectrum profile sync: empty API response.");
-  }
 }
 
 function formatValue(v: unknown): string {
