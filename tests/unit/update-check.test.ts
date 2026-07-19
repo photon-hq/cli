@@ -125,6 +125,41 @@ describe("startUpdateNotifier", () => {
     expect(invocation).toEqual([process.execPath, process.argv[1] as string]);
   });
 
+  test("guards the default launcher against emitted spawn errors", () => {
+    let errorListener: ((error: Error) => void) | undefined;
+    let unrefs = 0;
+
+    startUpdateNotifier({
+      interactive: () => true,
+      now: () => 1000 * 60 * 60 * 24 + 1,
+      spawnProcess: () => ({
+        on(event, listener) {
+          expect(event).toBe("error");
+          errorListener = listener;
+        },
+        unref() {
+          unrefs += 1;
+        },
+      }),
+    });
+
+    expect(errorListener).toBeDefined();
+    expect(() => errorListener?.(new Error("spawn failed"))).not.toThrow();
+    expect(unrefs).toBe(1);
+  });
+
+  test("guards the default launcher against synchronous spawn failures", () => {
+    expect(() =>
+      startUpdateNotifier({
+        interactive: () => true,
+        now: () => 1000 * 60 * 60 * 24 + 1,
+        spawnProcess: () => {
+          throw new Error("spawn failed");
+        },
+      })
+    ).not.toThrow();
+  });
+
   test("does not let a future cache timestamp suppress probes forever", () => {
     fs.writeFileSync(cacheFile, JSON.stringify({ lastCheck: 999_999_999 }));
     let spawns = 0;
@@ -252,5 +287,13 @@ describe("runUpdateProbe", () => {
     const cache = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
     expect(cache.lastCheck).toBeGreaterThan(0);
     expect(cache.latest).toBeUndefined();
+  });
+
+  test("swallows an initial cache write failure", async () => {
+    const notADirectory = path.join(tmpDir, "not-a-directory");
+    fs.writeFileSync(notADirectory, "blocks cache directory creation");
+    process.env.PHOTON_CONFIG_DIR = notADirectory;
+
+    await runUpdateProbe();
   });
 });

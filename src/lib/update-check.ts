@@ -29,10 +29,22 @@ interface UpdateCache {
   latest?: string;
 }
 
+interface SpawnedProbe {
+  on(event: "error", listener: (error: Error) => void): unknown;
+  unref(): void;
+}
+
+type SpawnProcess = (
+  executable: string,
+  args: string[],
+  options: { detached: true; stdio: "ignore" }
+) => SpawnedProbe;
+
 interface UpdateNotifierDependencies {
   interactive?: () => boolean;
   now?: () => number;
   spawnProbe?: (executable: string, entry: string) => void;
+  spawnProcess?: SpawnProcess;
   writeError?: (message: string) => void;
 }
 
@@ -107,8 +119,8 @@ export const isUpdateProbeInvocation = (argv: string[]): boolean =>
  * cache it for the next interactive run to display.
  */
 export async function runUpdateProbe(): Promise<void> {
-  writeCache({ ...readUpdateCache(), lastCheck: Date.now() });
   try {
+    writeCache({ ...readUpdateCache(), lastCheck: Date.now() });
     const res = await fetch(
       `${registryUrl()}/${encodeURIComponent(pkg.name)}/latest`,
       {
@@ -122,7 +134,7 @@ export async function runUpdateProbe(): Promise<void> {
       writeCache({ lastCheck: Date.now(), latest: info.version });
     }
   } catch {
-    // Offline or registry down — next probe is 24h away.
+    // Cache I/O, offline, and registry failures are all best-effort.
   }
 }
 
@@ -157,10 +169,17 @@ export function startUpdateNotifier(
   const spawnProbe =
     dependencies.spawnProbe ??
     ((executable: string, entryFile: string) => {
-      spawn(executable, [entryFile, PROBE_ARG], {
-        detached: true,
-        stdio: "ignore",
-      }).unref();
+      const spawnProcess = dependencies.spawnProcess ?? spawn;
+      try {
+        const child = spawnProcess(executable, [entryFile, PROBE_ARG], {
+          detached: true,
+          stdio: "ignore",
+        });
+        child.on("error", () => undefined);
+        child.unref();
+      } catch {
+        // Update checks are best-effort and must never break the CLI.
+      }
     });
   spawnProbe(process.execPath, entry);
 }
