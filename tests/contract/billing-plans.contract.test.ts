@@ -55,27 +55,16 @@ describe("photon billing plans", () => {
   });
 });
 
-describe("photon billing plans — payload compatibility", () => {
-  test("table mode supports the plans envelope", async () => {
+describe("photon billing plans — payload validation", () => {
+  test("rejects a plans envelope that is not in the API contract", async () => {
     payload = { plans: plansFixture, pendingChanges: [] };
-    const { stdout, exitCode } = await runCommand(
+    const { stderr, exitCode } = await runCommand(
       ["billing", "plans", "--api-host", baseUrl],
       { env: ENV }
     );
 
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("price_pro_monthly");
-  });
-
-  test("--json normalizes the plans envelope to an array", async () => {
-    payload = { plans: plansFixture, pendingChanges: [] };
-    const { stdout, exitCode } = await runCommand(
-      ["billing", "plans", "--json", "--api-host", baseUrl],
-      { env: ENV }
-    );
-
-    expect(exitCode).toBe(0);
-    expect(Array.isArray(JSON.parse(stdout))).toBe(true);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("expected an array of plans");
   });
 
   test("rejects unrelated objects with a clear shape error", async () => {

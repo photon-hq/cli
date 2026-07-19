@@ -33,15 +33,7 @@ export interface BillingPlan {
 }
 
 function plansFromPayload(value: unknown): BillingPlan[] {
-  return requireArray<BillingPlan>(
-    value as
-      | readonly BillingPlan[]
-      | Record<string, unknown>
-      | null
-      | undefined,
-    "plans",
-    "plans"
-  );
+  return requireArray(value, "plans") as BillingPlan[];
 }
 
 export interface Subscription {

@@ -25,8 +25,8 @@ beforeEach(() => {
 
 const ENV = { PHOTON_TOKEN: "test-token", PHOTON_PROJECT_ID: PROJECT_ID };
 
-// Regression coverage for ENG-1998's bug class: normalize the two response
-// shapes deployed historically, while rejecting unrelated payloads clearly.
+// Runtime validation must follow the current published API contract. Shape
+// drift should fail clearly instead of crashing inside table rendering.
 
 describe("photon spectrum lines list", () => {
   test("renders the lines table", async () => {
@@ -40,15 +40,15 @@ describe("photon spectrum lines list", () => {
     expect(stdout).toContain("available");
   });
 
-  test("supports the legacy bare-array payload", async () => {
+  test("rejects a bare array instead of the documented lines envelope", async () => {
     setMockWrongShape("lines");
-    const { stdout, exitCode } = await runCommand(
+    const { stderr, exitCode } = await runCommand(
       ["spectrum", "lines", "list", "--api-host", baseUrl],
       { env: ENV }
     );
 
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("+16283586125");
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("expected an array of lines");
   });
 
   test("rejects an unrelated payload clearly", async () => {
@@ -75,15 +75,15 @@ describe("photon spectrum users list", () => {
     expect(stdout).toContain("+15555550100");
   });
 
-  test("supports the legacy bare-array payload", async () => {
+  test("rejects a bare array instead of the documented users envelope", async () => {
     setMockWrongShape("users");
-    const { stdout, exitCode } = await runCommand(
+    const { stderr, exitCode } = await runCommand(
       ["spectrum", "users", "list", "--api-host", baseUrl],
       { env: ENV }
     );
 
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("Henry Zhang");
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("expected an array of users");
   });
 
   test("rejects an unrelated payload clearly", async () => {
@@ -110,15 +110,15 @@ describe("photon spectrum platforms list", () => {
     expect(stdout).toContain("on");
   });
 
-  test("supports the legacy entry-array payload", async () => {
+  test("rejects an entry array instead of the documented platform map", async () => {
     setMockWrongShape("platforms");
-    const { stdout, exitCode } = await runCommand(
+    const { stderr, exitCode } = await runCommand(
       ["spectrum", "platforms", "list", "--api-host", baseUrl],
       { env: ENV }
     );
 
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("imessage");
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("expected a platform map object");
   });
 
   test("rejects non-boolean platform values", async () => {
@@ -134,15 +134,15 @@ describe("photon spectrum platforms list", () => {
 });
 
 describe("photon projects list", () => {
-  test("supports the legacy projects envelope", async () => {
+  test("rejects an envelope instead of the documented projects array", async () => {
     setMockWrongShape("projects");
-    const { stdout, exitCode } = await runCommand(
+    const { stderr, exitCode } = await runCommand(
       ["projects", "list", "--api-host", baseUrl],
       { env: ENV }
     );
 
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("Acme Agent");
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("expected an array of projects");
   });
 
   test("rejects an unrelated payload clearly", async () => {

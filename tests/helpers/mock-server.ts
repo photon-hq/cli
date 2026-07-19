@@ -33,10 +33,7 @@ interface MockState {
    *  exercise SessionExpiredError flows without having to manipulate
    *  the test's PHOTON_TOKEN. */
   forceUnauthorized: boolean;
-  /** Endpoints flagged here return a shape-drifted payload (array
-   *  wrapped in an object, or an envelope collapsed to a bare array) —
-   *  the drift class that broke `spectrum users list` ≤0.4.0 and
-   *  `spectrum lines list` ≤1.1.0. Used by wrong-shape regression tests. */
+  /** Endpoints flagged here return a payload outside the published contract. */
   wrongShape: Set<WrongShapeEndpoint>;
   invalidShape: Set<WrongShapeEndpoint>;
   lineAvatarResponseFault: "missing-avatar-url" | "missing-upload-key" | null;
@@ -155,7 +152,6 @@ const app = new Elysia()
     if (state.invalidShape.has("lines")) {
       return { items: linesFixture.lines };
     }
-    // Wrong shape = the pre-July-2026 payload (bare array, no envelope).
     if (state.wrongShape.has("lines")) {
       return linesFixture.lines;
     }
@@ -167,7 +163,6 @@ const app = new Elysia()
     if (state.invalidShape.has("platforms")) {
       return { imessage: "yes" };
     }
-    // Wrong shape = the toggle map drifted into a list of entries.
     if (state.wrongShape.has("platforms")) {
       return [{ platform: "imessage", enabled: true }];
     }
@@ -179,7 +174,6 @@ const app = new Elysia()
     if (state.invalidShape.has("users")) {
       return { items: usersFixture.users };
     }
-    // Wrong shape = the pre-May-30-2026 payload (bare array, no envelope).
     if (state.wrongShape.has("users")) {
       return usersFixture.users;
     }

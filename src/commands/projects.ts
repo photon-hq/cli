@@ -66,7 +66,7 @@ function registerListCommand(projects: Command): void {
         die(`Failed to list projects: ${formatApiError(error)}`);
       }
 
-      const list = requireArray(data, "projects", "projects");
+      const list = requireArray(data, "projects");
       if (opts.json) {
         printJson(list);
         return;
