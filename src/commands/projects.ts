@@ -19,6 +19,7 @@ import { parsePositiveInt } from "~/lib/commander.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
+import { requireArray } from "~/lib/shape.ts";
 import { isInteractive } from "~/lib/tty.ts";
 
 /** Platforms accepted by `projects create` (mirrors the API's create body). */
@@ -65,7 +66,7 @@ function registerListCommand(projects: Command): void {
         die(`Failed to list projects: ${formatApiError(error)}`);
       }
 
-      const list = data ?? [];
+      const list = requireArray(data, "projects", "projects");
       if (opts.json) {
         printJson(list);
         return;

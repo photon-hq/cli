@@ -1,0 +1,17 @@
+{
+  "users": [
+    {
+      "id": "c8538d5c-f5af-4c15-ae7b-a4b4b2684f8c",
+      "projectId": "00000000-0000-4000-a000-000000000001",
+      "type": "shared",
+      "firstName": "Henry",
+      "lastName": "Zhang",
+      "email": "henry@example.test",
+      "phoneNumber": "+15555550100",
+      "assignedPhoneNumber": "+15555550199",
+      "meta": { "project_owner": true },
+      "createdAt": "2026-07-18T15:39:37.322Z"
+    }
+  ],
+  "total": 1
+}

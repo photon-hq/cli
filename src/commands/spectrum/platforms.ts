@@ -3,6 +3,7 @@ import { getApi } from "~/lib/api.ts";
 import { resolveProject } from "~/lib/api-context.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
+import { requireBooleanRecord } from "~/lib/shape.ts";
 
 export function registerSpectrumPlatforms(spectrum: Command): void {
   const platforms = spectrum
@@ -34,7 +35,7 @@ export function registerSpectrumPlatforms(spectrum: Command): void {
       if (status === 401) throw new SessionExpiredError(resolved.name);
       if (error) die(`Failed to list platforms: ${formatApiError(error)}`);
 
-      const map = (data ?? {}) as Record<string, boolean>;
+      const map = requireBooleanRecord(data, "platform map");
       if (opts.json) return printJson(map);
       const entries = Object.entries(map);
       if (entries.length === 0) {

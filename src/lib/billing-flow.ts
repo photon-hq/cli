@@ -31,6 +31,18 @@ export interface BillingPlan {
   prices?: BillingPrice[];
 }
 
+function plansFromPayload(value: unknown): BillingPlan[] {
+  if (value == null) return [];
+  if (Array.isArray(value)) return value as BillingPlan[];
+  if (typeof value === "object" && value !== null) {
+    const plans = (value as Record<string, unknown>).plans;
+    if (Array.isArray(plans)) return plans as BillingPlan[];
+  }
+  die("Unexpected API response: expected an array of plans.", {
+    hint: "The API response format may have changed — try updating the CLI.",
+  });
+}
+
 export interface Subscription {
   tier?: string;
   status?: string | null;
@@ -63,7 +75,7 @@ export async function fetchPlans(api: Api, envName: string): Promise<BillingPlan
   const { data, error, status } = await api.api.billing.plans.get();
   if (status === 401) throw new SessionExpiredError(envName);
   if (error) die(`Failed to list plans: ${formatApiError(error)}`);
-  return (data ?? []) as BillingPlan[];
+  return plansFromPayload(data);
 }
 
 /**

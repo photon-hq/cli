@@ -14,6 +14,8 @@ import healthFixture from "../fixtures/health.json";
 import projectsFixture from "../fixtures/projects.list.json";
 import projectFixture from "../fixtures/project.show.json";
 import plansFixture from "../fixtures/billing.plans.json";
+import linesFixture from "../fixtures/lines.list.json";
+import usersFixture from "../fixtures/spectrum.users.list.json";
 import whoamiFixture from "../fixtures/whoami.json";
 import subscriptionFree from "../fixtures/subscription.free.json";
 import subscriptionActive from "../fixtures/subscription.active.json";
@@ -31,6 +33,12 @@ interface MockState {
    *  exercise SessionExpiredError flows without having to manipulate
    *  the test's PHOTON_TOKEN. */
   forceUnauthorized: boolean;
+  /** Endpoints flagged here return a shape-drifted payload (array
+   *  wrapped in an object, or an envelope collapsed to a bare array) —
+   *  the drift class that broke `spectrum users list` ≤0.4.0 and
+   *  `spectrum lines list` ≤1.1.0. Used by wrong-shape regression tests. */
+  wrongShape: Set<WrongShapeEndpoint>;
+  invalidShape: Set<WrongShapeEndpoint>;
   lineAvatarResponseFault: "missing-avatar-url" | "missing-upload-key" | null;
   lineProfileRequests: MockLineProfileRequest[];
   profileSyncRequests: MockProfileSyncRequest[];
@@ -51,9 +59,17 @@ export interface MockProfileSyncRequest {
   authorization: string | null;
 }
 
+export type WrongShapeEndpoint =
+  | "projects"
+  | "lines"
+  | "users"
+  | "platforms";
+
 const state: MockState = {
   subscription: subscriptionFree,
   forceUnauthorized: false,
+  wrongShape: new Set(),
+  invalidShape: new Set(),
   lineAvatarResponseFault: null,
   lineProfileRequests: [],
   profileSyncRequests: [],
@@ -65,6 +81,14 @@ export function setMockSubscription(sub: "free" | "active"): void {
 
 export function setMockUnauthorized(force: boolean): void {
   state.forceUnauthorized = force;
+}
+
+export function setMockWrongShape(endpoint: WrongShapeEndpoint): void {
+  state.wrongShape.add(endpoint);
+}
+
+export function setMockInvalidShape(endpoint: WrongShapeEndpoint): void {
+  state.invalidShape.add(endpoint);
 }
 
 export function setMockLineAvatarResponseFault(
@@ -84,6 +108,8 @@ export function getMockLineProfileRequests(): MockLineProfileRequest[] {
 export function resetMockState(): void {
   state.subscription = subscriptionFree;
   state.forceUnauthorized = false;
+  state.wrongShape.clear();
+  state.invalidShape.clear();
   state.lineAvatarResponseFault = null;
   state.lineProfileRequests = [];
   state.profileSyncRequests = [];
@@ -115,7 +141,49 @@ const app = new Elysia()
   .get("/api/projects", ({ headers }) => {
     const denied = requireAuth(headers as Record<string, string | undefined>);
     if (denied) return denied;
+    if (state.invalidShape.has("projects")) {
+      return { items: projectsFixture };
+    }
+    if (state.wrongShape.has("projects")) {
+      return { projects: projectsFixture };
+    }
     return projectsFixture;
+  })
+  .get("/api/projects/:id/lines", ({ headers }) => {
+    const denied = requireAuth(headers as Record<string, string | undefined>);
+    if (denied) return denied;
+    if (state.invalidShape.has("lines")) {
+      return { items: linesFixture.lines };
+    }
+    // Wrong shape = the pre-July-2026 payload (bare array, no envelope).
+    if (state.wrongShape.has("lines")) {
+      return linesFixture.lines;
+    }
+    return linesFixture;
+  })
+  .get("/api/projects/:id/platforms", ({ headers }) => {
+    const denied = requireAuth(headers as Record<string, string | undefined>);
+    if (denied) return denied;
+    if (state.invalidShape.has("platforms")) {
+      return { imessage: "yes" };
+    }
+    // Wrong shape = the toggle map drifted into a list of entries.
+    if (state.wrongShape.has("platforms")) {
+      return [{ platform: "imessage", enabled: true }];
+    }
+    return { imessage: true, whatsapp_business: false };
+  })
+  .get("/api/projects/:id/spectrum/users", ({ headers }) => {
+    const denied = requireAuth(headers as Record<string, string | undefined>);
+    if (denied) return denied;
+    if (state.invalidShape.has("users")) {
+      return { items: usersFixture.users };
+    }
+    // Wrong shape = the pre-May-30-2026 payload (bare array, no envelope).
+    if (state.wrongShape.has("users")) {
+      return usersFixture.users;
+    }
+    return usersFixture;
   })
   .get("/api/projects/check-availability", ({ headers, query }) => {
     const denied = requireAuth(headers as Record<string, string | undefined>);

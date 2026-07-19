@@ -5,6 +5,7 @@ import { resolveProject } from "~/lib/api-context.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
+import { requireArrayField } from "~/lib/shape.ts";
 
 export function registerSpectrumLines(spectrum: Command): void {
   const lines = spectrum
@@ -38,7 +39,7 @@ export function registerSpectrumLines(spectrum: Command): void {
       if (status === 401) throw new SessionExpiredError(resolved.name);
       if (error) die(`Failed to list lines: ${formatApiError(error)}`);
 
-      const list = data?.lines ?? [];
+      const list = requireArrayField(data, "lines");
       if (opts.json) return printJson(list);
       if (list.length === 0) {
         console.log(c.dim("No lines yet."));
