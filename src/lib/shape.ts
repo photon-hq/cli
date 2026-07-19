@@ -76,14 +76,14 @@ export function requireBooleanRecord(
 /**
  * For endpoints that wrap the list in an envelope (e.g. `{users, total}`,
  * `{lines, pendingRegistrations}`). A null/undefined payload means "no
- * data" and maps to []; a payload that exists but lacks the array field
- * means the envelope drifted, so fail loudly rather than render an
- * empty-but-wrong "No X yet."
+ * data" and maps to []; an envelope that exists must contain the expected
+ * array. A missing, null, or otherwise non-array field means the envelope
+ * drifted, so fail loudly rather than render an empty-but-wrong "No X yet."
  */
 export function requireArrayField<K extends string, T>(
   container:
     | readonly T[]
-    | { readonly [P in K]?: readonly T[] | null }
+    | { readonly [P in K]: readonly T[] }
     | null
     | undefined,
   key: K,

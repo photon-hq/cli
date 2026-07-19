@@ -13,6 +13,7 @@ import type { ApiContext } from "~/lib/api.ts";
 import { openInBrowser } from "~/lib/browser.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson } from "~/lib/output.ts";
+import { requireArray } from "~/lib/shape.ts";
 import { isInteractive } from "~/lib/tty.ts";
 
 // ──────────────────────────── DTOs ────────────────────────────
@@ -32,15 +33,15 @@ export interface BillingPlan {
 }
 
 function plansFromPayload(value: unknown): BillingPlan[] {
-  if (value == null) return [];
-  if (Array.isArray(value)) return value as BillingPlan[];
-  if (typeof value === "object" && value !== null) {
-    const plans = (value as Record<string, unknown>).plans;
-    if (Array.isArray(plans)) return plans as BillingPlan[];
-  }
-  die("Unexpected API response: expected an array of plans.", {
-    hint: "The API response format may have changed — try updating the CLI.",
-  });
+  return requireArray<BillingPlan>(
+    value as
+      | readonly BillingPlan[]
+      | Record<string, unknown>
+      | null
+      | undefined,
+    "plans",
+    "plans"
+  );
 }
 
 export interface Subscription {
