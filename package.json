@@ -40,7 +40,7 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build ./src/index.ts --outfile dist/photon.js --target node --minify && chmod +x dist/photon.js",
+    "build": "bun build ./src/index.ts --outfile dist/photon.js --target node --minify --external update-notifier && chmod +x dist/photon.js",
     "compile": "bun build ./src/index.ts --compile --outfile dist/photon",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
