@@ -1,0 +1,17 @@
+{
+  "lines": [
+    {
+      "platform": "imessage",
+      "id": "120aa6c4-899a-4421-b989-c770cf5548be",
+      "phoneNumber": "+16283586125",
+      "profile": {
+        "firstName": "Test",
+        "lastName": "Line",
+        "avatarUrl": null
+      },
+      "status": "available",
+      "createdAt": "2026-07-12T20:02:20.147Z"
+    }
+  ],
+  "pendingRegistrations": []
+}

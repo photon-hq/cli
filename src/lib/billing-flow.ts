@@ -13,6 +13,7 @@ import type { ApiContext } from "~/lib/api.ts";
 import { openInBrowser } from "~/lib/browser.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson } from "~/lib/output.ts";
+import { requireArray } from "~/lib/shape.ts";
 import { isInteractive } from "~/lib/tty.ts";
 
 // ──────────────────────────── DTOs ────────────────────────────
@@ -29,6 +30,10 @@ export interface BillingPlan {
   name: string;
   description?: string;
   prices?: BillingPrice[];
+}
+
+function plansFromPayload(value: unknown): BillingPlan[] {
+  return requireArray(value, "plans") as BillingPlan[];
 }
 
 export interface Subscription {
@@ -63,7 +68,7 @@ export async function fetchPlans(api: Api, envName: string): Promise<BillingPlan
   const { data, error, status } = await api.api.billing.plans.get();
   if (status === 401) throw new SessionExpiredError(envName);
   if (error) die(`Failed to list plans: ${formatApiError(error)}`);
-  return (data ?? []) as BillingPlan[];
+  return plansFromPayload(data);
 }
 
 /**

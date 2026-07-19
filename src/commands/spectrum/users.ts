@@ -5,6 +5,7 @@ import { resolveProject } from "~/lib/api-context.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
+import { requireArrayField } from "~/lib/shape.ts";
 import { isInteractive } from "~/lib/tty.ts";
 
 export function registerSpectrumUsers(spectrum: Command): void {
@@ -37,7 +38,7 @@ export function registerSpectrumUsers(spectrum: Command): void {
       if (status === 401) throw new SessionExpiredError(resolved.name);
       if (error) die(`Failed to list users: ${formatApiError(error)}`);
 
-      const list = data?.users ?? [];
+      const list = requireArrayField(data, "users");
       if (opts.json) return printJson(list);
       if (list.length === 0) {
         console.log(c.dim("No Spectrum users yet."));

@@ -10,7 +10,6 @@ import {
   pickPlanInteractively,
   resolveBrowserPolicy,
   TIER_NAMES,
-  type BillingPlan,
   type BillingPrice,
   type Subscription,
   type TierName,
@@ -50,11 +49,7 @@ function registerPlans(billing: Command): void {
         requireAuth: true,
       });
 
-      const { data, error, status } = await api.api.billing.plans.get();
-      if (status === 401) throw new SessionExpiredError(env.name);
-      if (error) die(`Failed to list plans: ${formatApiError(error)}`);
-
-      const plans = (data ?? []) as BillingPlan[];
+      const plans = await fetchPlans(api, env.name);
       if (opts.json) return printJson(plans);
       if (plans.length === 0) {
         console.log(c.dim("No plans available."));
