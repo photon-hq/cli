@@ -7,9 +7,10 @@ import {
 } from '~/lib/errors.ts';
 import { die } from '~/lib/output.ts';
 import { startUpdateNotifier } from '~/lib/update-check.ts';
+import { isUpdateCommandInvocation } from '~/lib/self-update.ts';
 import { buildProgram } from '~/program.ts';
 
-startUpdateNotifier();
+if (!isUpdateCommandInvocation(process.argv)) startUpdateNotifier();
 
 const program = buildProgram();
 program.parseAsync(process.argv).catch(handleTopLevelError);

@@ -18,9 +18,12 @@ Runs on Node.js >= 18. Bun is also supported but not required.
 ```sh
 npx @photon-ai/cli login
 npx @photon-ai/cli projects ls
+yarn dlx --package @photon-ai/cli@latest photon login
 ```
 
-Each invocation pulls the latest release on demand. Good for scripts, throwaway machines, or trying the CLI before committing. Works with `npx`, `pnpx`, or `bunx`.
+Each invocation pulls the requested release on demand. Good for scripts,
+throwaway machines, or trying the CLI before committing. Works with `npx`,
+`pnpx`, `bunx`, or `yarn dlx`.
 
 ### Global install
 
@@ -31,7 +34,8 @@ photon login
 
 After install, both `photon` and the shorter `pho` alias are on your `PATH`.
 
-Also works with other package managers:
+Also works with other package managers (Yarn global installs require Yarn
+Classic 1.x):
 
 ```sh
 pnpm add -g @photon-ai/cli
@@ -57,7 +61,27 @@ Available for macOS (arm64 / x64) and Linux (x64 / arm64). Each binary ships wit
 
 ## Update
 
-The CLI shows a notification when a new version is available. To update:
+The CLI shows a notification when a new version is available. It can detect
+global npm, pnpm, Yarn Classic, and Bun installs, and securely replace standalone
+binaries after verifying the published SHA-256 checksum:
+
+```sh
+photon update
+photon update --check           # check without installing
+photon update --force           # reinstall even when already current
+photon update --check --json    # machine-readable check result
+```
+
+`--json` also works during an installation. `--force` cannot be combined with
+`--check`.
+
+If automatic detection is ambiguous, choose the installer explicitly:
+
+```sh
+photon update --installer npm   # npm | pnpm | yarn | bun
+```
+
+You can also update directly with the package manager you originally used:
 
 ```sh
 npm update -g @photon-ai/cli
@@ -80,7 +104,11 @@ curl -L -o /usr/local/bin/photon \
 chmod +x /usr/local/bin/photon
 ```
 
-`npx` / `pnpx` / `bunx` users always get the latest release automatically — no manual update needed.
+`npx` / `pnpx` / `bunx` users can request `@photon-ai/cli@latest` directly.
+Yarn 2+ users can run
+`yarn dlx --package @photon-ai/cli@latest photon`, so no self-update is needed.
+If a Yarn 2+ project lists Photon as a local dependency, update it from that
+project with `yarn up @photon-ai/cli`.
 
 To suppress the update notification, set `PHOTON_NO_UPDATE_NOTIFIER=1`.
 

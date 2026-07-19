@@ -9,6 +9,7 @@ import { registerPingCommand } from '~/commands/ping.ts';
 import { registerProfileCommand } from '~/commands/profile.ts';
 import { registerProjectsCommand } from '~/commands/projects.ts';
 import { registerSpectrumCommands } from '~/commands/spectrum/index.ts';
+import { registerUpdateCommand } from '~/commands/update.ts';
 import { registerWhoamiCommand } from '~/commands/whoami.ts';
 import { setDebug } from '~/lib/debug.ts';
 import pkg from '../package.json' with { type: 'json' };
@@ -33,6 +34,7 @@ export function buildProgram(): Command {
   registerLoginCommand(program);
   registerLogoutCommand(program);
   registerWhoamiCommand(program);
+  registerUpdateCommand(program);
   registerProfileCommand(program);
   registerProjectsCommand(program);
   registerSpectrumCommands(program);

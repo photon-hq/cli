@@ -52,6 +52,7 @@
     "@photon-ai/dashboard-api": "1.6.12",
     "@types/bun": "latest",
     "@types/node": "^25.6.2",
+    "@types/semver": "^7.7.1",
     "@types/update-notifier": "^6.0.8",
     "elysia": "1.4.28",
     "typescript": "^5"
@@ -65,6 +66,7 @@
     "commander": "^14.0.3",
     "open": "^11.0.0",
     "picocolors": "^1.1.1",
+    "semver": "^7.8.5",
     "update-notifier": "^7.3.1"
   }
 }
