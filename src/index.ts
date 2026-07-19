@@ -6,8 +6,19 @@ import {
   SessionExpiredError,
 } from '~/lib/errors.ts';
 import { die } from '~/lib/output.ts';
-import { startUpdateNotifier } from '~/lib/update-check.ts';
+import {
+  isUpdateProbeInvocation,
+  runUpdateProbe,
+  startUpdateNotifier,
+} from '~/lib/update-check.ts';
 import { buildProgram } from '~/program.ts';
+
+// The detached background update check re-invokes this same entry file
+// with a hidden flag — handle it before commander ever loads.
+if (isUpdateProbeInvocation(process.argv)) {
+  await runUpdateProbe();
+  process.exit(0);
+}
 
 startUpdateNotifier();
 

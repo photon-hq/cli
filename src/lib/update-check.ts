@@ -1,28 +1,166 @@
-import updateNotifier from "update-notifier";
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { configDir } from "~/lib/env.ts";
+import { c } from "~/lib/output.ts";
 import { isInteractive } from "~/lib/tty.ts";
 import pkg from "../../package.json" with { type: "json" };
 
 /**
- * Light-weight wrapper around `update-notifier`. Disabled in non-TTY
- * and when `PHOTON_NO_UPDATE_NOTIFIER=1` is set. Caches lookups for
- * 24h. Posts the standard boxed notification on the next run after a
- * new version is detected — does not block the current run.
+ * Self-contained update notifier.
  *
- * Call this once at startup, BEFORE invoking commander. The notifier
- * spawns a detached child process to do the npm registry lookup, so
- * there's no perceptible startup cost.
+ * This used to wrap `update-notifier`, which does its registry lookup by
+ * spawning `<pkg-dir>/check.js` as a detached child. We bundle the CLI
+ * into a single `dist/photon.js`, so that file never shipped and the
+ * child died on MODULE_NOT_FOUND with stdio ignored — no published
+ * version ever showed the update box. The replacement keeps the same
+ * shape (24h-cached background check, notice on a later run) but spawns
+ * THIS same entry file with a hidden argv flag as the checker, so
+ * bundling can't break it, and drops the dependency entirely.
+ *
+ * Opt-outs honored: non-interactive sessions and PHOTON_NO_UPDATE_NOTIFIER=1.
  */
-export function startUpdateNotifier(): void {
-  if (!isInteractive()) return;
+
+const CHECK_INTERVAL_MS = 1000 * 60 * 60 * 24; // 24h
+const PROBE_ARG = "__photon-update-probe";
+
+interface UpdateCache {
+  lastCheck: number;
+  latest?: string;
+}
+
+interface UpdateNotifierDependencies {
+  interactive?: () => boolean;
+  now?: () => number;
+  spawnProbe?: (executable: string, entry: string) => void;
+  writeError?: (message: string) => void;
+}
+
+const cachePath = (): string => path.join(configDir(), "update-check.json");
+
+// Test hook + escape hatch for self-hosted registries.
+const registryUrl = (): string =>
+  process.env.PHOTON_UPDATE_REGISTRY ?? "https://registry.npmjs.org";
+
+const parseVersion = (version: string): [bigint, bigint, bigint] | null => {
+  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(
+    version
+  );
+  if (!match) return null;
+  return [
+    BigInt(match[1] as string),
+    BigInt(match[2] as string),
+    BigInt(match[3] as string),
+  ];
+};
+
+export function readUpdateCache(): UpdateCache {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(cachePath(), "utf8")) as unknown;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return { lastCheck: 0 };
+    }
+    const { lastCheck, latest } = parsed as Record<string, unknown>;
+    if (
+      typeof lastCheck !== "number" ||
+      !Number.isFinite(lastCheck) ||
+      lastCheck < 0
+    ) {
+      return { lastCheck: 0 };
+    }
+    if (typeof latest === "string" && parseVersion(latest)) {
+      return { lastCheck, latest };
+    }
+    return { lastCheck };
+  } catch {
+    return { lastCheck: 0 };
+  }
+}
+
+function writeCache(cache: UpdateCache): void {
+  fs.mkdirSync(path.dirname(cachePath()), { recursive: true });
+  fs.writeFileSync(cachePath(), JSON.stringify(cache));
+}
+
+/**
+ * Dotted-numeric semver compare. Prerelease/garbage segments compare as
+ * "not newer" — a notifier must never nag someone off a stable release
+ * onto something it can't parse.
+ */
+export function isNewerVersion(latest: string, current: string): boolean {
+  const a = parseVersion(latest);
+  const b = parseVersion(current);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return (a[i] as bigint) > (b[i] as bigint);
+  }
+  return false;
+}
+
+/** True when this process was launched as the detached background probe. */
+export const isUpdateProbeInvocation = (argv: string[]): boolean =>
+  argv[2] === PROBE_ARG;
+
+/**
+ * The detached child's job: stamp lastCheck first (so an offline probe
+ * doesn't retry-storm on every invocation), then fetch the dist-tag and
+ * cache it for the next interactive run to display.
+ */
+export async function runUpdateProbe(): Promise<void> {
+  writeCache({ ...readUpdateCache(), lastCheck: Date.now() });
+  try {
+    const res = await fetch(
+      `${registryUrl()}/${encodeURIComponent(pkg.name)}/latest`,
+      {
+        signal: AbortSignal.timeout(10_000),
+        headers: { accept: "application/json" },
+      }
+    );
+    if (!res.ok) return;
+    const info = (await res.json()) as { version?: unknown };
+    if (typeof info.version === "string" && parseVersion(info.version)) {
+      writeCache({ lastCheck: Date.now(), latest: info.version });
+    }
+  } catch {
+    // Offline or registry down — next probe is 24h away.
+  }
+}
+
+/**
+ * Call once at startup, before commander. Prints to stderr so `--json`
+ * pipelines never see it.
+ */
+export function startUpdateNotifier(
+  dependencies: UpdateNotifierDependencies = {}
+): void {
+  const interactive = dependencies.interactive ?? isInteractive;
+  if (!interactive()) return;
   if (process.env.PHOTON_NO_UPDATE_NOTIFIER === "1") return;
 
-  const notifier = updateNotifier({
-    pkg: { name: pkg.name, version: pkg.version },
-    updateCheckInterval: 1000 * 60 * 60 * 24, // 24h
-  });
+  const cache = readUpdateCache();
+  const writeError =
+    dependencies.writeError ?? ((message: string) => console.error(message));
+  if (cache.latest && isNewerVersion(cache.latest, pkg.version)) {
+    writeError(c.warn(`Update available: ${pkg.version} → ${cache.latest}`));
+    writeError(
+      c.hint(
+        `  Run \`npm update -g ${pkg.name}\`, or use the installer you originally chose.`
+      )
+    );
+  }
 
-  // .notify() prints (on the NEXT invocation, after a fresh fetch
-  // landed in the cache). The first call schedules the background
-  // lookup and returns immediately.
-  notifier.notify({ defer: true, isGlobal: true });
+  const now = dependencies.now ?? Date.now;
+  const elapsed = now() - cache.lastCheck;
+  if (elapsed >= 0 && elapsed < CHECK_INTERVAL_MS) return;
+  const entry = process.argv[1];
+  if (!entry) return;
+  const spawnProbe =
+    dependencies.spawnProbe ??
+    ((executable: string, entryFile: string) => {
+      spawn(executable, [entryFile, PROBE_ARG], {
+        detached: true,
+        stdio: "ignore",
+      }).unref();
+    });
+  spawnProbe(process.execPath, entry);
 }
