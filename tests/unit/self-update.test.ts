@@ -300,6 +300,20 @@ describe("updatePhoton", () => {
         }
       )
     ).rejects.toThrow("A development checkout cannot update itself");
+
+    await expect(
+      updatePhoton(
+        {},
+        {
+          currentVersion: "2.0.0",
+          latestVersion: async () => "3.0.0",
+          installation: {
+            kind: "ephemeral",
+            entryPath: "/tmp/npx/node_modules/@photon-ai/cli/dist/photon.js",
+          },
+        }
+      )
+    ).rejects.toThrow("A one-off Photon invocation cannot update itself");
   });
 
   test("directs Yarn Berry users to update the owning project", async () => {

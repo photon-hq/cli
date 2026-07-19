@@ -6,7 +6,10 @@ describe("photon update", () => {
   const registry = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
-    fetch() {
+    fetch(request) {
+      if (new URL(request.url).pathname !== "/@photon-ai%2Fcli") {
+        return new Response("not found", { status: 404 });
+      }
       return Response.json({
         name: "@photon-ai/cli",
         "dist-tags": { latest: "99.0.0" },
