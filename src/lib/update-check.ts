@@ -2,6 +2,11 @@ import updateNotifier from "update-notifier";
 import { isInteractive } from "~/lib/tty.ts";
 import pkg from "../../package.json" with { type: "json" };
 
+interface UpdateNotifierDependencies {
+  interactive?: () => boolean;
+  createNotifier?: typeof updateNotifier;
+}
+
 /**
  * Light-weight wrapper around `update-notifier`. Disabled in non-TTY
  * and when `PHOTON_NO_UPDATE_NOTIFIER=1` is set. Caches lookups for
@@ -12,11 +17,15 @@ import pkg from "../../package.json" with { type: "json" };
  * spawns a detached child process to do the npm registry lookup, so
  * there's no perceptible startup cost.
  */
-export function startUpdateNotifier(): void {
-  if (!isInteractive()) return;
+export function startUpdateNotifier(
+  dependencies: UpdateNotifierDependencies = {}
+): void {
+  const interactive = dependencies.interactive ?? isInteractive;
+  if (!interactive()) return;
   if (process.env.PHOTON_NO_UPDATE_NOTIFIER === "1") return;
 
-  const notifier = updateNotifier({
+  const createNotifier = dependencies.createNotifier ?? updateNotifier;
+  const notifier = createNotifier({
     pkg: { name: pkg.name, version: pkg.version },
     updateCheckInterval: 1000 * 60 * 60 * 24, // 24h
   });
