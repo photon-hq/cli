@@ -134,6 +134,9 @@ function registerShowCommand(projects: Command): void {
       printKv([
         ["status", formatStatus(p.status)],
         ["location", p.location],
+        ["plan", p.plan],
+        ["platforms", p.platforms.length > 0 ? p.platforms.join(", ") : c.dim("—")],
+        ["userCount", String(p.userCount)],
         ["owner", p.isOwner ? c.green("yes") : c.dim("no")],
         ["template", p.template ? "yes" : "no"],
         ["observability", p.observability ? "yes" : "no"],

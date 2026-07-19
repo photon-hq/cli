@@ -1,44 +1,40 @@
-# Upstream API Diff
+# Upstream diff — @photon-ai/dashboard-api 1.6.13 → 1.6.14
 
-> Old routes: 36 · New routes: 58
-
-## Added Routes
-
-| Route | Method |
-|-------|--------|
-| `api.profile.spectrum-updates` | `PATCH` |
-| `api.projects.:id.members` | `GET` |
-| `api.projects.:id.members` | `POST` |
-| `api.projects.:id.members.:memberUserId` | `DELETE` |
-| `api.projects.:id.slack` | `DELETE` |
-| `api.projects.:id.slack` | `GET` |
-| `api.projects.:id.slack` | `PUT` |
-| `api.projects.:id.slack.installations` | `GET` |
-| `api.projects.:id.slack.installations.:teamId` | `DELETE` |
-| `api.projects.:id.spectrum.avatar` | `DELETE` |
-| `api.projects.:id.spectrum.avatar.commit` | `POST` |
-| `api.projects.:id.spectrum.avatar.upload` | `POST` |
-| `api.projects.:id.voice.imessage-enabled` | `PATCH` |
-| `api.projects.:id.voice.settings` | `GET` |
-| `api.projects.:id.voice.sip-inbound` | `DELETE` |
-| `api.projects.:id.voice.sip-inbound` | `PATCH` |
-| `api.projects.:id.webhooks` | `GET` |
-| `api.projects.:id.webhooks` | `POST` |
-| `api.projects.:id.webhooks.:webhookId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates` | `GET` |
-| `api.projects.:id.whatsapp.templates` | `POST` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `PATCH` |
-
-## Removed Routes
-
-| Route | Method |
-|-------|--------|
-| `api.projects.:id.spectrum.avatar-upload-url` | `GET` |
+Dashboard release: [v1.6.14](https://github.com/photon-hq/dashboard/releases/tag/v1.6.14)
+Dashboard SHA: `bf18b4a3b72c4ddb03ebee09b0c176959daa847b`
 
 ## Summary
 
-- **23** added
-- **1** removed
-- **0** changed
-- **35** unchanged
+Additive DTO change on the project-detail endpoint plus server-side
+security hardening in the dashboard that doesn't touch the public
+API surface.
+
+## Changed routes
+
+- `GET /api/projects/:id` — response body gained four fields:
+  - `avatarUrl: string | null`
+  - `plan: PlanTier` (`"free" | "pro" | "business" | "enterprise"`)
+  - `platforms: SpectrumPlatformId[]`
+  - `userCount: number`
+
+  Source: dashboard#255 ("include plan and platforms in project details").
+
+## Added / removed routes
+
+- Added: (none)
+- Removed: (none)
+
+## Non-API dashboard changes (no CLI impact)
+
+- dashboard#251 — suspend accounts after six phone-OTP failures (server-side rate limit).
+- dashboard#253 — scaffold install commands now use `--yes` instead of `-y` (dashboard-generated shell snippets; CLI is unaffected).
+- dashboard#256 — redirect suspended users to a reason page (dashboard UI).
+- dashboard#257 — suspicious email-domain OTP abuse controls (server-side signup validation).
+
+## Snapshot changes
+
+(none)
+
+## New runtime dependencies
+
+(none)
