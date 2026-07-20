@@ -268,7 +268,10 @@ function registerCreateCommand(projects: Command): void {
 interface FilledCreate {
   name: string;
   location: string;
-  platforms: Platform[];
+  // `undefined` when the user specified no platforms — the field is then omitted
+  // from the create body so the server applies its default (iMessage). Sending an
+  // empty `[]` instead would create a project with NO platform enabled.
+  platforms: Platform[] | undefined;
   template: boolean;
   observability: boolean;
 }
@@ -292,7 +295,7 @@ function parsePlatforms(value: string): Platform[] {
   return [...new Set(parsed)] as Platform[];
 }
 
-async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
+export async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
   // Non-interactive path: name is required; defaults fill the rest.
   if (!isInteractive()) {
     if (!opts.name?.trim()) {
@@ -303,7 +306,9 @@ async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     return {
       name: opts.name.trim(),
       location: opts.location ?? "United States",
-      platforms: opts.platforms !== undefined ? parsePlatforms(opts.platforms) : [],
+      // No --platforms => omit (undefined), letting the server default to iMessage.
+      platforms:
+        opts.platforms !== undefined ? parsePlatforms(opts.platforms) : undefined,
       template: opts.template ?? false,
       observability: opts.observability ?? false,
     };
@@ -337,16 +342,18 @@ async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     location = answer || "United States";
   }
 
-  const platforms =
+  const parsedPlatforms =
     opts.platforms !== undefined
       ? parsePlatforms(opts.platforms)
       : parsePlatforms(
           await promptText(
-            `Platforms (comma-separated: ${PLATFORMS.join(", ")})`,
+            `Platforms (comma-separated, blank = iMessage default: ${PLATFORMS.join(", ")})`,
             undefined,
             true
           )
         );
+  // Blank => omit so the server applies its default; sending [] disables all platforms.
+  const platforms = parsedPlatforms.length > 0 ? parsedPlatforms : undefined;
   const template = opts.template ?? (await promptBool("Use as template?", false));
   const observability =
     opts.observability ?? (await promptBool("Enable observability?", false));
