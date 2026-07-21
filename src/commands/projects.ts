@@ -268,9 +268,6 @@ function registerCreateCommand(projects: Command): void {
 interface FilledCreate {
   name: string;
   location: string;
-  // `undefined` when the user specified no platforms — the field is then omitted
-  // from the create body so the server applies its default (iMessage). Sending an
-  // empty `[]` instead would create a project with NO platform enabled.
   platforms: Platform[] | undefined;
   template: boolean;
   observability: boolean;
@@ -295,16 +292,10 @@ function parsePlatforms(value: string): Platform[] {
   return [...new Set(parsed)] as Platform[];
 }
 
-/**
- * Resolve the `--platforms` flag (or its interactive answer) to the create
- * body's `platforms` field. Returns `undefined` — which omits the field so the
- * server applies its default (iMessage) — whenever the user gave nothing
- * usable: an absent flag, an empty string, or an all-whitespace / comma-only
- * list. Only a non-empty parse yields an explicit array (which may
- * intentionally narrow the enabled platforms). Empty input must never reach the
- * request body as `[]`, since the server reads that as "disable every platform".
- */
-function resolvePlatformsFlag(value: string | undefined): Platform[] | undefined {
+/** Empty platform selections stay omitted so the API can apply its default. */
+function normalizeOptionalPlatforms(
+  value: string | undefined
+): Platform[] | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -312,7 +303,7 @@ function resolvePlatformsFlag(value: string | undefined): Platform[] | undefined
   return parsed.length > 0 ? parsed : undefined;
 }
 
-export async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
+async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
   // Non-interactive path: name is required; defaults fill the rest.
   if (!isInteractive()) {
     if (!opts.name?.trim()) {
@@ -323,11 +314,7 @@ export async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     return {
       name: opts.name.trim(),
       location: opts.location ?? "United States",
-      // No (or blank) --platforms => omit (undefined) so the server defaults to
-      // iMessage. resolvePlatformsFlag also folds an empty/whitespace value
-      // (e.g. `--platforms ""` from a script with an unset var) to undefined, so
-      // it never sends the `[]` that would disable every platform.
-      platforms: resolvePlatformsFlag(opts.platforms),
+      platforms: normalizeOptionalPlatforms(opts.platforms),
       template: opts.template ?? false,
       observability: opts.observability ?? false,
     };
@@ -361,10 +348,7 @@ export async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     location = answer || "United States";
   }
 
-  // A missing flag falls back to the prompt; a blank flag value, a blank prompt
-  // answer, or an all-whitespace list all normalize to undefined so the server
-  // applies its default — sending [] would instead disable every platform.
-  const platforms = resolvePlatformsFlag(
+  const platforms = normalizeOptionalPlatforms(
     opts.platforms ??
       (await promptText(
         `Platforms (comma-separated, blank = iMessage default: ${PLATFORMS.join(", ")})`,

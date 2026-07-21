@@ -1,5 +1,17 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { startMockServer, stopMockServer } from "../helpers/mock-server.ts";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+} from "bun:test";
+import {
+  getMockProjectCreateRequests,
+  resetMockState,
+  startMockServer,
+  stopMockServer,
+} from "../helpers/mock-server.ts";
 import { runCommand } from "../helpers/cli-runner.ts";
 
 let baseUrl: string;
@@ -10,6 +22,102 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await stopMockServer();
+});
+
+beforeEach(() => {
+  resetMockState();
+});
+
+describe("photon projects create", () => {
+  test("omits platforms from the request body when --platforms is absent", async () => {
+    const { exitCode } = await runCommand(
+      ["projects", "create", "--name", "DX 25", "--json"],
+      {
+        env: {
+          CI: "1",
+          PHOTON_TOKEN: "test-token",
+          PHOTON_API_HOST: baseUrl,
+        },
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(getMockProjectCreateRequests()).toEqual([
+      {
+        name: "DX 25",
+        location: "United States",
+        template: false,
+        observability: false,
+      },
+    ]);
+  });
+
+  test("omits platforms from the request body when --platforms is empty", async () => {
+    const emptyValues = ["", "   ", ",", ",,", " , "];
+
+    for (const value of emptyValues) {
+      const { exitCode } = await runCommand(
+        [
+          "projects",
+          "create",
+          "--name",
+          "DX 25",
+          "--platforms",
+          value,
+          "--json",
+        ],
+        {
+          env: {
+            CI: "1",
+            PHOTON_TOKEN: "test-token",
+            PHOTON_API_HOST: baseUrl,
+          },
+        },
+      );
+      expect(exitCode).toBe(0);
+    }
+
+    expect(getMockProjectCreateRequests()).toEqual(
+      emptyValues.map(() => ({
+        name: "DX 25",
+        location: "United States",
+        template: false,
+        observability: false,
+      })),
+    );
+  });
+
+  test("preserves explicit platforms in the request body", async () => {
+    const { exitCode } = await runCommand(
+      [
+        "projects",
+        "create",
+        "--name",
+        "DX 25",
+        "--platforms",
+        " imessage , voice , imessage ,",
+        "--json",
+      ],
+      {
+        env: {
+          CI: "1",
+          PHOTON_TOKEN: "test-token",
+          PHOTON_API_HOST: baseUrl,
+        },
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(getMockProjectCreateRequests()).toEqual([
+      {
+        name: "DX 25",
+        location: "United States",
+        platforms: ["imessage", "voice"],
+        template: false,
+        observability: false,
+      },
+    ]);
+  });
 });
 
 describe("photon projects list", () => {
