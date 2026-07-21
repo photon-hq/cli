@@ -295,6 +295,23 @@ function parsePlatforms(value: string): Platform[] {
   return [...new Set(parsed)] as Platform[];
 }
 
+/**
+ * Resolve the `--platforms` flag (or its interactive answer) to the create
+ * body's `platforms` field. Returns `undefined` — which omits the field so the
+ * server applies its default (iMessage) — whenever the user gave nothing
+ * usable: an absent flag, an empty string, or an all-whitespace / comma-only
+ * list. Only a non-empty parse yields an explicit array (which may
+ * intentionally narrow the enabled platforms). Empty input must never reach the
+ * request body as `[]`, since the server reads that as "disable every platform".
+ */
+function resolvePlatformsFlag(value: string | undefined): Platform[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = parsePlatforms(value);
+  return parsed.length > 0 ? parsed : undefined;
+}
+
 export async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
   // Non-interactive path: name is required; defaults fill the rest.
   if (!isInteractive()) {
@@ -306,9 +323,11 @@ export async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     return {
       name: opts.name.trim(),
       location: opts.location ?? "United States",
-      // No --platforms => omit (undefined), letting the server default to iMessage.
-      platforms:
-        opts.platforms !== undefined ? parsePlatforms(opts.platforms) : undefined,
+      // No (or blank) --platforms => omit (undefined) so the server defaults to
+      // iMessage. resolvePlatformsFlag also folds an empty/whitespace value
+      // (e.g. `--platforms ""` from a script with an unset var) to undefined, so
+      // it never sends the `[]` that would disable every platform.
+      platforms: resolvePlatformsFlag(opts.platforms),
       template: opts.template ?? false,
       observability: opts.observability ?? false,
     };
@@ -342,18 +361,17 @@ export async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     location = answer || "United States";
   }
 
-  const parsedPlatforms =
-    opts.platforms !== undefined
-      ? parsePlatforms(opts.platforms)
-      : parsePlatforms(
-          await promptText(
-            `Platforms (comma-separated, blank = iMessage default: ${PLATFORMS.join(", ")})`,
-            undefined,
-            true
-          )
-        );
-  // Blank => omit so the server applies its default; sending [] disables all platforms.
-  const platforms = parsedPlatforms.length > 0 ? parsedPlatforms : undefined;
+  // A missing flag falls back to the prompt; a blank flag value, a blank prompt
+  // answer, or an all-whitespace list all normalize to undefined so the server
+  // applies its default — sending [] would instead disable every platform.
+  const platforms = resolvePlatformsFlag(
+    opts.platforms ??
+      (await promptText(
+        `Platforms (comma-separated, blank = iMessage default: ${PLATFORMS.join(", ")})`,
+        undefined,
+        true
+      ))
+  );
   const template = opts.template ?? (await promptBool("Use as template?", false));
   const observability =
     opts.observability ?? (await promptBool("Enable observability?", false));
