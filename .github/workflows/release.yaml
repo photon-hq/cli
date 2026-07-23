@@ -35,6 +35,11 @@ jobs:
       contents: write
       pull-requests: read
       id-token: write
+      # buildspace's typescript-service-release.yaml declares `packages: write` on its
+      # (opt-in, skipped) github-packages-publish job. GitHub validates called-workflow
+      # job permissions against this grant at startup — before evaluating `if:` — so
+      # omitting this fails every run with startup_failure.
+      packages: write
     with:
       service-name: "@photon-ai/cli"
       build-command: "bun run build"
