@@ -39,6 +39,7 @@ interface MockState {
   lineAvatarResponseFault: "missing-avatar-url" | "missing-upload-key" | null;
   lineProfileRequests: MockLineProfileRequest[];
   profileSyncRequests: MockProfileSyncRequest[];
+  projectCreateRequests: Record<string, unknown>[];
 }
 
 export interface MockLineProfileRequest {
@@ -70,6 +71,7 @@ const state: MockState = {
   lineAvatarResponseFault: null,
   lineProfileRequests: [],
   profileSyncRequests: [],
+  projectCreateRequests: [],
 };
 
 export function setMockSubscription(sub: "free" | "active"): void {
@@ -102,6 +104,10 @@ export function getMockLineProfileRequests(): MockLineProfileRequest[] {
   return state.lineProfileRequests.map((request) => ({ ...request }));
 }
 
+export function getMockProjectCreateRequests(): Record<string, unknown>[] {
+  return state.projectCreateRequests.map((request) => ({ ...request }));
+}
+
 export function resetMockState(): void {
   state.subscription = subscriptionFree;
   state.forceUnauthorized = false;
@@ -110,6 +116,7 @@ export function resetMockState(): void {
   state.lineAvatarResponseFault = null;
   state.lineProfileRequests = [];
   state.profileSyncRequests = [];
+  state.projectCreateRequests = [];
 }
 
 function requireAuth(headers: Record<string, string | undefined>) {
@@ -292,9 +299,10 @@ const app = new Elysia()
     if (found) return found;
     return projectFixture;
   })
-  .post("/api/projects", ({ headers }) => {
+  .post("/api/projects", ({ body, headers }) => {
     const denied = requireAuth(headers as Record<string, string | undefined>);
     if (denied) return denied;
+    state.projectCreateRequests.push({ ...(body as Record<string, unknown>) });
     return { success: true, id: projectFixture.id };
   })
   .get("/api/projects/:id/subscription", ({ headers }) => {
