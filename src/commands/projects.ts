@@ -259,6 +259,17 @@ function registerCreateCommand(projects: Command): void {
           `Created ${c.bold(filled.name)} ${c.dim(`(${result.id})`)} on ${c.bold(env.name)}`
         )
       );
+      if (filled.platforms.length === 0) {
+        console.log(c.dim("  No platforms enabled."));
+        console.log(
+          c.dim("  See accepted platform names with `photon projects create --help`.")
+        );
+        console.log(
+          c.dim(
+            `  Enable one with \`photon spectrum platforms enable <platform-name> --project '${result.id}'\`.`
+          )
+        );
+      }
       console.log(
         c.dim(`  To make this the active project: export PHOTON_PROJECT_ID='${result.id}'`)
       );
