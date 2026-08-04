@@ -365,6 +365,7 @@ const app = new Elysia()
   .post("/api/projects/:id/spectrum/users", ({ body, headers, params }) => {
     const denied = requireAuth(headers as Record<string, string | undefined>);
     if (denied) return denied;
+    if (state.invalidShape.has("users")) return {};
     if (state.spectrumUserAddFailure) {
       return new Response(JSON.stringify(state.spectrumUserAddFailure), {
         status: 409,

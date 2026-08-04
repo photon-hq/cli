@@ -11,6 +11,7 @@ import {
   getMockProjectCreateRequests,
   getMockProjectDeleteRequests,
   resetMockState,
+  setMockInvalidShape,
   setMockPlatformToggleEmptyResponse,
   setMockPlatformToggleWarning,
   setMockProjectCreateWarning,
@@ -553,6 +554,24 @@ describe("photon spectrum users add", () => {
         message: "Enable iMessage for this project before adding a Spectrum user.",
       },
     });
+  });
+
+  test("fails instead of reporting success for an incomplete response", async () => {
+    setMockInvalidShape("users");
+
+    const { stdout, stderr, exitCode } = await runCommand(args, {
+      env: {
+        PHOTON_TOKEN: "test-token",
+        PHOTON_API_HOST: baseUrl,
+        PHOTON_PROJECT_ID: projectId,
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stdout).not.toContain("Added");
+    expect(stderr).toContain(
+      "Server did not return a valid Spectrum user result.",
+    );
   });
 });
 

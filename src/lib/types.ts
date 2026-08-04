@@ -55,8 +55,6 @@ export interface SpectrumUser {
   phoneNumber?: string | null;
 }
 
-export interface SpectrumUserAddResult {
-  error?: string;
-  success?: true;
-  user?: SpectrumUser;
-}
+export type SpectrumUserAddResult =
+  | { error: string }
+  | { success: true; user: SpectrumUser };

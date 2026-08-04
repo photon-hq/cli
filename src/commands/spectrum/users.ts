@@ -99,14 +99,14 @@ export function registerSpectrumUsers(spectrum: Command): void {
         });
       if (status === 401) throw new SessionExpiredError(resolved.name);
       if (error) failSpectrumUserAdd(error, opts.json ?? false);
-      if (!data) {
+      const result = parseSpectrumUserAddResult(data);
+      if (!result) {
         failSpectrumUserAdd(
-          "Server did not return a Spectrum user result.",
+          "Server did not return a valid Spectrum user result.",
           opts.json ?? false,
         );
       }
-      const result = data as SpectrumUserAddResult;
-      if (result.error) {
+      if ("error" in result) {
         failSpectrumUserAdd(
           {
             code: "shared_user_create_failed",
@@ -116,11 +116,11 @@ export function registerSpectrumUsers(spectrum: Command): void {
         );
       }
 
-      if (opts.json) return printJson(result.user ?? {});
+      if (opts.json) return printJson(result.user);
       const u = result.user;
       console.log(
         c.success(
-          `Added ${formatName(u ?? filled)} ${u?.id ? c.dim(`(${u.id})`) : ""}`
+          `Added ${formatName(u)} ${c.dim(`(${u.id})`)}`
         )
       );
       if (opts.invite) console.log(c.dim("  Invite sent."));
@@ -161,6 +161,23 @@ export function registerSpectrumUsers(spectrum: Command): void {
 
       console.log(c.success(`Removed user ${userId}`));
     });
+}
+
+function parseSpectrumUserAddResult(
+  value: unknown
+): SpectrumUserAddResult | null {
+  if (!(value && typeof value === "object") || Array.isArray(value)) return null;
+  const result = value as Record<string, unknown>;
+  if (typeof result.error === "string") return { error: result.error };
+  if (
+    result.success !== true ||
+    !(result.user && typeof result.user === "object") ||
+    Array.isArray(result.user) ||
+    typeof (result.user as Record<string, unknown>).id !== "string"
+  ) {
+    return null;
+  }
+  return { success: true, user: result.user as SpectrumUser };
 }
 
 function isSpectrumUserAddFailureCode(
