@@ -22,6 +22,9 @@ import subscriptionActive from "../fixtures/subscription.active.json";
 import checkoutResponse from "../fixtures/billing.checkout.json";
 import manageResponse from "../fixtures/subscription.manage.json";
 
+// Deliberately stale copy proves the CLI owns the approved recovery wording.
+const STALE_RECOVERY_MESSAGE = "Delete an unused project or contact support.";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let server: any = null;
 
@@ -39,7 +42,29 @@ interface MockState {
   lineAvatarResponseFault: "missing-avatar-url" | "missing-upload-key" | null;
   lineProfileRequests: MockLineProfileRequest[];
   profileSyncRequests: MockProfileSyncRequest[];
-  projectCreateRequests: Record<string, unknown>[];
+  projectCreateWarning: boolean;
+  projectCreateWarningMessage: boolean;
+  projectCreateRequests: MockProjectCreateRequest[];
+  projectDeleteRequests: string[];
+  platformToggleEmptyResponse: boolean;
+  platformToggleWarning: boolean;
+  platformToggleRequests: MockPlatformToggleRequest[];
+  platforms: Record<string, boolean> | null;
+  spectrumUserAddFailure: { code: string; message: string } | null;
+}
+
+export interface MockProjectCreateRequest {
+  location?: string;
+  name?: string;
+  observability?: boolean;
+  platforms?: string[];
+  template?: boolean;
+}
+
+export interface MockPlatformToggleRequest {
+  enabled: boolean;
+  platformId: string;
+  projectId: string;
 }
 
 export interface MockLineProfileRequest {
@@ -71,8 +96,53 @@ const state: MockState = {
   lineAvatarResponseFault: null,
   lineProfileRequests: [],
   profileSyncRequests: [],
+  projectCreateWarning: false,
+  projectCreateWarningMessage: true,
   projectCreateRequests: [],
+  projectDeleteRequests: [],
+  platformToggleEmptyResponse: false,
+  platformToggleWarning: false,
+  platformToggleRequests: [],
+  platforms: null,
+  spectrumUserAddFailure: null,
 };
+
+export function setMockProjectCreateWarning(
+  enabled: boolean,
+  includeMessage = true,
+): void {
+  state.projectCreateWarning = enabled;
+  state.projectCreateWarningMessage = includeMessage;
+}
+
+export function getMockProjectCreateRequests(): MockProjectCreateRequest[] {
+  return state.projectCreateRequests.map((request) => ({
+    ...request,
+    platforms: request.platforms ? [...request.platforms] : undefined,
+  }));
+}
+
+export function getMockPlatformToggleRequests(): MockPlatformToggleRequest[] {
+  return state.platformToggleRequests.map((request) => ({ ...request }));
+}
+
+export function setMockPlatformToggleWarning(enabled: boolean): void {
+  state.platformToggleWarning = enabled;
+}
+
+export function setMockPlatformToggleEmptyResponse(enabled: boolean): void {
+  state.platformToggleEmptyResponse = enabled;
+}
+
+export function getMockProjectDeleteRequests(): string[] {
+  return [...state.projectDeleteRequests];
+}
+
+export function setMockSpectrumUserAddFailure(
+  failure: MockState["spectrumUserAddFailure"]
+): void {
+  state.spectrumUserAddFailure = failure;
+}
 
 export function setMockSubscription(sub: "free" | "active"): void {
   state.subscription = sub === "active" ? subscriptionActive : subscriptionFree;
@@ -104,10 +174,6 @@ export function getMockLineProfileRequests(): MockLineProfileRequest[] {
   return state.lineProfileRequests.map((request) => ({ ...request }));
 }
 
-export function getMockProjectCreateRequests(): Record<string, unknown>[] {
-  return state.projectCreateRequests.map((request) => ({ ...request }));
-}
-
 export function resetMockState(): void {
   state.subscription = subscriptionFree;
   state.forceUnauthorized = false;
@@ -116,7 +182,15 @@ export function resetMockState(): void {
   state.lineAvatarResponseFault = null;
   state.lineProfileRequests = [];
   state.profileSyncRequests = [];
+  state.projectCreateWarning = false;
+  state.projectCreateWarningMessage = true;
   state.projectCreateRequests = [];
+  state.projectDeleteRequests = [];
+  state.platformToggleEmptyResponse = false;
+  state.platformToggleWarning = false;
+  state.platformToggleRequests = [];
+  state.platforms = null;
+  state.spectrumUserAddFailure = null;
 }
 
 function requireAuth(headers: Record<string, string | undefined>) {
@@ -163,17 +237,6 @@ const app = new Elysia()
       return linesFixture.lines;
     }
     return linesFixture;
-  })
-  .get("/api/projects/:id/platforms", ({ headers }) => {
-    const denied = requireAuth(headers as Record<string, string | undefined>);
-    if (denied) return denied;
-    if (state.invalidShape.has("platforms")) {
-      return { imessage: "yes" };
-    }
-    if (state.wrongShape.has("platforms")) {
-      return [{ platform: "imessage", enabled: true }];
-    }
-    return { imessage: true, whatsapp_business: false };
   })
   .get("/api/projects/:id/spectrum/users", ({ headers }) => {
     const denied = requireAuth(headers as Record<string, string | undefined>);
@@ -299,11 +362,107 @@ const app = new Elysia()
     if (found) return found;
     return projectFixture;
   })
+  .post("/api/projects/:id/spectrum/users", ({ body, headers, params }) => {
+    const denied = requireAuth(headers as Record<string, string | undefined>);
+    if (denied) return denied;
+    if (state.invalidShape.has("users")) return {};
+    if (state.spectrumUserAddFailure) {
+      return new Response(JSON.stringify(state.spectrumUserAddFailure), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const input = body as {
+      email: string;
+      firstName: string;
+      lastName: string;
+      phoneNumber: string;
+    };
+    return {
+      success: true as const,
+      user: {
+        id: "spectrum-user-1",
+        projectId: params.id,
+        type: "shared" as const,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email,
+        phoneNumber: input.phoneNumber,
+        assignedPhoneNumber: "+15550000001",
+        createdAt: new Date(0).toISOString(),
+        meta: null,
+      },
+    };
+  })
+  .get("/api/projects/:id/platforms", ({ headers }) => {
+    const denied = requireAuth(headers as Record<string, string | undefined>);
+    if (denied) return denied;
+    if (state.invalidShape.has("platforms")) {
+      return { imessage: "yes" };
+    }
+    if (state.wrongShape.has("platforms")) {
+      return [{ platform: "imessage", enabled: true }];
+    }
+    return state.platforms ?? { imessage: true, whatsapp_business: false };
+  })
+  .post(
+    "/api/projects/:id/platforms/toggle",
+    ({ body, headers, params }) => {
+      const denied = requireAuth(headers as Record<string, string | undefined>);
+      if (denied) return denied;
+      const input = body as { enabled: boolean; platformId: string };
+      state.platformToggleRequests.push({
+        ...input,
+        projectId: params.id,
+      });
+      if (state.platformToggleEmptyResponse) {
+        return new Response(null, { status: 204 });
+      }
+      const platformState = state.platforms ?? {};
+      platformState[input.platformId] = input.enabled;
+      state.platforms = platformState;
+      const warning =
+        state.platformToggleWarning
+          ? {
+              code: "imessage_connection_missing",
+              message: STALE_RECOVERY_MESSAGE,
+            }
+          : undefined;
+      return {
+        success: true as const,
+        platforms: { ...platformState },
+        ...(warning ? { warning } : {}),
+      };
+    }
+  )
   .post("/api/projects", ({ body, headers }) => {
     const denied = requireAuth(headers as Record<string, string | undefined>);
     if (denied) return denied;
-    state.projectCreateRequests.push({ ...(body as Record<string, unknown>) });
-    return { success: true, id: projectFixture.id };
+    const input = body as MockProjectCreateRequest;
+    state.projectCreateRequests.push({
+      ...input,
+      platforms: input.platforms ? [...input.platforms] : undefined,
+    });
+    const requestsImessage = input.platforms?.includes("imessage") ?? false;
+    const warning = requestsImessage && state.projectCreateWarning
+        ? {
+            code: "shared_line_unavailable",
+            ...(state.projectCreateWarningMessage
+              ? { message: STALE_RECOVERY_MESSAGE }
+              : {}),
+          }
+        : undefined;
+    return {
+      success: true as const,
+      id: projectFixture.id,
+      ...(warning ? { warning } : {}),
+    };
+  })
+  .delete("/api/projects/:id", ({ headers, params }) => {
+    const denied = requireAuth(headers as Record<string, string | undefined>);
+    if (denied) return denied;
+    state.projectDeleteRequests.push(params.id);
+    return { success: true as const };
   })
   .get("/api/projects/:id/subscription", ({ headers }) => {
     const denied = requireAuth(headers as Record<string, string | undefined>);

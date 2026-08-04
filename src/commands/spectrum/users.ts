@@ -6,6 +6,12 @@ import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 import { requireArrayField } from "~/lib/shape.ts";
+import type {
+  SpectrumUser,
+  SpectrumUserAddFailure,
+  SpectrumUserAddFailureCode,
+  SpectrumUserAddResult,
+} from "~/lib/types.ts";
 import { isInteractive } from "~/lib/tty.ts";
 
 export function registerSpectrumUsers(spectrum: Command): void {
@@ -92,15 +98,29 @@ export function registerSpectrumUsers(spectrum: Command): void {
           sendInvite: opts.invite ?? false,
         });
       if (status === 401) throw new SessionExpiredError(resolved.name);
-      if (error) die(`Failed to add user: ${formatApiError(error)}`);
-      const result = data as { success?: true; user?: SpectrumUser; error?: string };
-      if (result.error) die(result.error);
+      if (error) failSpectrumUserAdd(error, opts.json ?? false);
+      const result = parseSpectrumUserAddResult(data);
+      if (!result) {
+        failSpectrumUserAdd(
+          "Server did not return a valid Spectrum user result.",
+          opts.json ?? false,
+        );
+      }
+      if ("error" in result) {
+        failSpectrumUserAdd(
+          {
+            code: "shared_user_create_failed",
+            message: result.error,
+          },
+          opts.json ?? false,
+        );
+      }
 
-      if (opts.json) return printJson(result.user ?? {});
+      if (opts.json) return printJson(result.user);
       const u = result.user;
       console.log(
         c.success(
-          `Added ${formatName(u ?? filled)} ${u?.id ? c.dim(`(${u.id})`) : ""}`
+          `Added ${formatName(u)} ${c.dim(`(${u.id})`)}`
         )
       );
       if (opts.invite) console.log(c.dim("  Invite sent."));
@@ -143,12 +163,73 @@ export function registerSpectrumUsers(spectrum: Command): void {
     });
 }
 
-interface SpectrumUser {
-  id: string;
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
-  phoneNumber?: string | null;
+function parseSpectrumUserAddResult(
+  value: unknown
+): SpectrumUserAddResult | null {
+  if (!(value && typeof value === "object") || Array.isArray(value)) return null;
+  const result = value as Record<string, unknown>;
+  if (typeof result.error === "string") return { error: result.error };
+  if (
+    result.success !== true ||
+    !(result.user && typeof result.user === "object") ||
+    Array.isArray(result.user) ||
+    typeof (result.user as Record<string, unknown>).id !== "string"
+  ) {
+    return null;
+  }
+  return { success: true, user: result.user as SpectrumUser };
+}
+
+function isSpectrumUserAddFailureCode(
+  value: unknown
+): value is SpectrumUserAddFailureCode {
+  return (
+    value === "imessage_not_enabled" ||
+    value === "shared_line_unavailable" ||
+    value === "shared_user_create_failed"
+  );
+}
+
+function findStructuredFailure(error: unknown): SpectrumUserAddFailure | null {
+  const queue: unknown[] = [error];
+  const seen = new Set<object>();
+  while (queue.length > 0) {
+    const value = queue.shift();
+    if (!(value && typeof value === "object") || seen.has(value)) continue;
+    seen.add(value);
+    const record = value as Record<string, unknown>;
+    if (
+      isSpectrumUserAddFailureCode(record.code) &&
+      typeof record.message === "string"
+    ) {
+      return { code: record.code, message: record.message };
+    }
+    for (const key of ["value", "message", "error", "cause"]) {
+      if (record[key] && typeof record[key] === "object") {
+        queue.push(record[key]);
+      }
+    }
+  }
+  return null;
+}
+
+const SHARED_LINE_UNAVAILABLE_MESSAGE =
+  "This phone couldn't be connected to a shared iMessage line. Try another phone or connect a dedicated line.";
+
+function failSpectrumUserAdd(error: unknown, json: boolean): never {
+  const parsedFailure = findStructuredFailure(error) ?? {
+    code: "shared_user_create_failed",
+    message: formatApiError(error),
+  };
+  const failure =
+    parsedFailure.code === "shared_line_unavailable"
+      ? { ...parsedFailure, message: SHARED_LINE_UNAVAILABLE_MESSAGE }
+      : parsedFailure;
+  if (json) {
+    printJson({ error: failure });
+    process.exit(1);
+  }
+  die(`Failed to add user: ${failure.message}`);
 }
 
 interface FilledAdd {

@@ -20,11 +20,55 @@ import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 import { requireArray } from "~/lib/shape.ts";
+import type {
+  ProjectCreateResult,
+  ProjectCreateWarning,
+  ProjectCreateWarningCode,
+} from "~/lib/types.ts";
 import { isInteractive } from "~/lib/tty.ts";
 
 /** Platforms accepted by `projects create` (mirrors the API's create body). */
 const PLATFORMS = ["imessage", "whatsapp_business", "voice"] as const;
 type Platform = (typeof PLATFORMS)[number];
+
+const PROJECT_CREATE_WARNINGS = {
+  owner_phone_missing: {
+    code: "owner_phone_missing",
+    message:
+      "Your project was created without a connected phone. Add a phone number to your Photon account or connect a dedicated line.",
+  },
+  shared_line_unavailable: {
+    code: "shared_line_unavailable",
+    message:
+      "We couldn't connect your phone to a shared iMessage line. You can add another phone or connect a dedicated line.",
+  },
+  owner_enrollment_failed: {
+    code: "owner_enrollment_failed",
+    message:
+      "We couldn't connect your phone to a shared iMessage line. Try again with another phone or connect a dedicated line.",
+  },
+} as const satisfies Record<ProjectCreateWarningCode, ProjectCreateWarning>;
+
+function isProjectCreateWarningCode(
+  value: unknown
+): value is ProjectCreateWarningCode {
+  return (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(PROJECT_CREATE_WARNINGS, value)
+  );
+}
+
+function readProjectCreateWarning(result: {
+  warning?: unknown;
+}): ProjectCreateWarning | undefined {
+  if (result.warning && typeof result.warning === "object") {
+    const warning = result.warning as { code?: unknown };
+    if (isProjectCreateWarningCode(warning.code)) {
+      return PROJECT_CREATE_WARNINGS[warning.code];
+    }
+  }
+  return undefined;
+}
 
 export function registerProjectsCommand(program: Command): void {
   const projects = program
@@ -241,7 +285,10 @@ function registerCreateCommand(projects: Command): void {
       if (error) {
         die(`Failed to create project: ${formatApiError(error)}`);
       }
-      const result = data as { success?: true; id?: string; error?: string };
+      if (!data) {
+        die("Server did not return a project result.");
+      }
+      const result = data as unknown as ProjectCreateResult;
       if (result.error) {
         die(result.error);
       }
@@ -249,8 +296,14 @@ function registerCreateCommand(projects: Command): void {
         die("Server did not return a project id.");
       }
 
+      const warning = readProjectCreateWarning(result);
       if (opts.json) {
-        printJson({ id: result.id, name: filled.name, env: env.name });
+        printJson({
+          id: result.id,
+          name: filled.name,
+          env: env.name,
+          ...(warning ? { warning } : {}),
+        });
         return;
       }
 
@@ -269,6 +322,9 @@ function registerCreateCommand(projects: Command): void {
             `  Enable one with \`photon spectrum platforms enable <platform-name> --project '${result.id}'\`.`
           )
         );
+      }
+      if (warning) {
+        console.error(c.warn(warning.message));
       }
       console.log(
         c.dim(`  To make this the active project: export PHOTON_PROJECT_ID='${result.id}'`)
