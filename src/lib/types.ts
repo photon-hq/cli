@@ -9,4 +9,42 @@
  * in command logic.
  */
 
-export {};
+export type ProjectCreateWarningCode =
+  | "owner_enrollment_failed"
+  | "owner_phone_missing"
+  | "shared_line_unavailable";
+
+export interface ProjectCreateWarning {
+  code: ProjectCreateWarningCode;
+  message: string;
+}
+
+export interface ProjectCreateResult {
+  error?: string;
+  id?: string;
+  ownerStatus?: unknown;
+  warning?: unknown;
+}
+
+export interface PlatformToggleWarning {
+  code: "imessage_connection_missing";
+  message: string;
+}
+
+export interface PlatformToggleResult {
+  error?: string;
+  platforms?: Record<string, boolean>;
+  success?: true;
+  warning?: unknown;
+}
+
+export type SpectrumUserAddFailureCode =
+  | "imessage_not_enabled"
+  | "shared_line_unavailable"
+  | "shared_user_create_failed"
+  | "shared_user_limit_reached";
+
+export interface SpectrumUserAddFailure {
+  code: SpectrumUserAddFailureCode;
+  message: string;
+}

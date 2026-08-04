@@ -20,11 +20,73 @@ import { SessionExpiredError } from "~/lib/errors.ts";
 import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 import { requireArray } from "~/lib/shape.ts";
+import type {
+  ProjectCreateResult,
+  ProjectCreateWarning,
+  ProjectCreateWarningCode,
+} from "~/lib/types.ts";
 import { isInteractive } from "~/lib/tty.ts";
 
 /** Platforms accepted by `projects create` (mirrors the API's create body). */
 const PLATFORMS = ["imessage", "whatsapp_business", "voice"] as const;
 type Platform = (typeof PLATFORMS)[number];
+
+const PROJECT_CREATE_WARNINGS = {
+  owner_phone_missing: {
+    code: "owner_phone_missing",
+    message:
+      "Your project was created without a connected phone. Add a phone number to your Photon account or connect a dedicated line.",
+  },
+  shared_line_unavailable: {
+    code: "shared_line_unavailable",
+    message:
+      "We couldn't connect your phone to a shared iMessage line. You can add another phone or connect a dedicated line.",
+  },
+  owner_enrollment_failed: {
+    code: "owner_enrollment_failed",
+    message:
+      "We couldn't connect your phone to a shared iMessage line. Try again with another phone or connect a dedicated line.",
+  },
+} as const satisfies Record<ProjectCreateWarningCode, ProjectCreateWarning>;
+
+const OWNER_STATUS_WARNING_CODES = {
+  skipped_no_phone: "owner_phone_missing",
+  skipped_pool_exhausted: "shared_line_unavailable",
+  failed: "owner_enrollment_failed",
+} as const satisfies Record<string, ProjectCreateWarningCode>;
+
+type OwnerWarningStatus = keyof typeof OWNER_STATUS_WARNING_CODES;
+
+function isOwnerWarningStatus(value: unknown): value is OwnerWarningStatus {
+  return typeof value === "string" && value in OWNER_STATUS_WARNING_CODES;
+}
+
+function isProjectCreateWarningCode(
+  value: unknown
+): value is ProjectCreateWarningCode {
+  return (
+    typeof value === "string" && value in PROJECT_CREATE_WARNINGS
+  );
+}
+
+function readProjectCreateWarning(result: {
+  ownerStatus?: unknown;
+  warning?: unknown;
+}): ProjectCreateWarning | undefined {
+  if (result.warning && typeof result.warning === "object") {
+    const warning = result.warning as { code?: unknown; message?: unknown };
+    if (
+      isProjectCreateWarningCode(warning.code) &&
+      typeof warning.message === "string"
+    ) {
+      return PROJECT_CREATE_WARNINGS[warning.code];
+    }
+  }
+  if (!isOwnerWarningStatus(result.ownerStatus)) return undefined;
+  return PROJECT_CREATE_WARNINGS[
+    OWNER_STATUS_WARNING_CODES[result.ownerStatus]
+  ];
+}
 
 export function registerProjectsCommand(program: Command): void {
   const projects = program
@@ -216,7 +278,10 @@ function registerCreateCommand(projects: Command): void {
     .description("create a new project")
     .option("-n, --name <name>", "project name")
     .option("-l, --location <location>", 'location (default: "United States")')
-    .option("--platforms <list>", `comma-separated platforms (${PLATFORMS.join(", ")})`)
+    .option(
+      "--platforms <list>",
+      `comma-separated platforms (${PLATFORMS.join(", ")}); omit to enable none`
+    )
     .option("--template", "use as template")
     .option("--observability", "enable observability")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
@@ -241,7 +306,10 @@ function registerCreateCommand(projects: Command): void {
       if (error) {
         die(`Failed to create project: ${formatApiError(error)}`);
       }
-      const result = data as { success?: true; id?: string; error?: string };
+      if (!data) {
+        die("Server did not return a project result.");
+      }
+      const result = data as unknown as ProjectCreateResult;
       if (result.error) {
         die(result.error);
       }
@@ -249,8 +317,14 @@ function registerCreateCommand(projects: Command): void {
         die("Server did not return a project id.");
       }
 
+      const warning = readProjectCreateWarning(result);
       if (opts.json) {
-        printJson({ id: result.id, name: filled.name, env: env.name });
+        printJson({
+          id: result.id,
+          name: filled.name,
+          env: env.name,
+          ...(warning ? { warning } : {}),
+        });
         return;
       }
 
@@ -269,6 +343,9 @@ function registerCreateCommand(projects: Command): void {
             `  Enable one with \`photon spectrum platforms enable <platform-name> --project '${result.id}'\`.`
           )
         );
+      }
+      if (warning) {
+        console.error(c.warn(warning.message));
       }
       console.log(
         c.dim(`  To make this the active project: export PHOTON_PROJECT_ID='${result.id}'`)
@@ -304,6 +381,9 @@ function parsePlatforms(value: string): Platform[] {
 }
 
 async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
+  const platforms =
+    opts.platforms !== undefined ? parsePlatforms(opts.platforms) : [];
+
   // Non-interactive path: name is required; defaults fill the rest.
   if (!isInteractive()) {
     if (!opts.name?.trim()) {
@@ -314,7 +394,7 @@ async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     return {
       name: opts.name.trim(),
       location: opts.location ?? "United States",
-      platforms: opts.platforms !== undefined ? parsePlatforms(opts.platforms) : [],
+      platforms,
       template: opts.template ?? false,
       observability: opts.observability ?? false,
     };
@@ -348,40 +428,12 @@ async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     location = answer || "United States";
   }
 
-  const platforms =
-    opts.platforms !== undefined
-      ? parsePlatforms(opts.platforms)
-      : parsePlatforms(
-          await promptText(
-            `Platforms (comma-separated: ${PLATFORMS.join(", ")})`,
-            undefined,
-            true
-          )
-        );
   const template = opts.template ?? (await promptBool("Use as template?", false));
   const observability =
     opts.observability ?? (await promptBool("Enable observability?", false));
 
   outro(c.dim("Submitting…"));
   return { name, location, platforms, template, observability };
-}
-
-/**
- * Free-text prompt. When `optional`, an empty answer is allowed and
- * returns "". Aborts on cancel.
- */
-async function promptText(
-  message: string,
-  preset?: string,
-  optional = false
-): Promise<string> {
-  if (preset !== undefined) return preset;
-  const answer = await text({
-    message,
-    placeholder: optional ? "(skip)" : undefined,
-  });
-  if (isCancel(answer)) die("Aborted.");
-  return answer ?? "";
 }
 
 async function promptBool(message: string, initial: boolean): Promise<boolean> {

@@ -4,6 +4,26 @@ import { resolveProject } from "~/lib/api-context.ts";
 import { SessionExpiredError } from "~/lib/errors.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 import { requireBooleanRecord } from "~/lib/shape.ts";
+import type {
+  PlatformToggleResult,
+  PlatformToggleWarning,
+} from "~/lib/types.ts";
+
+const IMESSAGE_CONNECTION_MISSING_WARNING: PlatformToggleWarning = {
+  code: "imessage_connection_missing",
+  message:
+    "iMessage was enabled without a connected phone. Add another phone or connect a dedicated line.",
+};
+
+function readPlatformToggleWarning(
+  value: unknown
+): PlatformToggleWarning | undefined {
+  if (!(value && typeof value === "object")) return undefined;
+  const warning = value as { code?: unknown };
+  return warning.code === "imessage_connection_missing"
+    ? IMESSAGE_CONNECTION_MISSING_WARNING
+    : undefined;
+}
 
 export function registerSpectrumPlatforms(spectrum: Command): void {
   const platforms = spectrum
@@ -91,11 +111,7 @@ async function togglePlatform(
     .platforms.toggle.post({ platformId: name, enabled });
   if (status === 401) throw new SessionExpiredError(resolved.name);
   if (error) die(`Failed to ${enabled ? "enable" : "disable"} ${name}: ${formatApiError(error)}`);
-  const result = data as {
-    success?: true;
-    platforms?: Record<string, boolean>;
-    error?: string;
-  };
+  const result = data as PlatformToggleResult;
   if (result.error) {
     die(result.error, {
       hint:
@@ -105,6 +121,19 @@ async function togglePlatform(
     });
   }
 
-  if (opts.json) return printJson(result.platforms ?? {});
+  const warning =
+    name === "imessage" && enabled
+      ? readPlatformToggleWarning(result.warning)
+      : undefined;
+  if (opts.json) {
+    return printJson(
+      warning
+        ? { platforms: result.platforms ?? {}, warning }
+        : (result.platforms ?? {}),
+    );
+  }
   console.log(c.success(`${enabled ? "Enabled" : "Disabled"} ${c.bold(name)}`));
+  if (warning) {
+    console.error(c.warn(warning.message));
+  }
 }

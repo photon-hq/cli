@@ -245,7 +245,8 @@ photon
 ├── projects
 │   ├── ls                                              list projects
 │   ├── show [id]                                       project detail
-│   ├── create [--name <n> --location <loc> --spectrum] new project
+│   ├── create [--name <n> --location <loc> --platforms <list>]
+│   │                                                   new project; no platform when omitted
 │   ├── update [id] [...]                               rename / toggle flags
 │   ├── delete [id] [-y]                                permanent delete
 │   ├── regenerate-secret [id] [-y]                     rotate Spectrum secret
