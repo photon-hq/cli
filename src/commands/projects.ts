@@ -62,11 +62,8 @@ function readProjectCreateWarning(result: {
   warning?: unknown;
 }): ProjectCreateWarning | undefined {
   if (result.warning && typeof result.warning === "object") {
-    const warning = result.warning as { code?: unknown; message?: unknown };
-    if (
-      isProjectCreateWarningCode(warning.code) &&
-      typeof warning.message === "string"
-    ) {
+    const warning = result.warning as { code?: unknown };
+    if (isProjectCreateWarningCode(warning.code)) {
       return PROJECT_CREATE_WARNINGS[warning.code];
     }
   }

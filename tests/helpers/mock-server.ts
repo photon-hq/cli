@@ -43,8 +43,10 @@ interface MockState {
   lineProfileRequests: MockLineProfileRequest[];
   profileSyncRequests: MockProfileSyncRequest[];
   projectCreateWarning: boolean;
+  projectCreateWarningMessage: boolean;
   projectCreateRequests: MockProjectCreateRequest[];
   projectDeleteRequests: string[];
+  platformToggleEmptyResponse: boolean;
   platformToggleWarning: boolean;
   platformToggleRequests: MockPlatformToggleRequest[];
   platforms: Record<string, boolean> | null;
@@ -95,16 +97,22 @@ const state: MockState = {
   lineProfileRequests: [],
   profileSyncRequests: [],
   projectCreateWarning: false,
+  projectCreateWarningMessage: true,
   projectCreateRequests: [],
   projectDeleteRequests: [],
+  platformToggleEmptyResponse: false,
   platformToggleWarning: false,
   platformToggleRequests: [],
   platforms: null,
   spectrumUserAddFailure: null,
 };
 
-export function setMockProjectCreateWarning(enabled: boolean): void {
+export function setMockProjectCreateWarning(
+  enabled: boolean,
+  includeMessage = true,
+): void {
   state.projectCreateWarning = enabled;
+  state.projectCreateWarningMessage = includeMessage;
 }
 
 export function getMockProjectCreateRequests(): MockProjectCreateRequest[] {
@@ -120,6 +128,10 @@ export function getMockPlatformToggleRequests(): MockPlatformToggleRequest[] {
 
 export function setMockPlatformToggleWarning(enabled: boolean): void {
   state.platformToggleWarning = enabled;
+}
+
+export function setMockPlatformToggleEmptyResponse(enabled: boolean): void {
+  state.platformToggleEmptyResponse = enabled;
 }
 
 export function getMockProjectDeleteRequests(): string[] {
@@ -171,8 +183,10 @@ export function resetMockState(): void {
   state.lineProfileRequests = [];
   state.profileSyncRequests = [];
   state.projectCreateWarning = false;
+  state.projectCreateWarningMessage = true;
   state.projectCreateRequests = [];
   state.projectDeleteRequests = [];
+  state.platformToggleEmptyResponse = false;
   state.platformToggleWarning = false;
   state.platformToggleRequests = [];
   state.platforms = null;
@@ -400,6 +414,9 @@ const app = new Elysia()
         ...input,
         projectId: params.id,
       });
+      if (state.platformToggleEmptyResponse) {
+        return new Response(null, { status: 204 });
+      }
       const platformState = state.platforms ?? {};
       platformState[input.platformId] = input.enabled;
       state.platforms = platformState;
@@ -429,7 +446,9 @@ const app = new Elysia()
     const warning = requestsImessage && state.projectCreateWarning
         ? {
             code: "shared_line_unavailable",
-            message: STALE_RECOVERY_MESSAGE,
+            ...(state.projectCreateWarningMessage
+              ? { message: STALE_RECOVERY_MESSAGE }
+              : {}),
           }
         : undefined;
     return {

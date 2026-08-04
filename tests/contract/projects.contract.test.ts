@@ -11,6 +11,7 @@ import {
   getMockProjectCreateRequests,
   getMockProjectDeleteRequests,
   resetMockState,
+  setMockPlatformToggleEmptyResponse,
   setMockPlatformToggleWarning,
   setMockProjectCreateWarning,
   setMockSpectrumUserAddFailure,
@@ -219,6 +220,34 @@ describe("photon projects create", () => {
     expect(getMockProjectDeleteRequests()).toEqual([]);
   });
 
+  test("uses CLI warning copy when the API returns only a known code", async () => {
+    resetMockState();
+    setMockProjectCreateWarning(true, false);
+
+    const { stdout, stderr, exitCode } = await runCommand(
+      [
+        "projects",
+        "create",
+        "--name",
+        "Quota test",
+        "--platforms",
+        "imessage",
+      ],
+      {
+        env: {
+          PHOTON_TOKEN: "test-token",
+          PHOTON_API_HOST: baseUrl,
+        },
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Created Quota test");
+    expect(stderr).toContain(
+      "We couldn't connect your phone to a shared iMessage line",
+    );
+  });
+
   test("still warns when deletion does not restore shared capacity", async () => {
     resetMockState();
     setMockProjectCreateWarning(true);
@@ -400,6 +429,31 @@ describe("photon spectrum platforms enable", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
     expect(JSON.parse(stdout)).toEqual({ whatsapp: true });
+  });
+
+  test("fails clearly when platform toggle returns no result", async () => {
+    resetMockState();
+    setMockPlatformToggleEmptyResponse(true);
+
+    const { stderr, exitCode } = await runCommand(
+      [
+        "spectrum",
+        "platforms",
+        "enable",
+        "imessage",
+        "--project",
+        projectId,
+      ],
+      {
+        env: {
+          PHOTON_TOKEN: "test-token",
+          PHOTON_API_HOST: baseUrl,
+        },
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Server did not return a platform result.");
   });
 });
 

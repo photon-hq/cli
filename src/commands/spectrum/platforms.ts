@@ -111,6 +111,9 @@ async function togglePlatform(
     .platforms.toggle.post({ platformId: name, enabled });
   if (status === 401) throw new SessionExpiredError(resolved.name);
   if (error) die(`Failed to ${enabled ? "enable" : "disable"} ${name}: ${formatApiError(error)}`);
+  if (!data) {
+    die("Server did not return a platform result.");
+  }
   const result = data as PlatformToggleResult;
   if (result.error) {
     die(result.error, {
