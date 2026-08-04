@@ -46,3 +46,17 @@ export interface SpectrumUserAddFailure {
   code: SpectrumUserAddFailureCode;
   message: string;
 }
+
+export interface SpectrumUser {
+  email?: string | null;
+  firstName?: string | null;
+  id: string;
+  lastName?: string | null;
+  phoneNumber?: string | null;
+}
+
+export interface SpectrumUserAddResult {
+  error?: string;
+  success?: true;
+  user?: SpectrumUser;
+}

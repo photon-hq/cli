@@ -7,8 +7,10 @@ import { confirmDestructive } from "~/lib/interactive.ts";
 import { c, die, formatApiError, printJson, printTable } from "~/lib/output.ts";
 import { requireArrayField } from "~/lib/shape.ts";
 import type {
+  SpectrumUser,
   SpectrumUserAddFailure,
   SpectrumUserAddFailureCode,
+  SpectrumUserAddResult,
 } from "~/lib/types.ts";
 import { isInteractive } from "~/lib/tty.ts";
 
@@ -103,11 +105,7 @@ export function registerSpectrumUsers(spectrum: Command): void {
           opts.json ?? false,
         );
       }
-      const result = data as {
-        success?: true;
-        user?: SpectrumUser;
-        error?: string;
-      };
+      const result = data as SpectrumUserAddResult;
       if (result.error) {
         failSpectrumUserAdd(
           {
@@ -163,14 +161,6 @@ export function registerSpectrumUsers(spectrum: Command): void {
 
       console.log(c.success(`Removed user ${userId}`));
     });
-}
-
-interface SpectrumUser {
-  id: string;
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
-  phoneNumber?: string | null;
 }
 
 function isSpectrumUserAddFailureCode(
