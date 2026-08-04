@@ -49,28 +49,16 @@ const PROJECT_CREATE_WARNINGS = {
   },
 } as const satisfies Record<ProjectCreateWarningCode, ProjectCreateWarning>;
 
-const OWNER_STATUS_WARNING_CODES = {
-  skipped_no_phone: "owner_phone_missing",
-  skipped_pool_exhausted: "shared_line_unavailable",
-  failed: "owner_enrollment_failed",
-} as const satisfies Record<string, ProjectCreateWarningCode>;
-
-type OwnerWarningStatus = keyof typeof OWNER_STATUS_WARNING_CODES;
-
-function isOwnerWarningStatus(value: unknown): value is OwnerWarningStatus {
-  return typeof value === "string" && value in OWNER_STATUS_WARNING_CODES;
-}
-
 function isProjectCreateWarningCode(
   value: unknown
 ): value is ProjectCreateWarningCode {
   return (
-    typeof value === "string" && value in PROJECT_CREATE_WARNINGS
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(PROJECT_CREATE_WARNINGS, value)
   );
 }
 
 function readProjectCreateWarning(result: {
-  ownerStatus?: unknown;
   warning?: unknown;
 }): ProjectCreateWarning | undefined {
   if (result.warning && typeof result.warning === "object") {
@@ -82,10 +70,7 @@ function readProjectCreateWarning(result: {
       return PROJECT_CREATE_WARNINGS[warning.code];
     }
   }
-  if (!isOwnerWarningStatus(result.ownerStatus)) return undefined;
-  return PROJECT_CREATE_WARNINGS[
-    OWNER_STATUS_WARNING_CODES[result.ownerStatus]
-  ];
+  return undefined;
 }
 
 export function registerProjectsCommand(program: Command): void {
@@ -278,10 +263,7 @@ function registerCreateCommand(projects: Command): void {
     .description("create a new project")
     .option("-n, --name <name>", "project name")
     .option("-l, --location <location>", 'location (default: "United States")')
-    .option(
-      "--platforms <list>",
-      `comma-separated platforms (${PLATFORMS.join(", ")}); omit to enable none`
-    )
+    .option("--platforms <list>", `comma-separated platforms (${PLATFORMS.join(", ")})`)
     .option("--template", "use as template")
     .option("--observability", "enable observability")
     .option("--api-host <url>", "API host URL (defaults to PHOTON_API_HOST or built-in production)")
@@ -381,9 +363,6 @@ function parsePlatforms(value: string): Platform[] {
 }
 
 async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
-  const platforms =
-    opts.platforms !== undefined ? parsePlatforms(opts.platforms) : [];
-
   // Non-interactive path: name is required; defaults fill the rest.
   if (!isInteractive()) {
     if (!opts.name?.trim()) {
@@ -394,7 +373,7 @@ async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     return {
       name: opts.name.trim(),
       location: opts.location ?? "United States",
-      platforms,
+      platforms: opts.platforms !== undefined ? parsePlatforms(opts.platforms) : [],
       template: opts.template ?? false,
       observability: opts.observability ?? false,
     };
@@ -428,12 +407,40 @@ async function fillCreateOpts(opts: CreateOpts): Promise<FilledCreate> {
     location = answer || "United States";
   }
 
+  const platforms =
+    opts.platforms !== undefined
+      ? parsePlatforms(opts.platforms)
+      : parsePlatforms(
+          await promptText(
+            `Platforms (comma-separated: ${PLATFORMS.join(", ")})`,
+            undefined,
+            true
+          )
+        );
   const template = opts.template ?? (await promptBool("Use as template?", false));
   const observability =
     opts.observability ?? (await promptBool("Enable observability?", false));
 
   outro(c.dim("Submitting…"));
   return { name, location, platforms, template, observability };
+}
+
+/**
+ * Free-text prompt. When `optional`, an empty answer is allowed and
+ * returns "". Aborts on cancel.
+ */
+async function promptText(
+  message: string,
+  preset?: string,
+  optional = false
+): Promise<string> {
+  if (preset !== undefined) return preset;
+  const answer = await text({
+    message,
+    placeholder: optional ? "(skip)" : undefined,
+  });
+  if (isCancel(answer)) die("Aborted.");
+  return answer ?? "";
 }
 
 async function promptBool(message: string, initial: boolean): Promise<boolean> {

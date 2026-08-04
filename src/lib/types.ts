@@ -22,7 +22,6 @@ export interface ProjectCreateWarning {
 export interface ProjectCreateResult {
   error?: string;
   id?: string;
-  ownerStatus?: unknown;
   warning?: unknown;
 }
 
@@ -41,8 +40,7 @@ export interface PlatformToggleResult {
 export type SpectrumUserAddFailureCode =
   | "imessage_not_enabled"
   | "shared_line_unavailable"
-  | "shared_user_create_failed"
-  | "shared_user_limit_reached";
+  | "shared_user_create_failed";
 
 export interface SpectrumUserAddFailure {
   code: SpectrumUserAddFailureCode;

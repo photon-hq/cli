@@ -12,7 +12,7 @@ import {
   getMockProjectDeleteRequests,
   resetMockState,
   setMockPlatformToggleWarning,
-  setMockProjectCreateOwnerStatus,
+  setMockProjectCreateWarning,
   setMockSpectrumUserAddFailure,
   startMockServer,
   stopMockServer,
@@ -156,7 +156,7 @@ describe("photon projects list", () => {
 describe("photon projects create", () => {
   test("creates the project and warns when owner enrollment is exhausted", async () => {
     resetMockState();
-    setMockProjectCreateOwnerStatus("skipped_pool_exhausted");
+    setMockProjectCreateWarning(true);
 
     const { stdout, stderr, exitCode } = await runCommand(
       [
@@ -185,7 +185,7 @@ describe("photon projects create", () => {
 
   test("create --json includes the non-blocking warning", async () => {
     resetMockState();
-    setMockProjectCreateOwnerStatus("skipped_pool_exhausted");
+    setMockProjectCreateWarning(true);
 
     const { stdout, stderr, exitCode } = await runCommand(
       [
@@ -221,7 +221,7 @@ describe("photon projects create", () => {
 
   test("still warns when deletion does not restore shared capacity", async () => {
     resetMockState();
-    setMockProjectCreateOwnerStatus("skipped_pool_exhausted");
+    setMockProjectCreateWarning(true);
     const projectId = "00000000-0000-4000-a000-000000000001";
     const env = {
       PHOTON_TOKEN: "test-token",
@@ -254,84 +254,6 @@ describe("photon projects create", () => {
     );
   });
 
-  test("omitting --platforms creates a platformless project without an iMessage warning", async () => {
-    resetMockState();
-    setMockProjectCreateOwnerStatus("skipped_pool_exhausted");
-
-    const { stdout, stderr, exitCode } = await runCommand(
-      ["projects", "create", "--name", "Platformless"],
-      {
-        env: {
-          PHOTON_TOKEN: "test-token",
-          PHOTON_API_HOST: baseUrl,
-        },
-      },
-    );
-
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("Created Platformless");
-    expect(stderr).toBe("");
-    expect(getMockProjectCreateRequests().at(-1)?.platforms).toEqual([]);
-  });
-
-  test("omitting --platforms stays platformless in an interactive terminal", async () => {
-    resetMockState();
-    const originalCI = process.env.CI;
-    const stdoutDescriptor = Object.getOwnPropertyDescriptor(
-      process.stdout,
-      "isTTY",
-    );
-    const stdinDescriptor = Object.getOwnPropertyDescriptor(
-      process.stdin,
-      "isTTY",
-    );
-    delete process.env.CI;
-    Object.defineProperty(process.stdout, "isTTY", {
-      configurable: true,
-      value: true,
-    });
-    Object.defineProperty(process.stdin, "isTTY", {
-      configurable: true,
-      value: true,
-    });
-
-    try {
-      const { exitCode } = await runCommand(
-        [
-          "projects",
-          "create",
-          "--name",
-          "Interactive platformless",
-          "--location",
-          "United States",
-          "--template",
-          "--observability",
-        ],
-        {
-          env: {
-            PHOTON_TOKEN: "test-token",
-            PHOTON_API_HOST: baseUrl,
-          },
-        },
-      );
-
-      expect(exitCode).toBe(0);
-      expect(getMockProjectCreateRequests().at(-1)?.platforms).toEqual([]);
-    } finally {
-      if (originalCI === undefined) delete process.env.CI;
-      else process.env.CI = originalCI;
-      if (stdoutDescriptor) {
-        Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
-      } else {
-        delete (process.stdout as { isTTY?: boolean }).isTTY;
-      }
-      if (stdinDescriptor) {
-        Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
-      } else {
-        delete (process.stdin as { isTTY?: boolean }).isTTY;
-      }
-    }
-  });
 });
 
 describe("photon spectrum platforms enable", () => {

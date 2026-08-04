@@ -179,8 +179,7 @@ function isSpectrumUserAddFailureCode(
   return (
     value === "imessage_not_enabled" ||
     value === "shared_line_unavailable" ||
-    value === "shared_user_create_failed" ||
-    value === "shared_user_limit_reached"
+    value === "shared_user_create_failed"
   );
 }
 

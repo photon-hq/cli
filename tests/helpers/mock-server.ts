@@ -42,11 +42,7 @@ interface MockState {
   lineAvatarResponseFault: "missing-avatar-url" | "missing-upload-key" | null;
   lineProfileRequests: MockLineProfileRequest[];
   profileSyncRequests: MockProfileSyncRequest[];
-  projectCreateOwnerStatus:
-    | "skipped_no_phone"
-    | "skipped_pool_exhausted"
-    | "failed"
-    | null;
+  projectCreateWarning: boolean;
   projectCreateRequests: MockProjectCreateRequest[];
   projectDeleteRequests: string[];
   platformToggleWarning: boolean;
@@ -98,7 +94,7 @@ const state: MockState = {
   lineAvatarResponseFault: null,
   lineProfileRequests: [],
   profileSyncRequests: [],
-  projectCreateOwnerStatus: null,
+  projectCreateWarning: false,
   projectCreateRequests: [],
   projectDeleteRequests: [],
   platformToggleWarning: false,
@@ -107,10 +103,8 @@ const state: MockState = {
   spectrumUserAddFailure: null,
 };
 
-export function setMockProjectCreateOwnerStatus(
-  status: MockState["projectCreateOwnerStatus"]
-): void {
-  state.projectCreateOwnerStatus = status;
+export function setMockProjectCreateWarning(enabled: boolean): void {
+  state.projectCreateWarning = enabled;
 }
 
 export function getMockProjectCreateRequests(): MockProjectCreateRequest[] {
@@ -176,7 +170,7 @@ export function resetMockState(): void {
   state.lineAvatarResponseFault = null;
   state.lineProfileRequests = [];
   state.profileSyncRequests = [];
-  state.projectCreateOwnerStatus = null;
+  state.projectCreateWarning = false;
   state.projectCreateRequests = [];
   state.projectDeleteRequests = [];
   state.platformToggleWarning = false;
@@ -432,9 +426,7 @@ const app = new Elysia()
       platforms: input.platforms ? [...input.platforms] : undefined,
     });
     const requestsImessage = input.platforms?.includes("imessage") ?? false;
-    const warning =
-      requestsImessage &&
-      state.projectCreateOwnerStatus === "skipped_pool_exhausted"
+    const warning = requestsImessage && state.projectCreateWarning
         ? {
             code: "shared_line_unavailable",
             message: STALE_RECOVERY_MESSAGE,
@@ -443,9 +435,6 @@ const app = new Elysia()
     return {
       success: true as const,
       id: projectFixture.id,
-      ...(requestsImessage && state.projectCreateOwnerStatus
-        ? { ownerStatus: state.projectCreateOwnerStatus }
-        : {}),
       ...(warning ? { warning } : {}),
     };
   })

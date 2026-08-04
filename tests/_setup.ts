@@ -9,9 +9,6 @@ process.env.TZ = "UTC";
 process.env.LC_ALL = "C";
 process.env.COLUMNS = "120";
 process.env.FORCE_TTY = "0";
-// `bun test` can be launched from a real terminal. Mark the test process as
-// CI so CLI commands never open prompts that can outlive a timed-out test.
-process.env.CI = "1";
 
 // Deterministic timestamps when PHOTON_TEST_NOW is set.
 if (process.env.PHOTON_TEST_NOW) {
