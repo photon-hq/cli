@@ -1,0 +1,72 @@
+name: Release documentation artifact
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing published release tag
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  reference:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve published revision
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$REQUESTED_TAG"
+          if [ -z "$tag" ]; then tag=$(gh release view --repo "$REPOSITORY" --json tagName --jq .tagName); fi
+          test "$(gh release view "$tag" --repo "$REPOSITORY" --json isDraft --jq .isDraft)" = false
+          revision=$(gh api "repos/$REPOSITORY/commits/$tag" --jq .sha)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          path: producer
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.revision }}
+          path: released
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.13'
+      - run: bun install --frozen-lockfile
+        working-directory: released
+      - name: Export released command definitions
+        working-directory: released
+        run: |
+          mkdir -p scripts
+          cp ../producer/scripts/export-docs.ts scripts/export-docs.ts
+          bun run scripts/export-docs.ts
+      - name: Verify npm publication and upload artifact
+        working-directory: released
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          bun -e 'const p = await Bun.file("package.json").json(); const r = await fetch(`https://registry.npmjs.org/${encodeURIComponent(p.name)}/${p.version}`); if (!r.ok || (await r.json()).version !== p.version) throw Error("Package is not published");'
+          gh release upload "$TAG" artifacts/docs-reference.json --clobber
+      - uses: actions/create-github-app-token@v3
+        id: token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: photon-hq
+          repositories: docs
+          permission-contents: write
+      - name: Request reviewed docs update
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: gh api repos/photon-hq/docs/dispatches --method POST -f event_type=reference-release -f 'client_payload[family]=cli-stable' -f "client_payload[tag]=$TAG"

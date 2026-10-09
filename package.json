@@ -1,7 +1,7 @@
 {
   "name": "@photon-ai/cli",
   "version": "2.2.0",
-  "description": "Photon CLI — typed terminal UI for the Photon Dashboard. Binary: `photon` (alias `pho`).",
+  "description": "Photon CLI \u2014 typed terminal UI for the Photon Dashboard. Binary: `photon` (alias `pho`).",
   "keywords": [
     "photon",
     "cli",
@@ -46,7 +46,8 @@
     "test": "bun test",
     "check": "bun run typecheck && bun test && bun run build",
     "manifest": "bun run scripts/generate-route-manifest.ts",
-    "prepublishOnly": "bun run typecheck && bun run build"
+    "prepublishOnly": "bun run typecheck && bun run build",
+    "docs:reference": "bun run scripts/export-docs.ts"
   },
   "devDependencies": {
     "@photon-ai/dashboard-api": "1.6.12",

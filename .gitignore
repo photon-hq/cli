@@ -35,3 +35,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 !.vscode/settings.json
 .DS_Store
 .cursor
+# Release documentation artifacts
+artifacts/
