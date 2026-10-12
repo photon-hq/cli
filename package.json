@@ -50,7 +50,7 @@
     "docs:reference": "bun run scripts/export-docs.ts"
   },
   "devDependencies": {
-    "@photon-ai/dashboard-api": "1.6.12",
+    "@photon-ai/dashboard-api": "1.6.22",
     "@types/bun": "latest",
     "@types/node": "^25.6.2",
     "@types/semver": "^7.7.1",
