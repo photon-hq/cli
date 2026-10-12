@@ -1,44 +1,28 @@
 # Upstream API Diff
 
-> Old routes: 36 · New routes: 58
+> `@photon-ai/dashboard-api@1.6.12` → `@photon-ai/dashboard-api@1.6.16`
+> Spans dashboard releases v1.6.13 (no-op), v1.6.14 (additive), v1.6.15 (additive), v1.6.16 (no-op).
 
 ## Added Routes
 
 | Route | Method |
 |-------|--------|
-| `api.profile.spectrum-updates` | `PATCH` |
-| `api.projects.:id.members` | `GET` |
-| `api.projects.:id.members` | `POST` |
-| `api.projects.:id.members.:memberUserId` | `DELETE` |
-| `api.projects.:id.slack` | `DELETE` |
-| `api.projects.:id.slack` | `GET` |
-| `api.projects.:id.slack` | `PUT` |
-| `api.projects.:id.slack.installations` | `GET` |
-| `api.projects.:id.slack.installations.:teamId` | `DELETE` |
-| `api.projects.:id.spectrum.avatar` | `DELETE` |
-| `api.projects.:id.spectrum.avatar.commit` | `POST` |
-| `api.projects.:id.spectrum.avatar.upload` | `POST` |
-| `api.projects.:id.voice.imessage-enabled` | `PATCH` |
-| `api.projects.:id.voice.settings` | `GET` |
-| `api.projects.:id.voice.sip-inbound` | `DELETE` |
-| `api.projects.:id.voice.sip-inbound` | `PATCH` |
-| `api.projects.:id.webhooks` | `GET` |
-| `api.projects.:id.webhooks` | `POST` |
-| `api.projects.:id.webhooks.:webhookId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates` | `GET` |
-| `api.projects.:id.whatsapp.templates` | `POST` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `PATCH` |
+| `api.otp.phone2.send` | `POST` |
 
 ## Removed Routes
 
-| Route | Method |
-|-------|--------|
-| `api.projects.:id.spectrum.avatar-upload-url` | `GET` |
+_(none)_
+
+## Changed Routes
+
+| Route | Method | Change |
+|-------|--------|--------|
+| `api.projects.:id` | `GET` | response body gained `avatarUrl: string \| null`, `plan: PlanTier`, `platforms: SpectrumPlatformId[]`, `userCount: number` |
+| `api.otp.phone.send` | `POST` | body field ordering swap (`code` / `captchaToken`); cosmetic only |
 
 ## Summary
 
-- **23** added
-- **1** removed
-- **0** changed
-- **35** unchanged
+- **1** added
+- **0** removed
+- **2** changed
+- **rest** unchanged
