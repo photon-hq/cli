@@ -1,44 +1,30 @@
 # Upstream API Diff
 
-> Old routes: 36 · New routes: 58
+> Sync target: dashboard@v1.6.15 (82d51e40947c35def51e38c92fb9edadc89b1408)
+> Previous CLI pin: `@photon-ai/dashboard-api@1.6.12` (last CLI sync landed at v1.6.14 upstream but never merged to `main`).
 
-## Added Routes
-
-| Route | Method |
-|-------|--------|
-| `api.profile.spectrum-updates` | `PATCH` |
-| `api.projects.:id.members` | `GET` |
-| `api.projects.:id.members` | `POST` |
-| `api.projects.:id.members.:memberUserId` | `DELETE` |
-| `api.projects.:id.slack` | `DELETE` |
-| `api.projects.:id.slack` | `GET` |
-| `api.projects.:id.slack` | `PUT` |
-| `api.projects.:id.slack.installations` | `GET` |
-| `api.projects.:id.slack.installations.:teamId` | `DELETE` |
-| `api.projects.:id.spectrum.avatar` | `DELETE` |
-| `api.projects.:id.spectrum.avatar.commit` | `POST` |
-| `api.projects.:id.spectrum.avatar.upload` | `POST` |
-| `api.projects.:id.voice.imessage-enabled` | `PATCH` |
-| `api.projects.:id.voice.settings` | `GET` |
-| `api.projects.:id.voice.sip-inbound` | `DELETE` |
-| `api.projects.:id.voice.sip-inbound` | `PATCH` |
-| `api.projects.:id.webhooks` | `GET` |
-| `api.projects.:id.webhooks` | `POST` |
-| `api.projects.:id.webhooks.:webhookId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates` | `GET` |
-| `api.projects.:id.whatsapp.templates` | `POST` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `PATCH` |
-
-## Removed Routes
+## Added Routes (v1.6.14 → v1.6.15)
 
 | Route | Method |
 |-------|--------|
-| `api.projects.:id.spectrum.avatar-upload-url` | `GET` |
+| `api.otp.phone2.send` | `POST` |
 
-## Summary
+## Removed Routes (v1.6.14 → v1.6.15)
 
-- **23** added
+_(none — the old `api.otp.phone.send` route is kept as a decoy by dashboard#259.)_
+
+## Changed Routes (v1.6.14 → v1.6.15)
+
+_(none — the body field-ordering shuffle on `api.otp.phone.send` is cosmetic only.)_
+
+## Notes
+
+- **dashboard#258 — signup IP suspensions.** Pure server-side abuse control. No public route surface change.
+- **dashboard#259 — phone OTP send route move + decoy.** The real send path becomes `POST /api/otp/phone2/send` (same body shape as before). The old `POST /api/otp/phone/send` is kept as a honeypot / decoy for scraped clients. The CLI never called either route (`otp` is a browser/mobile auth flow, not CLI), so no command edits are required.
+
+## Cumulative delta vs. `main` (`@photon-ai/dashboard-api@1.2.0` → `1.6.15`)
+
+- **24** added
 - **1** removed
-- **0** changed
-- **35** unchanged
+- **2** changed
+- **34** unchanged
