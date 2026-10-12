@@ -1,44 +1,26 @@
 # Upstream API Diff
 
-> Old routes: 36 · New routes: 58
+> dashboard@v1.6.23 (bump from @photon-ai/dashboard-api 1.6.22 → 1.6.23)
 
 ## Added Routes
 
-| Route | Method |
-|-------|--------|
-| `api.profile.spectrum-updates` | `PATCH` |
-| `api.projects.:id.members` | `GET` |
-| `api.projects.:id.members` | `POST` |
-| `api.projects.:id.members.:memberUserId` | `DELETE` |
-| `api.projects.:id.slack` | `DELETE` |
-| `api.projects.:id.slack` | `GET` |
-| `api.projects.:id.slack` | `PUT` |
-| `api.projects.:id.slack.installations` | `GET` |
-| `api.projects.:id.slack.installations.:teamId` | `DELETE` |
-| `api.projects.:id.spectrum.avatar` | `DELETE` |
-| `api.projects.:id.spectrum.avatar.commit` | `POST` |
-| `api.projects.:id.spectrum.avatar.upload` | `POST` |
-| `api.projects.:id.voice.imessage-enabled` | `PATCH` |
-| `api.projects.:id.voice.settings` | `GET` |
-| `api.projects.:id.voice.sip-inbound` | `DELETE` |
-| `api.projects.:id.voice.sip-inbound` | `PATCH` |
-| `api.projects.:id.webhooks` | `GET` |
-| `api.projects.:id.webhooks` | `POST` |
-| `api.projects.:id.webhooks.:webhookId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates` | `GET` |
-| `api.projects.:id.whatsapp.templates` | `POST` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `DELETE` |
-| `api.projects.:id.whatsapp.templates.:templateId` | `PATCH` |
+_(none)_
 
 ## Removed Routes
 
-| Route | Method |
-|-------|--------|
-| `api.projects.:id.spectrum.avatar-upload-url` | `GET` |
+_(none)_
+
+## Changed Routes
+
+_(none — no route surface changes)_
+
+## Other type changes
+
+- `CaptchaProvider` union changed from `"google-recaptcha" | "turnstile"` to `"hcaptcha" | "turnstile"` (dashboard#272/#273/#274 hCaptcha rollout). Not referenced by the CLI, no code impact.
 
 ## Summary
 
-- **23** added
-- **1** removed
-- **0** changed
-- **35** unchanged
+- **0** added
+- **0** removed
+- **0** changed (route surface)
+- 1 non-route type refinement (`CaptchaProvider`)
