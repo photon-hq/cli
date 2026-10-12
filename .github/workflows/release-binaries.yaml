@@ -64,7 +64,7 @@ jobs:
           fi
 
       - if: steps.tag.outputs.skip != 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.tag.outputs.tag }}
 
