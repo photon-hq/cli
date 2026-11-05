@@ -1,49 +1,74 @@
 name: Release
 
-# Mirrors the photon-hq pattern (see spectrum-ts, uri): push to main,
-# let buildspace's PR-label gate look back at the merge commit and
-# decide whether to actually release. `secrets: inherit` passes
-# org-level OPENAI_API_KEY + NPM_TOKEN through automatically.
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
-      release:
-        type: boolean
-        description: "Force release (skip the PR-label check)"
-        default: false
-      dry-run:
-        type: boolean
-        description: "Run without publishing"
-        default: false
-
-# npm OIDC Trusted Publishing prerequisites (so future maintainers don't relearn this):
-#   1. A trusted publisher must be configured on npmjs.com for @photon-ai/cli with the
-#      GitHub org `photon-hq`, repo `cli`, the CALLER workflow filename `release.yaml`
-#      (npm validates the caller, not buildspace's reusable workflow), no environment,
-#      and "Allow npm publish" enabled.
-#   2. `use-oidc: true` + `id-token: write` below.
-#   3. buildspace's publish-npm action upgrades npm to >= 11.5.1 (Node 20 ships npm 10,
-#      which can't authenticate tokenlessly).
+      operation:
+        description: Verify and pack, publish staging, or promote a stored candidate
+        type: choice
+        options: [dry-run, stage, promote]
+        default: dry-run
+      staging-version:
+        description: Staging version to promote; blank selects the current staging tag
+        type: string
+        default: ""
 
 jobs:
-  release:
-    uses: photon-hq/buildspace/.github/workflows/typescript-service-release.yaml@main
+  stage:
+    if: github.event_name == 'push' || inputs.operation == 'dry-run' || inputs.operation == 'stage'
+    uses: photon-hq/buildspace/.github/workflows/package-stage.yml@c1fb06e4ae457a8e053642a914bd37b8f5ce9e1b
     permissions:
       contents: write
       pull-requests: read
       id-token: write
-      # buildspace's typescript-service-release.yaml declares `packages: write` on its
-      # (opt-in, skipped) github-packages-publish job. GitHub validates called-workflow
-      # job permissions against this grant at startup — before evaluating `if:` — so
-      # omitting this fails every run with startup_failure.
       packages: write
+      actions: read
+      attestations: write
     with:
-      service-name: "@photon-ai/cli"
-      build-command: "bun run build"
-      use-oidc: true
-      release: ${{ github.event_name == 'workflow_dispatch' && inputs.release || false }}
-      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs['dry-run'] || false }}
-    secrets: inherit
+      package: "@photon-ai/cli"
+      registry: https://registry.npmjs.org
+      environment: staging
+      bun-version: "1.3.13"
+      install: bun install --frozen-lockfile
+      ci-workflow: ci.yml
+      verify: bun run check
+      pack: bun scripts/pack-release.ts
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'dry-run' }}
+
+  promote:
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'promote' && github.ref == 'refs/heads/main'
+    uses: photon-hq/buildspace/.github/workflows/package-promote.yml@c1fb06e4ae457a8e053642a914bd37b8f5ce9e1b
+    permissions:
+      contents: write
+      packages: write
+      actions: read
+      attestations: read
+      id-token: write
+    with:
+      package: "@photon-ai/cli"
+      registry: https://registry.npmjs.org
+      environment: production
+      staging-version: ${{ inputs.staging-version }}
+
+  release-binaries:
+    needs: promote
+    if: needs.promote.result == 'success' && needs.promote.outputs.pending == 'true'
+    uses: ./.github/workflows/release-binaries.yaml
+    permissions:
+      contents: write
+    with:
+      version: ${{ needs.promote.outputs.version }}
+
+  docs-reference:
+    needs: promote
+    if: needs.promote.result == 'success' && needs.promote.outputs.pending == 'true'
+    uses: ./.github/workflows/docs-reference.yml
+    permissions:
+      contents: write
+    with:
+      version: ${{ needs.promote.outputs.version }}
+    secrets:
+      APP_ID: ${{ secrets.APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}

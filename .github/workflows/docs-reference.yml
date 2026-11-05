@@ -1,8 +1,15 @@
 name: Release documentation artifact
 on:
-  workflow_run:
-    workflows: [Release]
-    types: [completed]
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+    secrets:
+      APP_ID:
+        required: true
+      APP_PRIVATE_KEY:
+        required: true
   workflow_dispatch:
     inputs:
       tag:
@@ -13,24 +20,24 @@ permissions:
   contents: write
 jobs:
   reference:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Resolve published revision
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUESTED_TAG: ${{ inputs.tag }}
+          REQUESTED_TAG: ${{ inputs.version != '' && format('v{0}', inputs.version) || inputs.tag }}
           REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
           tag="$REQUESTED_TAG"
-          if [ -z "$tag" ]; then tag=$(gh release view --repo "$REPOSITORY" --json tagName --jq .tagName); fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           test "$(gh release view "$tag" --repo "$REPOSITORY" --json isDraft --jq .isDraft)" = false
           revision=$(gh api "repos/$REPOSITORY/commits/$tag" --jq .sha)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           path: producer
@@ -45,7 +52,10 @@ jobs:
         working-directory: released
       - name: Export released command definitions
         working-directory: released
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
+          bun -e 'const p = await Bun.file("package.json").json(); p.version = process.env.RELEASE_VERSION; await Bun.write("package.json", JSON.stringify(p, null, 2) + "\n");'
           mkdir -p scripts
           cp ../producer/scripts/export-docs.ts scripts/export-docs.ts
           bun run scripts/export-docs.ts

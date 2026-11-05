@@ -1,17 +1,15 @@
 name: Release Binaries
 
 # Build standalone `photon` binaries (no Bun runtime required) and
-# attach them to the GitHub Release that the `release.yaml` workflow
-# created. Triggers automatically via workflow_run when Release
-# completes, or manually via workflow_dispatch for ad-hoc rebuilds.
+# attach them to the exact stable Release returned by promotion. Manual
+# workflow_dispatch remains available for stable-release rebuilds.
 
 on:
-  # Triggered automatically when the Release workflow finishes.
-  # (release: created does NOT fire when the release is made with
-  # GITHUB_TOKEN — workflow_run does.)
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       tag:
@@ -40,57 +38,48 @@ jobs:
           - os: ubuntu-latest
             target: bun-linux-arm64
             asset: photon-linux-arm64
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ${{ matrix.os }}
     steps:
       - name: Resolve release tag
         id: tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_TAG: ${{ inputs.version != '' && format('v{0}', inputs.version) || inputs.tag }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            TAG=$(gh release view --repo "${{ github.repository }}" --json tagName -q .tagName)
-            EXISTING=$(gh release view "$TAG" --repo "${{ github.repository }}" \
-              --json assets --jq '[.assets[] | select(.name | startswith("photon-"))] | length')
-            if [ "$EXISTING" -ge 4 ]; then
-              echo "::notice::Release $TAG already has binaries, skipping"
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-            fi
-            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          fi
+          set -euo pipefail
+          # macOS runners ship bash 3.2, where errexit ignores a failed [[ ]].
+          [[ "$REQUESTED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          gh release view "$REQUESTED_TAG" --repo "$REPOSITORY" --json tagName
+          echo "tag=$REQUESTED_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${REQUESTED_TAG#v}" >> "$GITHUB_OUTPUT"
 
-      - if: steps.tag.outputs.skip != 'true'
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           ref: ${{ steps.tag.outputs.tag }}
 
-      - if: steps.tag.outputs.skip != 'true'
-        uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.13"
 
       - name: Install
-        if: steps.tag.outputs.skip != 'true'
         run: bun install --frozen-lockfile
 
       - name: Compile binary
-        if: steps.tag.outputs.skip != 'true'
         run: |
+          bun -e 'const p = await Bun.file("package.json").json(); p.version = process.env.RELEASE_VERSION; await Bun.write("package.json", JSON.stringify(p, null, 2) + "\n");'
           bun build ./src/index.ts \
             --compile \
             --target=${{ matrix.target }} \
             --outfile dist/${{ matrix.asset }}
+        env:
+          RELEASE_VERSION: ${{ steps.tag.outputs.version }}
 
       - name: Smoke test (native targets only)
-        if: steps.tag.outputs.skip != 'true' && (matrix.target == 'bun-darwin-arm64' || matrix.target == 'bun-linux-x64')
+        if: matrix.target == 'bun-darwin-arm64' || matrix.target == 'bun-linux-x64'
         run: ./dist/${{ matrix.asset }} --version
 
       - name: Compute SHA256
-        if: steps.tag.outputs.skip != 'true'
         run: |
           if command -v shasum >/dev/null 2>&1; then
             shasum -a 256 dist/${{ matrix.asset }} > dist/${{ matrix.asset }}.sha256
@@ -99,7 +88,6 @@ jobs:
           fi
 
       - name: Upload to release
-        if: steps.tag.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
