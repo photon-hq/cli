@@ -12,7 +12,7 @@ describe("photon update", () => {
       }
       return Response.json({
         name: "@photon-ai/cli",
-        "dist-tags": { latest: "99.0.0" },
+        "dist-tags": { legacy: "99.0.0" },
         versions: {
           "99.0.0": { name: "@photon-ai/cli", version: "99.0.0" },
         },

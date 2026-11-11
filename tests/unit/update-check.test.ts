@@ -34,9 +34,14 @@ describe("startUpdateNotifier", () => {
 
     expect(factoryOptions).toEqual({
       pkg: { name: "@photon-ai/cli", version: pkg.version },
+      distTag: "legacy",
       updateCheckInterval: 1000 * 60 * 60 * 24,
     });
-    expect(notifyOptions).toEqual({ defer: true, isGlobal: true });
+    expect(notifyOptions).toEqual({
+      defer: true,
+      isGlobal: true,
+      message: expect.stringContaining("photon update"),
+    });
   });
 
   test("skips non-interactive sessions", () => {

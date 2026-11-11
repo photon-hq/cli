@@ -330,11 +330,11 @@ describe("updatePhoton", () => {
         }
       )
     ).rejects.toThrow(
-      "Run `yarn up @photon-ai/cli` from the project that owns this dependency"
+      "Run `yarn up @photon-ai/cli@legacy` from the project that owns this dependency"
     );
   });
 
-  test("directs Yarn dlx users to rerun the latest package", async () => {
+  test("directs Yarn dlx users to rerun the legacy package", async () => {
     await expect(
       updatePhoton(
         {},
@@ -348,7 +348,7 @@ describe("updatePhoton", () => {
         }
       )
     ).rejects.toThrow(
-      "Run `yarn dlx --package @photon-ai/cli@latest photon` instead"
+      "Run `yarn dlx --package @photon-ai/cli@legacy photon` instead"
     );
   });
 
