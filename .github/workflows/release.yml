@@ -1,0 +1,237 @@
+name: Release
+
+# Publishes a release that Photon's release app prepared: a draft GitHub
+# release for a v<version> tag on the tested commit, with the files that
+# build.yml built from the release candidate and that passed the production
+# test, checksums.txt, the production test's report, and their SHA-256s in
+# the release body. This workflow
+# publishes exactly those files. After approval in the npm environment, the
+# npm tarball goes to npm through trusted publishing, with provenance; then
+# the draft release is published as the latest release, which puts the
+# binaries live for the installers. A version npm already has is checked byte
+# for byte and never published again.
+#
+# Retry by running this workflow on the release tag (not a branch):
+# gh workflow run release.yml --ref v3.0.0
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE: '@photon-ai/cli'
+  RELEASE_APP: photon-action-bot[bot]
+
+jobs:
+  # Accepts only a v<version> tag whose release and files come from the release
+  # app, whose files match checksums.txt and the SHA-256s in the release body,
+  # whose release carries the production test report, and whose package.json
+  # has that version. No dependency code runs here.
+  verify:
+    name: Verify the release files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Reads the build attestations.
+      attestations: read
+      # GitHub shows draft releases only to tokens that can push.
+      contents: write
+    outputs:
+      assets: ${{ steps.check.outputs.assets }}
+      commit: ${{ steps.check.outputs.commit }}
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - id: plan
+        run: |
+          [[ "$GITHUB_REF" =~ ^refs/tags/v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || { echo "::error::Run this workflow on a v<version> tag, not $GITHUB_REF"; exit 1; }
+          {
+            echo "tag=${GITHUB_REF#refs/tags/}"
+            echo "version=${BASH_REMATCH[1]}"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
+      - id: check
+        name: Check the release, its files and the tagged source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq "[.[] | select(.tag_name == \"$TAG\")]" | jq -s add > "$RUNNER_TEMP/releases.json"
+          test "$(jq length "$RUNNER_TEMP/releases.json")" -eq 1 || { echo "::error::Expected one release for $TAG"; exit 1; }
+          jq '.[0]' "$RUNNER_TEMP/releases.json" > "$RUNNER_TEMP/release.json"
+          test "$(jq -r .author.login "$RUNNER_TEMP/release.json")" = "$RELEASE_APP" || { echo "::error::$TAG was not prepared by $RELEASE_APP"; exit 1; }
+          jq -e --arg app "$RELEASE_APP" 'all(.assets[]; .uploader.login == $app)' "$RUNNER_TEMP/release.json" > /dev/null || { echo "::error::A release file was not uploaded by $RELEASE_APP"; exit 1; }
+          commit="$(git rev-parse HEAD)"
+          test "$(jq -r .target_commitish "$RUNNER_TEMP/release.json")" = "$commit" || { echo "::error::The release does not target the tagged commit"; exit 1; }
+          {
+            echo "assets=$(jq -c '[.assets[] | [.id, .name]] | sort' "$RUNNER_TEMP/release.json")"
+            echo "commit=$commit"
+          } >> "$GITHUB_OUTPUT"
+          mkdir "$RUNNER_TEMP/files"
+          jq -r '.assets[] | "\(.id) \(.name)"' "$RUNNER_TEMP/release.json" | while read -r id name; do
+            gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/releases/assets/$id" > "$RUNNER_TEMP/files/$name"
+          done
+          cd "$RUNNER_TEMP/files"
+          export LC_ALL=C
+          sha256sum --check --strict checksums.txt
+          test -f production-test-report.md || { echo "::error::The release has no production-test-report.md"; exit 1; }
+          files=()
+          for file in *; do
+            case "$file" in
+              checksums.txt | production-test-report.md) ;;
+              *) files+=("$file") ;;
+            esac
+          done
+          test "$(printf '%s\n' "${files[@]}")" = "$(awk '{ print $2 }' checksums.txt | sort)" || { echo "::error::The release files and checksums.txt list different files"; exit 1; }
+          jq -r .body "$RUNNER_TEMP/release.json" | tr -d '\r' > "$RUNNER_TEMP/body.md"
+          { cat checksums.txt; sha256sum production-test-report.md; } > "$RUNNER_TEMP/sums.txt"
+          while read -r line; do
+            grep -Fqx -- "$line" "$RUNNER_TEMP/body.md" || { echo "::error::The release body does not list $line"; exit 1; }
+          done < "$RUNNER_TEMP/sums.txt"
+          # The report lists each file the production test ran as
+          # "- `<file>`: SHA-256 `<sha256>`, checked against ...".
+          # shellcheck disable=SC2016
+          sed -nE 's/^- `([^`]+)`: SHA-256 `([0-9a-f]{64})`.*$/\2  \1/p' production-test-report.md | sort -u > "$RUNNER_TEMP/tested.txt"
+          grep -Fqx -- "$(grep -F "  photon-ai-cli-$VERSION.tgz" checksums.txt)" "$RUNNER_TEMP/tested.txt" || { echo "::error::production-test-report.md doesn't list photon-ai-cli-$VERSION.tgz with its SHA-256 in checksums.txt"; exit 1; }
+          while read -r line; do
+            grep -Fqx -- "$line" checksums.txt || { echo "::error::production-test-report.md tested a file this release doesn't have: $line"; exit 1; }
+          done < "$RUNNER_TEMP/tested.txt"
+          for file in "${files[@]}" checksums.txt; do
+            gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/build.yml" \
+              --source-ref refs/heads/release-candidate --source-digest "$commit" \
+              --deny-self-hosted-runners > /dev/null || { echo "::error::$file has no build attestation from build.yml on the tagged commit"; exit 1; }
+          done
+          test "$(jq -r .version "$GITHUB_WORKSPACE/package.json")" = "$VERSION" || { echo "::error::package.json at $TAG is not version $VERSION"; exit 1; }
+          test -f "photon-ai-cli-$VERSION.tgz" || { echo "::error::The release has no photon-ai-cli-$VERSION.tgz"; exit 1; }
+          tar -xzOf "photon-ai-cli-$VERSION.tgz" package/package.json | jq -e --arg package "$PACKAGE" --arg version "$VERSION" '.name == $package and .version == $version' > /dev/null || { echo "::error::photon-ai-cli-$VERSION.tgz is not $PACKAGE@$VERSION"; exit 1; }
+          jq -e --arg version "$VERSION" --arg revision "$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)" '.source.version == $version and .source.revision == $revision' docs-reference.json > /dev/null || { echo "::error::docs-reference.json was not exported from $VERSION at the tagged commit"; exit 1; }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verified-release-files
+          path: ${{ runner.temp }}/files/
+          if-no-files-found: error
+
+  # Only this job publishes to npm: the npm environment (release tags only,
+  # with a required reviewer), trusted publishing (OIDC) and npm provenance.
+  # No dependency code runs here.
+  npm:
+    name: Publish to npm
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: verified-release-files
+          path: files
+      - name: Check the files again
+        working-directory: files
+        run: sha256sum --check --strict checksums.txt
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Install the npm that publishes through trusted publishing
+        run: npm install --global npm@11.21.1 --ignore-scripts --no-audit --no-fund
+      - id: registry
+        name: Check what npm has
+        run: |
+          integrity="sha512-$(openssl dgst -sha512 -binary "files/photon-ai-cli-$VERSION.tgz" | base64 -w0)"
+          echo "integrity=$integrity" >> "$GITHUB_OUTPUT"
+          if published="$(npm view "$PACKAGE@$VERSION" dist.integrity 2> "$RUNNER_TEMP/npm-view.log")"; then
+            :
+          elif grep -q 'code E404' "$RUNNER_TEMP/npm-view.log"; then
+            published=''
+          else
+            cat "$RUNNER_TEMP/npm-view.log"
+            echo "::error::npm view $PACKAGE@$VERSION failed; run this workflow again"
+            exit 1
+          fi
+          if test -z "$published"; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          elif test "$published" = "$integrity"; then
+            echo "npm already has $PACKAGE@$VERSION with the tested tarball"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::npm has a different $PACKAGE@$VERSION ($published); refusing to continue"
+            exit 1
+          fi
+      - name: Publish to npm
+        if: steps.registry.outputs.publish == 'true'
+        run: npm publish "files/photon-ai-cli-$VERSION.tgz" --access public --tag latest --ignore-scripts
+      - name: Check the registry has the tested tarball
+        env:
+          INTEGRITY: ${{ steps.registry.outputs.integrity }}
+        run: |
+          for _ in $(seq 40); do
+            published="$(npm view "$PACKAGE@$VERSION" dist.integrity 2> /dev/null || true)"
+            test "$published" = "$INTEGRITY" && { echo "npm serves $PACKAGE@$VERSION as $published"; exit 0; }
+            sleep 15
+          done
+          echo "::error::npm serves $PACKAGE@$VERSION as '$published', not the tested $INTEGRITY"
+          exit 1
+
+  # Publishes the draft only after npm has the version, because the installers
+  # read the latest release. The approval can take days, so the tag and the
+  # draft's files are compared with the ones verify checked first. A release
+  # file can't change in place, only be deleted and uploaded again under a new
+  # ID, so the same IDs and names mean the same files.
+  release:
+    name: Publish the GitHub release
+    needs: [verify, npm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the verified draft
+        env:
+          ASSETS: ${{ needs.verify.outputs.assets }}
+          COMMIT: ${{ needs.verify.outputs.commit }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.verify.outputs.tag }}
+        run: |
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$TAG" --jq .sha)" = "$COMMIT" || { echo "::error::$TAG moved after verify checked it; run this workflow again"; exit 1; }
+          current="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq "[.[] | select(.tag_name == \"$TAG\")]" | jq -s -c 'add | if length == 1 then [.[0].assets[] | [.id, .name]] | sort else null end')"
+          test "$current" = "$ASSETS" || { echo "::error::$TAG's files changed after verify checked them; run this workflow again"; exit 1; }
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+  docs:
+    name: Request the docs reference update
+    needs: [verify, release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: docs-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: photon-hq
+          repositories: docs
+          permission-contents: write
+      - env:
+          GH_TOKEN: ${{ steps.docs-token.outputs.token }}
+          TAG: ${{ needs.verify.outputs.tag }}
+        run: gh api repos/photon-hq/docs/dispatches --method POST -f event_type=reference-release -f 'client_payload[family]=cli-stable' -f "client_payload[tag]=$TAG"
