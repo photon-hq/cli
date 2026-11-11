@@ -1,0 +1,26 @@
+name: Bug report
+description: A command doesn't work as documented.
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include API keys, tokens, other credentials or private data.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `photon --version`.
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran, what you expected and what happened instead. Include the error and its request ID if the CLI printed one.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Your operating system, how you installed the CLI (npm, pnpm, Yarn, Bun or a standalone binary) and, for a package install, `node --version`.

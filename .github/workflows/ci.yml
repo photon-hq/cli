@@ -1,70 +1,85 @@
-name: Check
+name: CI
+
+# Checks every pull request to main and every push to main and
+# release-candidate, from public npm with no token or secret. The export
+# writes the source; until the first one, main holds only the community
+# files, and the job passes with a notice. Once an export has written the
+# source (a commit with its GitOrigin-RevId trailer), a tree without
+# package.json fails.
 on:
   pull_request:
-  push:
     branches: [main]
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  push:
+    branches: [main, release-candidate]
 
 permissions:
   contents: read
 
-jobs:
-  check:
-    name: ${{ matrix.task }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        task: [typecheck, test, build]
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: "1.3.13"
-      - run: bun install --frozen-lockfile
-      - run: bun run ${{ matrix.task }}
-        env:
-          TZ: UTC
-          LC_ALL: C
-          NO_COLOR: "1"
+# A pull request keeps only its newest run. Every pushed commit gets its own
+# run, because the release candidate workflow waits for the run on its commit.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-  policy:
-    name: ${{ matrix.check }}
+jobs:
+  test:
+    name: Test (Node.js ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        check: [snapshot-policy, deps-policy]
+        node-version: ['22', '24']
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: "1.3.13"
-      - run: bun install --frozen-lockfile
-      - run: bun run scripts/${{ matrix.check }}.ts
-        env:
-          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          GH_TOKEN: ${{ github.token }}
+          persist-credentials: false
 
-  smoke:
-    needs: check
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - id: tree
+        name: Find the CLI source
+        run: |
+          if test -f package.json; then
+            echo "source=true" >> "$GITHUB_OUTPUT"
+          elif test -n "$(git log -1 --format=%H --grep='^GitOrigin-RevId: [0-9a-f]\{40\}$')"; then
+            echo "::error::This tree has no package.json, but an export has already written the CLI source here."
+            exit 1
+          else
+            echo "::notice::This tree has only the community files; the CLI source arrives with the first release."
+            echo "source=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.tree.outputs.source == 'true'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
-          bun-version: "1.3.13"
-      - run: bun install --frozen-lockfile
-      - run: bun run build
-      - run: node dist/photon.js --version
-      - run: node dist/photon.js --help
+          version: 10.33.0
+
+      - if: steps.tree.outputs.source == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+
+      - if: steps.tree.outputs.source == 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Install dependencies
+        if: steps.tree.outputs.source == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Check
+        if: steps.tree.outputs.source == 'true'
+        run: pnpm check
+
+      - name: Smoke test the Node.js build
+        if: steps.tree.outputs.source == 'true'
+        run: pnpm smoke
+
+      - name: Smoke test a standalone binary
+        if: steps.tree.outputs.source == 'true'
+        run: |
+          pnpm build:binary
+          ./dist/photon --version
+          ./dist/photon --help
