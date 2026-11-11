@@ -8,6 +8,7 @@ import updateNotifier from "update-notifier";
 import pkg from "../../package.json" with { type: "json" };
 
 export const PACKAGE_INSTALLERS = ["npm", "pnpm", "yarn", "bun"] as const;
+export const UPDATE_DIST_TAG = "legacy";
 export type PackageInstaller = (typeof PACKAGE_INSTALLERS)[number];
 export type InstallationKind =
   | PackageInstaller
@@ -58,9 +59,16 @@ async function fetchLatestVersion(): Promise<string> {
   try {
     const notifier = updateNotifier({
       pkg: { name: pkg.name, version: pkg.version },
+      distTag: UPDATE_DIST_TAG,
     });
     ({ latest } = await notifier.fetchInfo());
   } catch (error) {
+    if (error instanceof Error && error.name === "VersionNotFoundError") {
+      throw new Error(
+        `The Photon update registry has no ${UPDATE_DIST_TAG} release of ${pkg.name}.`,
+        { cause: error }
+      );
+    }
     throw new Error("Could not reach the Photon update registry.", {
       cause: error,
     });
@@ -407,7 +415,7 @@ function automaticInstaller(installation: Installation): PackageInstaller | "sta
   if (installation.kind === "ephemeral") {
     throw new Error(
       `A one-off Photon invocation cannot update itself. ` +
-        `Run your package runner with ${pkg.name}@latest instead.`
+        `Run your package runner with ${pkg.name}@${UPDATE_DIST_TAG} instead.`
     );
   }
   if (installation.kind === "development") {
@@ -418,13 +426,13 @@ function automaticInstaller(installation: Installation): PackageInstaller | "sta
   if (installation.kind === "yarn-dlx") {
     throw new Error(
       `A Yarn dlx invocation cannot update itself. ` +
-        `Run \`yarn dlx --package ${pkg.name}@latest photon\` instead.`
+        `Run \`yarn dlx --package ${pkg.name}@${UPDATE_DIST_TAG} photon\` instead.`
     );
   }
   if (installation.kind === "yarn-berry") {
     throw new Error(
       `Yarn 2+ does not provide global installs. ` +
-        `Run \`yarn up ${pkg.name}\` from the project that owns this dependency.`
+        `Run \`yarn up ${pkg.name}@${UPDATE_DIST_TAG}\` from the project that owns this dependency.`
     );
   }
   throw new Error(

@@ -5,7 +5,7 @@ import { parsePackageInstaller, updatePhoton } from "~/lib/self-update.ts";
 export function registerUpdateCommand(program: Command): void {
   program
     .command("update")
-    .description("update Photon to the latest release")
+    .description("update Photon to the newest release on npm's legacy tag")
     .option("--check", "check for an update without installing it")
     .option("--force", "reinstall even when this version is current")
     .option(

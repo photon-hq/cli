@@ -52,6 +52,28 @@ jobs:
       environment: production
       staging-version: ${{ inputs.staging-version }}
 
+  legacy-tag:
+    needs: promote
+    if: needs.promote.result == 'success' && needs.promote.outputs.pending == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Install the npm that manages dist-tags through trusted publishing
+        run: npm install --global npm@11.21.1 --ignore-scripts --no-audit --no-fund
+      - name: Point legacy at the promoted version
+        env:
+          VERSION: ${{ needs.promote.outputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          npm dist-tag add "@photon-ai/cli@$VERSION" legacy --registry=https://registry.npmjs.org
+
   release-binaries:
     needs: promote
     if: needs.promote.result == 'success' && needs.promote.outputs.pending == 'true'

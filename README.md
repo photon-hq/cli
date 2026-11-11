@@ -3,11 +3,14 @@
 Typed terminal UI for the [Photon Dashboard](https://photon.codes). Replaces the web UI for everyday work — manage projects, Spectrum users / lines / platforms, billing, and your developer profile from a terminal.
 
 ```sh
-npx @photon-ai/cli login          # try it without installing
-npm install -g @photon-ai/cli     # or install for daily use
+npx @photon-ai/cli@legacy login          # try it without installing
+npm install -g @photon-ai/cli@legacy     # or install for daily use
 ```
 
 Runs on Node.js >= 18. Bun is also supported but not required.
+
+This release line is published under npm's `legacy` tag. `photon update` and
+the update notification follow `legacy`, never `latest`.
 
 ---
 
@@ -16,9 +19,9 @@ Runs on Node.js >= 18. Bun is also supported but not required.
 ### One-off — no install
 
 ```sh
-npx @photon-ai/cli login
-npx @photon-ai/cli projects ls
-yarn dlx --package @photon-ai/cli@latest photon login
+npx @photon-ai/cli@legacy login
+npx @photon-ai/cli@legacy projects ls
+yarn dlx --package @photon-ai/cli@legacy photon login
 ```
 
 Each invocation pulls the requested release on demand. Good for scripts,
@@ -28,7 +31,7 @@ throwaway machines, or trying the CLI before committing. Works with `npx`,
 ### Global install
 
 ```sh
-npm install -g @photon-ai/cli
+npm install -g @photon-ai/cli@legacy
 photon login
 ```
 
@@ -38,9 +41,9 @@ Also works with other package managers (Yarn global installs require Yarn
 Classic 1.x):
 
 ```sh
-pnpm add -g @photon-ai/cli
-yarn global add @photon-ai/cli
-bun add -g @photon-ai/cli
+pnpm add -g @photon-ai/cli@legacy
+yarn global add @photon-ai/cli@legacy
+bun add -g @photon-ai/cli@legacy
 ```
 
 ### Standalone binary
@@ -50,7 +53,7 @@ For CI environments or systems where you don't want any runtime. Replace `<os>` 
 ```sh
 # <os>: darwin | linux    <arch>: arm64 | x64
 curl -L -o /usr/local/bin/photon \
-  https://github.com/photon-hq/cli/releases/latest/download/photon-<os>-<arch>
+  https://github.com/photon-hq/cli/releases/download/v2.3.0/photon-<os>-<arch>
 chmod +x /usr/local/bin/photon
 photon --version
 ```
@@ -61,7 +64,7 @@ Available for macOS (arm64 / x64) and Linux (x64 / arm64). Each binary ships wit
 
 ## Update
 
-The CLI shows a notification when a new version is available. It can detect
+The CLI shows a notification when a newer release is on npm's `legacy` tag. It can detect
 global npm, pnpm, Yarn Classic, and Bun installs, and securely replace standalone
 binaries after verifying the published SHA-256 checksum:
 
@@ -84,31 +87,32 @@ photon update --installer npm   # npm | pnpm | yarn | bun
 You can also update directly with the package manager you originally used:
 
 ```sh
-npm update -g @photon-ai/cli
+npm install -g @photon-ai/cli@legacy
 photon --version
 ```
 
 Or with other package managers:
 
 ```sh
-pnpm update -g @photon-ai/cli
-yarn global upgrade @photon-ai/cli
-bun update -g @photon-ai/cli
+pnpm add -g @photon-ai/cli@legacy
+yarn global add @photon-ai/cli@legacy
+bun add -g @photon-ai/cli@legacy
 ```
 
-If you're using a standalone binary, re-download the latest release:
+If you're using a standalone binary, re-download the release that
+`photon update --check` names:
 
 ```sh
 curl -L -o /usr/local/bin/photon \
-  https://github.com/photon-hq/cli/releases/latest/download/photon-<os>-<arch>
+  https://github.com/photon-hq/cli/releases/download/v<version>/photon-<os>-<arch>
 chmod +x /usr/local/bin/photon
 ```
 
-`npx` / `pnpx` / `bunx` users can request `@photon-ai/cli@latest` directly.
+`npx` / `pnpx` / `bunx` users can request `@photon-ai/cli@legacy` directly.
 Yarn 2+ users can run
-`yarn dlx --package @photon-ai/cli@latest photon`, so no self-update is needed.
+`yarn dlx --package @photon-ai/cli@legacy photon`, so no self-update is needed.
 If a Yarn 2+ project lists Photon as a local dependency, update it from that
-project with `yarn up @photon-ai/cli`.
+project with `yarn up @photon-ai/cli@legacy`.
 
 To suppress the update notification, set `PHOTON_NO_UPDATE_NOTIFIER=1`.
 
@@ -332,7 +336,7 @@ See [`docs/cli-design.md`](docs/cli-design.md) and [`docs/cli-build-plan.md`](do
 
 ## Releases
 
-Every push to `main` runs the [Release workflow](.github/workflows/release.yaml) to verify and publish a staging candidate through the pinned [Buildspace package workflows](https://github.com/photon-hq/buildspace/tree/c1fb06e4ae457a8e053642a914bd37b8f5ce9e1b/.github/workflows). Manual dispatch defaults to `dry-run`, which verifies and packs without publishing or creating tags or Releases. To release, dispatch `promote` from `main` with the staging version and obtain approval in the `production` environment; promotion publishes the stored candidate under npm's stable `latest` tag without rebuilding or committing a source version bump. A successful new promotion calls [`release-binaries.yaml`](.github/workflows/release-binaries.yaml) and [`docs-reference.yml`](.github/workflows/docs-reference.yml) with that exact stable version.
+Every push to `main` runs the [Release workflow](.github/workflows/release.yaml) to verify and publish a staging candidate through the pinned [Buildspace package workflows](https://github.com/photon-hq/buildspace/tree/c1fb06e4ae457a8e053642a914bd37b8f5ce9e1b/.github/workflows). Manual dispatch defaults to `dry-run`, which verifies and packs without publishing or creating tags or Releases. To release, dispatch `promote` from `main` with the staging version and obtain approval in the `production` environment; promotion publishes the stored candidate under npm's stable `latest` tag without rebuilding or committing a source version bump. A successful new promotion calls [`release-binaries.yaml`](.github/workflows/release-binaries.yaml) and [`docs-reference.yml`](.github/workflows/docs-reference.yml) with that exact stable version, and its `legacy-tag` job, after a second `production` approval, adds npm's `legacy` tag to the same version, which `photon update` and the update notification follow.
 
 The pack script builds each channel in a temporary copy with its release version, checks that the archive contains the declared package entry points and binaries, and runs the packed CLI's `--version`. The source manifest and lockfile stay unchanged.
 
