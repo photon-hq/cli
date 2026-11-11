@@ -48,12 +48,12 @@ bun add -g @photon-ai/cli@legacy
 
 ### Standalone binary
 
-For CI environments or systems where you don't want any runtime. Replace `<os>` and `<arch>` with your platform:
+For CI environments or systems where you don't want any runtime. Replace `<version>` with the version on npm's `legacy` tag (`npm view @photon-ai/cli@legacy version`), and `<os>` and `<arch>` with your platform:
 
 ```sh
 # <os>: darwin | linux    <arch>: arm64 | x64
 curl -L -o /usr/local/bin/photon \
-  https://github.com/photon-hq/cli/releases/download/v2.3.0/photon-<os>-<arch>
+  https://github.com/photon-hq/cli/releases/download/v<version>/photon-<os>-<arch>
 chmod +x /usr/local/bin/photon
 photon --version
 ```

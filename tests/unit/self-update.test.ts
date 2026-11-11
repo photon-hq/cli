@@ -334,7 +334,7 @@ describe("updatePhoton", () => {
     );
   });
 
-  test("directs Yarn dlx users to rerun the latest package", async () => {
+  test("directs Yarn dlx users to rerun the legacy package", async () => {
     await expect(
       updatePhoton(
         {},

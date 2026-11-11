@@ -26,14 +26,14 @@ afterEach(() => {
   }
 });
 
-function cachedNotifier(latest: string) {
+function cachedNotifier(latest: unknown) {
   const notified: unknown[] = [];
-  const update: UpdateInfo = {
+  const update = {
     latest,
     current: pkg.version,
     type: "patch",
     name: pkg.name,
-  };
+  } as UpdateInfo;
   const createNotifier = (() => ({
     update,
     notify(options: unknown) {
@@ -68,6 +68,15 @@ describe("the update notice follows npm's legacy tag", () => {
 
     startUpdateNotifier({ interactive: () => true, createNotifier });
 
+    expect(notified).toEqual([]);
+  });
+
+  test("ignores a cached update whose version is not a string", () => {
+    const { createNotifier, notified } = cachedNotifier(5);
+
+    expect(() =>
+      startUpdateNotifier({ interactive: () => true, createNotifier })
+    ).not.toThrow();
     expect(notified).toEqual([]);
   });
 
