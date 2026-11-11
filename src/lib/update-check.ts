@@ -41,10 +41,11 @@ export function startUpdateNotifier(
     distTag: UPDATE_DIST_TAG,
     updateCheckInterval: 1000 * 60 * 60 * 24, // 24h
   });
-  const cached = notifier.update?.latest;
+  const { update } = notifier;
   if (
-    cached !== undefined &&
-    (typeof cached !== "string" || !semverSatisfies(cached, `^${pkg.version}`))
+    update &&
+    (typeof update.latest !== "string" ||
+      !semverSatisfies(update.latest, `^${pkg.version}`))
   ) {
     return;
   }

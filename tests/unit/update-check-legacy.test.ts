@@ -80,6 +80,15 @@ describe("the update notice follows npm's legacy tag", () => {
     expect(notified).toEqual([]);
   });
 
+  test("ignores a cached update without a version", () => {
+    const { createNotifier, notified } = cachedNotifier(undefined);
+
+    expect(() =>
+      startUpdateNotifier({ interactive: () => true, createNotifier })
+    ).not.toThrow();
+    expect(notified).toEqual([]);
+  });
+
   test("names photon update for a cached update on this line", () => {
     const { createNotifier, notified } = cachedNotifier(nextLegacy);
 

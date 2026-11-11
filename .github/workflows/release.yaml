@@ -54,7 +54,7 @@ jobs:
 
   legacy-tag:
     needs: promote
-    if: needs.promote.result == 'success' && needs.promote.outputs.pending == 'true'
+    if: needs.promote.result == 'success' && needs.promote.outputs.pending == 'true' && startsWith(needs.promote.outputs.version, '2.')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: production
@@ -80,7 +80,7 @@ jobs:
             exit 1
           fi
           current="$(npm view @photon-ai/cli dist-tags.legacy --registry=https://registry.npmjs.org)"
-          if [[ -n "$current" && "$(printf '%s\n' "$current" "$VERSION" | sort -V | tail -n 1)" == "$current" ]]; then
+          if [[ "$current" =~ ^2\.[0-9]+\.[0-9]+$ && "$(printf '%s\n' "$current" "$VERSION" | sort -V | tail -n 1)" == "$current" ]]; then
             echo "Kept legacy on $current, which is not older than $VERSION"
             exit 0
           fi
