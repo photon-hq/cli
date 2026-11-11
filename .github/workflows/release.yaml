@@ -61,6 +61,7 @@ jobs:
     concurrency:
       group: npm-legacy-dist-tag
       cancel-in-progress: false
+      queue: max
     permissions:
       id-token: write
     steps:
