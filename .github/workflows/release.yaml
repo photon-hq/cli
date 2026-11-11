@@ -71,7 +71,10 @@ jobs:
           VERSION: ${{ needs.promote.outputs.version }}
         run: |
           set -euo pipefail
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ ! "$VERSION" =~ ^2\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::legacy holds the 2.x line; refusing to tag $VERSION" >&2
+            exit 1
+          fi
           npm dist-tag add "@photon-ai/cli@$VERSION" legacy --registry=https://registry.npmjs.org
 
   release-binaries:
