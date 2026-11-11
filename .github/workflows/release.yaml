@@ -58,6 +58,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: production
+    concurrency:
+      group: npm-legacy-dist-tag
+      cancel-in-progress: false
     permissions:
       id-token: write
     steps:
@@ -74,6 +77,11 @@ jobs:
           if [[ ! "$VERSION" =~ ^2\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::legacy holds the 2.x line; refusing to tag $VERSION" >&2
             exit 1
+          fi
+          current="$(npm view @photon-ai/cli dist-tags.legacy --registry=https://registry.npmjs.org)"
+          if [[ -n "$current" && "$(printf '%s\n' "$current" "$VERSION" | sort -V | tail -n 1)" == "$current" ]]; then
+            echo "Kept legacy on $current, which is not older than $VERSION"
+            exit 0
           fi
           npm dist-tag add "@photon-ai/cli@$VERSION" legacy --registry=https://registry.npmjs.org
 
