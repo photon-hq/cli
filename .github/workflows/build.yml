@@ -1,11 +1,12 @@
 name: Build release files
 
 # Builds the release files of a release candidate once: the npm tarball, the
-# standalone binaries for eight platforms, and the command reference for the
-# docs, with checksums.txt over all of them. Photon's release process
-# downloads exactly these files, runs its production test on them and records
-# their SHA-256s; after approval, the release workflow publishes them
-# unchanged. Every file gets a GitHub build attestation here.
+# standalone binaries for eight platforms, the installers (install.sh and
+# install.ps1) and the command reference for the docs, with checksums.txt over
+# all of them. Photon's release process downloads exactly these files, runs
+# its production test on them and records their SHA-256s; after approval, the
+# release workflow publishes them unchanged. Every file gets a GitHub build
+# attestation here.
 on:
   push:
     branches: [release-candidate]
@@ -48,6 +49,13 @@ jobs:
         run: |
           pnpm docs:reference
           cp artifacts/docs-reference.json "$RUNNER_TEMP/release/"
+      # The release serves the installers at
+      # releases/latest/download/install.sh and install.ps1. Rendered with the
+      # production defaults, they install from this repository.
+      - name: Render the installers
+        run: |
+          node scripts/build-installers.mjs production
+          cp artifacts/install.sh artifacts/install.ps1 "$RUNNER_TEMP/release/"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-npm
@@ -115,6 +123,8 @@ jobs:
           ls -l
           expected=(
             docs-reference.json
+            install.ps1
+            install.sh
             photon-darwin-arm64.tar.gz
             photon-darwin-x64.tar.gz
             photon-linux-arm64-musl.tar.gz
