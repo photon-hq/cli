@@ -32,8 +32,9 @@ env:
 jobs:
   # Accepts only a v<version> tag whose release and files come from the release
   # app, whose files match checksums.txt and the SHA-256s in the release body,
-  # whose release carries the production test report, and whose package.json
-  # has that version. No dependency code runs here.
+  # whose release carries the production test report and the tagged commit's
+  # installers, and whose package.json has that version. No dependency code
+  # runs here.
   verify:
     name: Verify the release files
     runs-on: ubuntu-latest
@@ -118,6 +119,16 @@ jobs:
           test -f "photon-ai-cli-$VERSION.tgz" || { echo "::error::The release has no photon-ai-cli-$VERSION.tgz"; exit 1; }
           tar -xzOf "photon-ai-cli-$VERSION.tgz" package/package.json | jq -e --arg package "$PACKAGE" --arg version "$VERSION" '.name == $package and .version == $version' > /dev/null || { echo "::error::photon-ai-cli-$VERSION.tgz is not $PACKAGE@$VERSION"; exit 1; }
           jq -e --arg version "$VERSION" --arg revision "$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)" '.source.version == $version and .source.revision == $revision' docs-reference.json > /dev/null || { echo "::error::docs-reference.json was not exported from $VERSION at the tagged commit"; exit 1; }
+      # build.yml renders the installers with the production defaults, which
+      # the tagged commit's scripts/install.sh and scripts/install.ps1 carry,
+      # so the released ones are those files byte for byte.
+      - name: Check the installers
+        working-directory: ${{ runner.temp }}/files
+        run: |
+          for installer in install.sh install.ps1; do
+            test -f "$installer" || { echo "::error::The release has no $installer"; exit 1; }
+            cmp -s -- "$installer" "$GITHUB_WORKSPACE/scripts/$installer" || { echo "::error::$installer is not scripts/$installer at the tagged commit"; exit 1; }
+          done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: verified-release-files
