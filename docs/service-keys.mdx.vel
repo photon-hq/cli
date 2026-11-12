@@ -1,0 +1,140 @@
+---
+title: "Service keys"
+description: "Give automation that must act as your account a non-interactive Photon credential."
+---
+
+An **account service key** is a long-lived machine credential for your account.
+Use one for automation that must act as your account where no one can approve
+a browser-based [device login](/cli/authentication), such as a script that runs
+`photon account` commands.
+
+A service key acts as your account. Treat it like a password.
+
+Which credential to use (see the
+[full table](/cli/authentication#which-credential-to-use)):
+
+- Your own machine: `photon login`.
+- CI: a service identity API key with only the permissions the job needs. See
+  [Use a key in CI](#use-a-key-in-ci).
+- An app's own calls: a [project API key](/cli/projects/api-keys).
+- Automation that must act as your account: an account service key.
+- Creating or rotating keys: a person, not CI or an agent.
+
+```text
+photon account service-key
+├── create --name <name> (--expires-at <timestamp> | --no-expiry)
+├── list
+└── revoke <service-key-id> [--yes]
+```
+
+## Create a key
+
+Every key needs a name and an explicit expiry decision. Pass either
+`--expires-at` with an RFC 3339 timestamp, or `--no-expiry`:
+
+```sh
+photon account service-key create \
+  --name "Account automation" \
+  --expires-at 2027-01-01T00:00:00Z
+```
+
+```sh
+photon account service-key create --name "Account automation" --no-expiry
+```
+
+Names are limited to 128 characters. An expiry must be in the future and no
+more than 3650 days out.
+
+<Warning>
+  The credential is printed **once**, when the key is created. Photon returns
+  the secret only when it creates the key. The `list` and `revoke` responses
+  carry the key's metadata without it. Copy it into your secret store before
+  the command scrolls away.
+</Warning>
+
+## Use a key in CI
+
+CI gets a service identity API key, unless the job must act as your account,
+such as one that runs `photon account` commands. A service identity API key
+works in one organization, across its projects, and holds only the permissions
+a person grants it in the Dashboard, under the organization's service
+identities. Grant only what the job needs. This job lists a project's webhooks,
+so its key holds only `project:read`:
+
+```yaml
+- name: List webhooks
+  run: photon project webhook list --json
+  env:
+    PHOTON_API_TOKEN: ${{ secrets.PHOTON_SERVICE_IDENTITY_KEY }}
+    PHOTON_PROJECT_ID: pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s
+```
+
+Every command uses the key in `PHOTON_API_TOKEN`, and the CLI saves no
+credential for it. An account service key goes in the variable the same way,
+for automation that must act as your account. See
+[which credential to use](/cli/authentication#which-credential-to-use) and
+[how the CLI uses a key from the environment](/cli/authentication#use-a-key-from-the-environment).
+
+## Sign in with a key
+
+On a machine that should stay signed in, such as a long-lived server, save the
+key with `photon login --service-key`. It reads one complete credential from
+**non-interactive stdin**. The CLI refuses to read it from a terminal, so it
+never lands in your shell history or in the process list:
+
+```sh
+printf '%s' "$PHOTON_SERVICE_KEY" | photon login --service-key
+```
+
+The CLI verifies the key against Photon before storing it. If you are already
+signed in, add `--force` to replace the current session:
+
+```sh
+printf '%s' "$PHOTON_SERVICE_KEY" | photon login --service-key --force
+```
+
+On machines with no OS keychain, as in most containers, the CLI stores the key
+in a plain-text file and says where. While `PHOTON_API_TOKEN` is set,
+`photon login --service-key` refuses, because the variable's key would win. See
+[where credentials are stored](/cli/authentication#where-credentials-are-stored).
+
+After signing in, every other command works exactly as it does for a human
+session:
+
+```sh
+photon whoami --json
+photon project list --json
+```
+
+## List and revoke keys
+
+`list` shows unrevoked keys only, expired ones included, newest first. Photon's
+response carries each key's metadata without its secret:
+
+```sh
+photon account service-key list
+photon account service-key list --json
+```
+
+Revocation is immediate and cannot be undone:
+
+```sh
+photon account service-key revoke pho_ask_01jd... --yes
+```
+
+`revoke` asks for confirmation unless you pass `--yes`. Automation must pass
+it, since a non-interactive command with no answer exits with code `2`.
+
+## Credential format
+
+A service key is a `pho_ask_` prefix, a 26-character key ID, and a secret. The
+key ID is the part you pass to `revoke` and the part that appears in `list`
+output. The whole credential is at most 512 bytes and must be piped in exactly
+as issued, with no surrounding whitespace beyond a single trailing newline.
+
+## Recovery
+
+`create` and `revoke` are journaled mutations. If the network fails after the
+request leaves your machine, the result is recorded and you can replay it —
+see [Recoverable operations](/cli/operations). This matters most for `create`,
+where a lost response means a lost credential.

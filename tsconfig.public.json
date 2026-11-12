@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "customConditions": [],
+    "paths": {
+      "@photon-ai/api": ["./node_modules/@photon-ai/api-public/dist/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["src/internal/**", "test/internal/**"]
+}

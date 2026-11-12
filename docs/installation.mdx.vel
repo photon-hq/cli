@@ -1,0 +1,55 @@
+---
+title: "Installation"
+description: "Install the Photon CLI with a package manager or as a standalone binary."
+---
+
+Photon CLI runs on **Node.js 22 or newer**. Node must be available on your
+`PATH` regardless of which package manager installs the CLI.
+
+## Install with a package manager
+
+<CodeGroup>
+```sh npm
+npm install --global @photon-ai/cli
+```
+
+```sh pnpm
+pnpm add --global @photon-ai/cli
+```
+
+```sh Yarn
+yarn add --dev @photon-ai/cli
+yarn photon --version
+```
+
+```sh Bun
+bun add --global @photon-ai/cli
+```
+</CodeGroup>
+
+Bun works as the package manager, but Node.js remains the supported runtime.
+
+## Install a standalone binary
+
+<Note>
+  Standalone installers for macOS, Linux, and Windows are coming. Until they
+  ship, install the CLI with a package manager.
+</Note>
+
+## Verify the install
+
+```sh
+photon --version
+photon --help
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/cli/authentication">
+    Sign in with `photon login` and check your session.
+  </Card>
+  <Card title="Projects" icon="folder" href="/cli/projects">
+    Pick an active project and start working.
+  </Card>
+</CardGroup>

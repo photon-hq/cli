@@ -1,0 +1,202 @@
+---
+title: "Organizations"
+description: "Select an organization and manage its members, invitations, OAuth clients, and payment method."
+---
+
+An organization owns projects, members, OAuth clients, the payment method, and
+10DLC registrations. Membership belongs to the organization: a member has one
+organization role, and an invitation grants access to all of the
+organization's projects.
+
+```sh
+photon org list
+photon org show
+photon org use pho_org_01k9yq3m7d2c8x4v6b5n0p1r2s
+```
+
+## Command overview
+
+```text
+photon org
+├── list
+├── show
+├── use <organization-id>
+├── clear
+├── leave [--yes] [--idempotency-key <key>]
+├── member
+│   ├── list
+│   ├── invite --email <email> --role <member|viewer> [--idempotency-key <key>]
+│   ├── edit <account-id> --role <admin|member|viewer> [--idempotency-key <key>]
+│   └── remove <account-id> [--yes] [--idempotency-key <key>]
+├── invitation
+│   ├── list
+│   ├── preview [--token-file <path>]
+│   ├── accept [--token-file <path>] [--idempotency-key <key>]
+│   └── revoke <invitation-id> [--yes] [--idempotency-key <key>]
+├── oauth-client ...         # see OAuth clients
+└── billing
+    └── payment-method ...   # see Payment method
+```
+
+<CardGroup cols={2}>
+  <Card title="OAuth clients" icon="plug" href="/cli/organizations/oauth-clients">
+    OAuth applications the organization owns, and their secrets.
+  </Card>
+  <Card title="Payment method" icon="credit-card" href="/cli/organizations/billing">
+    The card on file for the organization.
+  </Card>
+</CardGroup>
+
+## Select an organization
+
+Organization-scoped commands resolve the organization in this order:
+
+1. The global `--org <organization-id>` flag, for that invocation only.
+2. A non-empty `PHOTON_ORGANIZATION_ID` environment variable.
+3. The organization of the project in the folder's
+   [`.photon/project.json`](/cli/projects#select-an-active-project).
+4. The organization you stored with `photon org use`.
+5. The organization your account belongs to, when it belongs to exactly one.
+
+With several organizations and none of the first four, commands fail with
+`ORGANIZATION_NOT_SELECTED` and exit `2`; run `photon org list`, then
+`photon org use <organization-id>`.
+
+```sh
+photon org show                                                  # the organization and where it came from
+photon org use pho_org_01k9yq3m7d2c8x4v6b5n0p1r2s                # store an active organization
+photon org member list --org pho_org_01k9yq3m7d2c8x4v6b5n0p1r2t  # one invocation only
+photon org clear                                                 # forget the stored selection
+```
+
+Before a command changes anything in an organization you didn't name with
+`--org`, `project create` included, it names the organization and where it
+came from on stderr, for example
+`Organization: pho_org_01k9yq3m7d2c8x4v6b5n0p1r2s, from your only organization` or
+`Organization: pho_org_01k9yq3m7d2c8x4v6b5n0p1r2s, from /srv/support-bot/.photon/project.json`.
+A command that knows its organization before it asks for confirmation prints
+the line before the question, `--org` included.
+
+`org show` reports the source as `flag`, `environment`, `folder` (with the
+file's `path`), `stored`, or `default`. `org use` reads the organization
+before storing it, so you can never make an inaccessible ID active. With
+`--json`, both print the organization as the API returns it under
+`organization`, beside `source`. `org use` and `org clear` warn you when
+`PHOTON_ORGANIZATION_ID` or the folder's project still selects another
+organization.
+
+`org list` marks the active organization and the ones you own. With `--json`,
+it prints the API's response, where `ownedOrganizationIds` lists the ones you
+own, and adds the active organization's ID as `activeOrganizationId`. When no
+organization can be selected, nothing is marked active and
+`activeOrganizationId` is left out:
+
+```json
+{"acquisitionQuestionnaireExempt":false,"organizations":[{"avatarUrl":null,"billingInitialization":"completed","createdAt":"2026-07-01T00:00:00.000Z","name":"Acme","organizationId":"pho_org_01k9yq3m7d2c8x4v6b5n0p1r2s","updatedAt":"2026-07-02T00:00:00.000Z","version":"3"}],"ownedOrganizationIds":["pho_org_01k9yq3m7d2c8x4v6b5n0p1r2s"],"activeOrganizationId":"pho_org_01k9yq3m7d2c8x4v6b5n0p1r2s"}
+```
+
+The stored organization is tied to the authenticated identity and API origin.
+If it becomes unreadable, `org list` still works, and `org use` or `org clear`
+replaces it.
+
+These commands use the selected organization:
+
+- `photon project list`, `project count`, and `project create`
+- `photon org member`, `org invitation`, `org leave`, `org oauth-client`, and
+  `org billing`
+- `photon account 10dlc`
+
+Commands that act on one project, such as `project view` or
+`project billing plan purchase`, use the project's own organization.
+
+## Members
+
+```sh
+photon org member list
+photon org member invite --email ada@example.com --role member
+photon org member edit pho_acc_01k9yq3m7d2c8x4v6b5n0p1r2s --role admin
+photon org member remove pho_acc_01k9yq3m7d2c8x4v6b5n0p1r2s --yes
+```
+
+Invitations grant `member` or `viewer`. `member edit` can set `admin`,
+`member`, or `viewer`; ownership is not changed through these commands.
+
+Membership changes are guarded by the member's current version. The CLI reads
+it before `edit`, `remove`, and `leave`, and records it with the operation, so
+a [replay](/cli/operations) sends the same request. If the membership changed
+in between, Photon rejects the request rather than overwriting the change.
+
+## Invitations
+
+`member invite` sends an invitation. Track and withdraw outstanding invitations
+from the `invitation` namespace:
+
+```sh
+photon org invitation list
+photon org invitation revoke pho_oinv_01k9yq3m7d2c8x4v6b5n0p1r2s --yes
+```
+
+### Accept an invitation
+
+Preview and acceptance **never** accept a token as a command-line argument.
+Read it from a file, or pipe it through stdin with `--token-file -`:
+
+```sh
+printf '%s\n' "$PHOTON_INVITATION_TOKEN" |
+  photon org invitation preview --token-file - --json
+
+photon org invitation accept --token-file ./invitation-token.txt
+```
+
+```json
+{"allProjects":true,"organizationId":"pho_org_01k9yq3m7d2c8x4v6b5n0p1r2s","organizationName":"Acme","role":"member","status":"accepted"}
+```
+
+Without `--token-file`, the command fails and names the option; it doesn't
+read piped stdin unless you pass `-`. Token values are trimmed, bounded, and
+kept out of output and errors. Acceptance does not need a selected
+organization: the token names it.
+
+<Note>
+  If acceptance is left unresolved, its journal record keeps the token so a
+  replay does not have to ask you for it again. See
+  [Recoverable operations](/cli/operations).
+</Note>
+
+## Leave an organization
+
+`org leave` removes your own membership from the selected organization:
+
+```sh
+photon org leave --org pho_org_01k9yq3m7d2c8x4v6b5n0p1r2s --yes --json
+```
+
+```json
+{"accountId":"pho_acc_01k9yq3m7d2c8x4v6b5n0p1r2s","createdAt":"2026-08-01T18:00:00.000Z","joinedVia":"invitation","organizationId":"pho_org_01k9yq3m7d2c8x4v6b5n0p1r2s","removedAt":"2026-08-07T18:00:00.000Z","role":"member","roleManagedAt":null,"status":"removed","updatedAt":"2026-08-07T18:00:00.000Z","version":"5"}
+```
+
+With `--json`, it prints your membership as the API returns it after the
+change, with `status` `removed`. Leaving clears the organization if it was
+your stored selection.
+
+## Moved commands
+
+These commands moved here from `photon project` and `photon account`. For one
+release the old names only print the replacement and exit with code `2`; they
+do not run it. The replacement keeps the global options you gave (`--org`,
+`--project`, `--json`, `--debug`, `--no-color`, `--no-input`), so it acts on
+the same organization and project, and leaves out the command's own options,
+so it never carries a `--yes`.
+
+| Old command | New command |
+| --- | --- |
+| `photon project member ...` | `photon org member ...` |
+| `photon project invitation ...` | `photon org invitation ...` |
+| `photon project leave` | `photon org leave` |
+| `photon account oauth client ...` | `photon org oauth-client ...` |
+| `photon account oauth secret ...` | `photon org oauth-client secret ...` |
+| `photon account billing payment ...` | `photon org billing payment-method ...` |
+
+```json
+{"error":{"code":"COMMAND_MOVED","message":"\"photon project member\" moved to \"photon org member\".","retryable":false,"docsUrl":"https://photon.codes/docs/cli/output#errors","next":[{"description":"Use the new command","run":"photon org member list --json"}]}}
+```

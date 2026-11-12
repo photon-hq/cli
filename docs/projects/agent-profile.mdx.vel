@@ -1,0 +1,51 @@
+---
+title: "Agent profile"
+description: "Configure the name and avatar your project presents to the people it messages."
+---
+
+```text
+photon project agent-profile
+├── view
+├── edit [--first-name] [--last-name | --clear-last-name] [--idempotency-key <key>]
+└── avatar
+    ├── upload <file> [--idempotency-key <key>]
+    └── reset [--yes] [--idempotency-key <key>]
+```
+
+<Note>
+  Members and invitations belong to the organization. See
+  [Organizations](/cli/organizations#members).
+</Note>
+
+The agent profile is the name and avatar your project presents to the people it
+messages.
+
+```sh
+photon project agent-profile view
+photon project agent-profile edit --first-name Ada --last-name Lovelace
+photon project agent-profile edit --clear-last-name
+```
+
+With `--json`, `view`, `edit`, `avatar upload` and `avatar reset` print the
+agent profile as Photon returns it, with every field in it, including a field
+the API adds after this CLI release:
+
+```json
+{"avatarUrl":"https://images.example.com/agent.png","firstName":"Ada","lastName":"Lovelace"}
+```
+
+## Avatar
+
+```sh
+photon project agent-profile avatar upload ./agent.webp
+photon project agent-profile avatar reset --yes
+```
+
+Upload accepts a regular JPEG, PNG, or WebP file. The CLI detects the media
+type from the file's signature rather than its extension, requests a presigned
+upload form, uploads the file without a Photon authorization header, and
+commits only once storage accepts it. It prints the profile Photon returns
+when it commits the upload. Presigned URLs and form values are never printed.
+
+An unresolved pre-commit upload keeps a private copy of the validated image so
+a replay can finish without you supplying the file again.

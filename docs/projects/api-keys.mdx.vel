@@ -1,0 +1,107 @@
+---
+title: "API keys"
+description: "Issue, rotate, and revoke project API keys."
+---
+
+API keys are project-scoped credentials for your own services. They are
+separate from [account service keys](/cli/service-keys), which authenticate the
+CLI itself.
+
+```text
+photon project api-key
+├── list
+├── create --name <name> --permission <permission> ... (--expires-at <RFC3339> | --no-expiry)
+│          [--idempotency-key <key>]
+└── revoke <api-key-id> [--yes] [--idempotency-key <key>]
+```
+
+## Create a key
+
+Every key needs a name of at most 128 characters and an explicit expiry
+decision, plus one or more explicit permissions. RFC 3339 timestamps are
+normalized to UTC. Replace the example expiry with a future timestamp when
+running the command.
+
+```sh
+photon project api-key create \
+  --name production-worker \
+  --permission events:write \
+  --expires-at 2027-09-01T00:00:00Z
+
+photon project api-key create --name legacy-worker --permission project:read --no-expiry
+```
+
+With `--json`, `create` prints the API's response as Photon sends it, with
+every field in it, including a field the API adds after this CLI release:
+
+```json
+{"apiKey":{"apiKeyId":"pho_sk_...","name":"production-worker","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","createdByAccountId":"pho_acc_01k9yq3m7d2c8x4v6b5n0p1r2s","createdAt":"2026-08-01T18:00:00.000Z","expiresAt":"2027-09-01T00:00:00.000Z","revokedAt":null,"permissions":["events:write"],"permissionsUpdatedAt":null},"secret":"..."}
+```
+
+Before it prints anything, with or without `--json`, the CLI checks the
+secret. An empty secret, one longer than 4,096 characters, or one with a
+character outside ASCII `!` to `~` (a space or a control character, for
+example) fails with `PROJECT_PROTOCOL_ERROR`, and nothing is printed.
+
+<Warning>
+  Creation is the only command that returns the secret. It is printed once on
+  stdout with a save-now warning on stderr, and never appears in `list`,
+  `revoke`, errors, `--debug` output, or the local journal. Send it straight to
+  a secrets manager — not into source control or a project config file.
+</Warning>
+
+Supported permissions are `events:read`, `events:write`, `platforms:read`,
+`platforms:write`, `project:read`, and `project:write`. Repeat `--permission`
+for each permission the service needs. No permissions are granted implicitly.
+List and create output include `permissions` and `permissionsUpdatedAt`.
+
+## List keys
+
+```sh
+photon project api-key list
+photon project api-key list --json
+```
+
+`api-key list` returns live keys only, so revoked keys drop out of later lists.
+It is not paginated — the API returns every live key, newest first. With
+`--json` it prints the API's response, `{"apiKeys": [...]}`.
+
+## Revoke a key
+
+```sh
+photon project api-key revoke <api-key-id>
+```
+
+With `--json`, `revoke` prints the API's response, `{"apiKey": {...}}`, with
+the key's `revokedAt` set.
+
+`revoke` takes the API key ID only, and `api-key list` shows the ID of every
+live key. A full API key (`pho_sk_…` followed by `_` and its secret) is refused
+with `ARGUMENT_VALIDATION` before the confirmation question and before any
+request, because command-line arguments can persist in shell history and are
+visible to other local processes. The error's next steps are the same command
+with the key's ID in place of the full key, then `photon project api-key list`.
+
+## Rotate safely
+
+Rotation is deliberately not one command, because a single atomic swap gives
+you no window to verify the replacement:
+
+<Steps>
+  <Step title="Create a replacement key">
+    ```sh
+    photon project api-key create --name production-worker-2 --permission events:write --no-expiry
+    ```
+  </Step>
+  <Step title="Update your consumers">
+    Deploy the new secret everywhere the old one is used.
+  </Step>
+  <Step title="Verify the replacement">
+    Confirm traffic is flowing with the new key before going further.
+  </Step>
+  <Step title="Revoke the old key">
+    ```sh
+    photon project api-key revoke <api-key-id> --yes
+    ```
+  </Step>
+</Steps>
