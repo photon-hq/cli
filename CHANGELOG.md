@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.1 (2026-11-12)
+
+
+### Bug Fixes
+
+* **release:** pass npm the tarball as a file and dry-run it before approval (ENG-3791)
+
 ## 3.0.0 (2026-11-12)
 
 
