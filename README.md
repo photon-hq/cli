@@ -30,5 +30,5 @@ privately, as [SECURITY.md](SECURITY.md) describes.
 
 ## License
 
-[MIT](LICENSE). The npm package and the binaries ship the licenses of the
+[Apache-2.0](LICENSE). The npm package and the binaries ship the licenses of the
 packages they bundle in `THIRD_PARTY_NOTICES.txt`.
