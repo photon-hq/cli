@@ -1,0 +1,11 @@
+language js
+
+or {
+  JsStaticMemberExpression(member=$name),
+  JsComputedMemberExpression(member=$name),
+  JsObjectBindingPatternShorthandProperty(identifier=$name),
+  JsObjectBindingPatternProperty(member=$name)
+} as $read where {
+  $name <: r"^['\"]?(?:isTTY|CI|PHOTON_NO_INPUT|NO_COLOR|NO_COLORS|FORCE_COLOR|NODE_DISABLE_COLORS|TERM)['\"]?$",
+  register_diagnostic(span=$read, message="Only src/core/terminal.ts reads isTTY and the terminal variables. Ask it whether the CLI may prompt, use color or show a spinner.", severity="error")
+}

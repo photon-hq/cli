@@ -1,0 +1,467 @@
+---
+title: "10DLC registration"
+description: "Register 10DLC brands and campaigns so your organization can send A2P messages."
+---
+
+`photon account 10dlc` registers and maintains your organization's 10DLC
+brands and campaigns. Registration starts the moment a command succeeds — there is no
+local draft and no separate submit step.
+
+<Warning>
+  An approved brand does **not** authorize A2P messaging on its own. A campaign
+  must also be approved, and a sending phone number must be assigned to that
+  campaign, before you can send traffic. Phone-number assignment happens
+  outside this CLI.
+</Warning>
+
+Brands and campaigns belong to the
+[selected organization](/cli/organizations#select-an-organization): your stored
+organization, your only organization, or `--org` for one invocation. The global `--project` option does not scope them.
+
+```text
+photon account 10dlc
+├── brand
+│   ├── list [--status <status>] [--limit 30] [--page-token <token>]
+│   ├── view <brand-id>
+│   ├── create [--profile-file <path>] [--yes] [--idempotency-key <key>]
+│   ├── edit <brand-id> [--profile-file <path>] [--replace] [--yes]
+│   │                   [--idempotency-key <key>]
+│   └── otp
+│       ├── view <brand-id>
+│       ├── send <brand-id> [--idempotency-key <key>]
+│       └── verify <brand-id> [--code <code>] [--idempotency-key <key>]
+└── campaign
+    ├── list [--brand-id <id>] [--status <status>] [--use-case <code> ...]
+    │        [--limit 25] [--page-token <token>]
+    ├── view <campaign-id>
+    ├── create <brand-id> [--campaign-file <path>] [--yes]
+    │                     [--idempotency-key <key>]
+    ├── edit <campaign-id> --etag <etag> [--name <name>] [--sample-message <message> ...]
+    │                      [--update-file <path> instead of edit flags]
+    │                      [--idempotency-key <key>]
+    ├── resubmit <campaign-id> [--resubmit-file <path>] [--yes]
+    │                         [--idempotency-key <key>]
+    └── use-case
+        └── list
+```
+
+## The workflow
+
+Use truthful business and contact information that matches government,
+tax-authority, and other official records. Mismatches delay registration or get
+it rejected.
+
+<Steps>
+  <Step title="Register a brand">
+    Supply a complete organization or sole-proprietor profile. Registration
+    begins as soon as `create` is accepted.
+
+    ```sh
+    photon account 10dlc brand create --profile-file ./brand-profile.json
+    ```
+  </Step>
+  <Step title="Verify the OTP, for a sole proprietor">
+    Send and verify the code for the registrant phone once the brand status
+    says verification is available.
+
+    ```sh
+    photon account 10dlc brand otp send pho_brd_...
+    photon account 10dlc brand otp verify pho_brd_...
+    ```
+  </Step>
+  <Step title="Monitor the brand">
+    ```sh
+    photon account 10dlc brand view pho_brd_...
+    ```
+
+    `brand view` shows registration feedback so you can fix rejected
+    information. Use `brand edit` to start a correction. Photon may verify the
+    correction automatically or ask for another OTP.
+  </Step>
+  <Step title="Register a campaign">
+    Describe the real use cases, consent flow, and representative messages.
+
+    ```sh
+    photon account 10dlc campaign use-case list
+    photon account 10dlc campaign create pho_brd_... --campaign-file ./campaign.json
+    ```
+
+    Photon may hold the campaign awaiting brand verification or qualification,
+    then submit it automatically once the brand is eligible.
+  </Step>
+  <Step title="Assign a phone number">
+    Assign a sending number to the approved campaign through the appropriate
+    Photon workflow before you send A2P traffic.
+  </Step>
+</Steps>
+
+`create` and `edit` confirm before reading private input. Registration warns
+that it begins immediately; correction warns that the current profile stays
+active until Photon accepts the replacement. Scripts must pass `--yes`.
+
+## Brand profiles
+
+`create` requires a complete profile. In an interactive terminal with no
+`--profile-file`, it walks you through every required field:
+
+```sh
+photon account 10dlc brand create
+```
+
+<Warning>
+  The wizard keeps your answers out of CLI diagnostics and the operation
+  journal, but your terminal may still echo what you type. Use a private file
+  or a trusted pipe if the terminal is recorded or visible to others.
+</Warning>
+
+Protect registration data at rest, and keep it out of shell arguments,
+environment variables, shell history, and shared temporary directories:
+
+```sh
+umask 077
+$EDITOR ./brand-profile.json
+photon account 10dlc brand create \
+  --profile-file ./brand-profile.json \
+  --yes
+
+# Or have a secret manager write raw JSON straight to stdout.
+secure-profile-source |
+  photon account 10dlc brand create --profile-file - --yes
+```
+
+The CLI accepts up to 16 KiB, rejects unknown fields and control characters,
+normalizes EIN and US state formatting, requires five-digit ZIP codes, and
+allows only HTTP(S) website URLs with no embedded credentials or fragment.
+
+<AccordionGroup>
+  <Accordion title="Organization profile">
+    Every field is required. `entityType` accepts only `private_profit` or
+    `non_profit`.
+
+    ```json
+    {
+      "type": "organization",
+      "entityType": "private_profit",
+      "companyName": "Photon Labs, Inc.",
+      "displayName": "Photon",
+      "ein": "12-3456789",
+      "firstName": "Ada",
+      "lastName": "Lovelace",
+      "email": "registration@example.com",
+      "supportEmail": "support@example.com",
+      "phone": "+14155550123",
+      "website": "https://example.com",
+      "vertical": "technology",
+      "address": {
+        "street": "1 Market Street",
+        "city": "San Francisco",
+        "state": "CA",
+        "postalCode": "94105"
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="Sole-proprietor profile">
+    A reduced schema. The phone must be a US `+1` number that can receive SMS.
+
+    ```json
+    {
+      "type": "sole_proprietor",
+      "displayName": "Ada Consulting",
+      "firstName": "Ada",
+      "lastName": "Lovelace",
+      "email": "ada@example.com",
+      "supportEmail": "support@ada.example",
+      "phone": "+14155550123",
+      "vertical": "professional",
+      "address": {
+        "street": "1 Broadway",
+        "city": "Oakland",
+        "state": "CA",
+        "postalCode": "94612"
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="Supported vertical values">
+    `agriculture`, `communication`, `construction`, `education`, `energy`,
+    `entertainment`, `financial`, `gambling`, `government`, `healthcare`,
+    `hospitality`, `human_resources`, `insurance`, `legal`, `manufacturing`,
+    `ngo`, `political`, `postal`, `professional`, `real_estate`, `retail`,
+    `technology`, `transportation`.
+  </Accordion>
+</AccordionGroup>
+
+## Correct a brand
+
+A normal `edit` is a partial profile. It must carry `type` as the discriminator
+plus at least one editable field:
+
+```json
+{
+  "type": "organization",
+  "displayName": "Photon Messaging",
+  "website": "https://messaging.example.com"
+}
+```
+
+```sh
+photon account 10dlc brand edit pho_brd_... \
+  --profile-file ./brand-patch.json \
+  --yes
+
+# Or walk through the fields; press Enter to keep each current value.
+photon account 10dlc brand edit pho_brd_...
+```
+
+In the guided flow the CLI reads the redacted brand, infers its immutable
+profile type, and prompts for every field that type supports. Current values
+are shown, with phone and EIN redacted to their last four digits. Address
+components are prompted separately, so changing one preserves the others. If
+you leave every prompt blank, nothing is submitted.
+
+`edit --replace` sends a complete profile, so it requires `--profile-file` in
+an interactive terminal — that keeps write-only EIN and phone values explicit
+rather than reconstructed from redacted data.
+
+Brand `type` is immutable either way. Edits return immediately as
+`{"brand": ...}`, and the existing profile stays active until Photon accepts
+the correction.
+
+Privacy policy and terms URLs belong to the campaign, not the brand profile.
+
+## Register a campaign
+
+Before you prepare campaign input, read the
+[CTIA Messaging Principles and Best Practices](https://api.ctia.org/wp-content/uploads/2023/05/230523-CTIA-Messaging-Principles-and-Best-Practices-FINAL.pdf)
+and [The Campaign Registry's campaign guidance](https://developer.campaignregistry.com/cadp/create-a-campaign).
+Describe the real subscriber experience: how consent is obtained, how the
+sender is identified, how HELP and STOP work, where the privacy policy and
+terms live, and what your messages actually look like.
+
+<Note>
+  The CLI validates the structural contract and offers guidance. It does not
+  guarantee approval and does not replace legal or compliance review.
+</Note>
+
+Check the current catalog before choosing use cases:
+
+```sh
+photon account 10dlc campaign use-case list
+```
+
+Supported codes are `2FA`, `ACCOUNT_NOTIFICATION`, `CUSTOMER_CARE`,
+`DELIVERY_NOTIFICATION`, `FRAUD_ALERT`, `HIGHER_EDUCATION`, `MARKETING`,
+`POLLING_VOTING`, `PUBLIC_SERVICE_ANNOUNCEMENT`, and `SECURITY_ALERT`. Select
+1–5 distinct purposes; order does not matter. The catalog response also reports
+the current minimum and maximum selection counts.
+
+<Accordion title="Campaign document">
+  ```json
+  {
+    "name": "Account alerts",
+    "privacyPolicyUrl": "https://example.com/privacy",
+    "termsAndConditionsUrl": "https://example.com/terms",
+    "description": "Example Company sends requested account alerts to its customers.",
+    "messageFlow": "Customers opt in on the Example Company account page. Messages identify Example Company and explain HELP and STOP.",
+    "sampleMessages": [
+      "Example Company: Your requested alert is ready. Reply HELP for help or STOP to opt out.",
+      "Example Company: Review your alert at https://example.com/account. Reply STOP to opt out."
+    ],
+    "useCases": ["ACCOUNT_NOTIFICATION"],
+    "embeddedLinks": true,
+    "embeddedLinkSample": "https://example.com/account",
+    "embeddedPhoneNumbers": false,
+    "subscriberHelp": true,
+    "subscriberOptIn": true,
+    "subscriberOptOut": true,
+    "termsAndConditionsAccepted": true
+  }
+  ```
+
+  At most 64 KiB. `name` is a caller-owned label of 1–64 characters that Photon
+  never submits to the registry. Descriptions are 40–4,096 characters and message flows are 40–2,048
+  characters. Supply 2–5 ordered representative messages of 20–255 characters,
+  with at least one sample per selected use case. Internal newlines are
+  preserved; other control and format characters are rejected. Unknown and
+  legacy registry fields are rejected.
+
+  All four attestations must be explicitly `true`. An embedded link sample must
+  be a safe absolute HTTP(S) URL with no credentials or fragment, and is
+  allowed only when `embeddedLinks` is `true`.
+</Accordion>
+
+```sh
+photon account 10dlc campaign create pho_brd_... \
+  --campaign-file ./campaign.json
+
+secure-campaign-source |
+  photon account 10dlc campaign create pho_brd_... --campaign-file - --yes
+```
+
+The guided wizard asks for 1–5 comma-separated use cases, then collects at
+least two representative messages — raising that minimum to match the number of
+use cases you picked — and offers to collect up to five.
+
+<Warning>
+  The confirmation warns that your selected use cases **cannot be changed after
+  submission** and that an accepted attempt carries a non-refundable fee.
+  Automation needs both `--yes` and the explicit JSON attestations.
+
+  A failed registration charge is terminal — no campaign is created. Fix the
+  [organization payment method](/cli/organizations/billing), then register again with a
+  **fresh** idempotency key. Do not replay the failed one.
+</Warning>
+
+When the API reports billing as pending, the CLI waits for the interval Photon
+specifies and replays the same request with an identical body and idempotency
+key until it gets a full campaign response or you press <kbd>Ctrl-C</kbd>.
+Campaign idempotency keys are 8–128 printable non-whitespace ASCII characters.
+
+### Filter campaigns
+
+```sh
+photon account 10dlc campaign list \
+  --use-case ACCOUNT_NOTIFICATION \
+  --use-case MARKETING
+```
+
+Status filters accept `awaiting_brand_verification`,
+`awaiting_brand_qualification`, `submitting`, `reviewing`, `action_required`,
+`activating`, `ready`, `suspended`, `expired`, and `support_required`. The two
+awaiting states mean Photon will submit automatically once the brand
+prerequisite completes. Returned status strings stay opaque so new server
+states still display.
+
+## Update a campaign
+
+Run `campaign view` first. The response includes `etag`,
+`capabilities.editableFields`, `capabilities.canResubmit`,
+`hasUnsubmittedChanges`, and review feedback.
+Use the returned ETag to protect against overwriting a newer campaign revision.
+
+```sh
+photon account 10dlc campaign view pho_cmp_... --json
+photon account 10dlc campaign edit pho_cmp_... \
+  --etag "<etag-from-view>" --name "Priority account alerts"
+```
+
+Fetch a fresh ETag after every successful edit. For other fields, use an update
+file instead of edit flags. Read the current campaign again and put its ETag
+into `campaign-update.json`:
+
+```sh
+photon account 10dlc campaign view pho_cmp_... --json
+```
+
+The file contains `etag`, `updateMask`, and the fields to replace:
+
+```json
+{
+  "etag": "<etag-from-latest-view>",
+  "privacyPolicyUrl": "https://example.com/privacy",
+  "messageFlow": "Customers opt in on the account page. Messages identify Example Company and explain HELP and STOP.",
+  "updateMask": ["privacyPolicyUrl", "messageFlow"]
+}
+```
+
+```sh
+photon account 10dlc campaign edit pho_cmp_... --update-file ./campaign-update.json
+```
+
+Editable fields also include description, sample messages, opt-in/opt-out/HELP
+messages and keywords, terms URL, and embedded-link and phone-number settings.
+The API determines which fields are editable in the current state. Repeat
+`--sample-message` 2–5 times to replace the full sample set.
+
+How edits take effect depends on the campaign state:
+
+- Name changes are local and allowed in every state.
+- Eligible rejected campaigns save content changes locally until resubmission.
+- Ready campaigns allow asynchronous sample updates; the approved samples stay
+  live until the registry applies the replacement.
+- Other states lock campaign content. Check `capabilities.editableFields`
+  before editing and `capabilities.canResubmit` before resubmitting.
+
+## Resubmit a campaign
+
+Edit the campaign first, then fetch its current ETag. Resubmit only when
+`capabilities.canResubmit` is true. The old `campaign correct` endpoint was
+replaced by separate edit and resubmit operations.
+
+```json
+{
+  "etag": "<etag-after-edit>",
+  "appealReason": "The replacement messages now identify Example Company and explain STOP clearly."
+}
+```
+
+```sh
+photon account 10dlc campaign resubmit pho_cmp_... \
+  --resubmit-file ./campaign-resubmit.json
+```
+
+`etag` is required. `appealReason` is optional and, when supplied, must be
+20–2,000 characters. Resubmission does not accept campaign edits. Automation
+may pipe the same JSON through stdin with `--resubmit-file -`. The CLI confirms
+before resubmission, which may incur another registration fee; scripts pass
+`--yes`.
+
+## Sole-proprietor OTP
+
+```sh
+photon account 10dlc brand otp view pho_brd_...
+photon account 10dlc brand otp send pho_brd_...
+photon account 10dlc brand otp verify pho_brd_...
+photon account 10dlc brand otp verify pho_brd_... --code AB1234
+```
+
+Inspect the redacted OTP status after registering a sole proprietor, then send
+and verify in the order Photon indicates. In an interactive terminal, `verify`
+prompts for the 4–10-character alphanumeric code without echoing it. Without a
+terminal, pass it with `--code`.
+
+<Warning>
+  `--code` exists for automation and convenience, but command arguments can be
+  visible in shell history and process listings. Prefer the hidden prompt on
+  shared systems. There are no `--pin` or `--pin-file` options.
+</Warning>
+
+Raw OTP codes, full phone numbers, EINs, profile contents, and registration
+feedback are excluded from errors, `--debug` diagnostics, and the local
+journal. `brand view` deliberately still shows registration feedback, since
+that is what you need to correct a rejection.
+
+## Output and recovery
+
+JSON uses stable, selected envelopes:
+
+| Command | Envelope |
+| --- | --- |
+| `brand list` | `{"brands": [...], "nextPageToken": "..."}` |
+| `brand view`, `create`, `edit` | `{"brand": {...}}` |
+| `brand otp *` | `{"otp": {...}}` |
+| `campaign list` | `{"campaigns": [...], "nextPageToken": "..."}` |
+| `campaign view` and completed mutations | `{"campaign": {...}}` |
+| `campaign use-case list` | `{"minimumUseCases": 1, "maximumUseCases": 5, "useCases": [...]}` |
+
+IDs are exposed as `brandId` and `campaignId`. Undocumented response fields are
+omitted, and statuses stay opaque strings.
+
+Brand create, brand edit, and OTP verification are **not** journaled, because
+replaying them would require sensitive input. Their idempotency key exists only
+in memory. If an outcome is uncertain, the error includes that key — check the
+current state, then rerun the exact command and private input with the same
+`--idempotency-key`.
+
+OTP send and campaign mutations do use the journal. Campaign records keep the
+normalized input and its digest but never file paths, and descriptions, message
+flows, samples, and appeal text are redacted from `operation view`, errors, and
+diagnostics. That means a replay needs only the operation ID:
+
+```sh
+photon operation view op_...
+photon operation replay op_...
+```
+
+See [Recoverable operations](/cli/operations) for the full model.

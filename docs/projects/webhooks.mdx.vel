@@ -1,0 +1,166 @@
+---
+title: "Webhooks"
+description: "Subscribe HTTPS endpoints to project events and manage signing secrets."
+---
+
+A webhook destination is a project-scoped HTTPS endpoint subscribed to a set of
+event types at a fixed payload API version.
+
+```text
+photon project webhook
+├── list [--limit 30] [--page-token <token>]
+├── view <destination-id>
+├── create --name <name> --url <https-url> --api-version <YYYY-MM-DD>
+│          (--event <type> ... | --all-events)
+│          [--description <text>] [--status <enabled|disabled>]
+│          [--idempotency-key <key>]
+├── edit <destination-id> [--name <name>] [--url <https-url>]
+│       [--description <text> | --clear-description]
+│       [--event <type> ... | --all-events]
+│       [--status <enabled|disabled>] [--idempotency-key <key>]
+├── delete <destination-id> [--yes]
+├── rotate-secret <destination-id> [--overlap-seconds 86400]
+│                 [--idempotency-key <key>] [--yes]
+├── api-version list
+└── event-type list --api-version <YYYY-MM-DD>
+```
+
+## Discover versions and events
+
+Payload API versions are calendar dates. Each version has its own event
+catalog, so list the versions first and then the events for the one you want:
+
+```sh
+photon project webhook api-version list
+photon project webhook event-type list --api-version 2026-07-01
+```
+
+## Create a destination
+
+Repeat `--event` for each type you need, or pass `--all-events` on its own. The
+CLI sorts explicit events and rejects duplicates.
+
+```sh
+photon project webhook create \
+  --name production-messages \
+  --url https://hooks.example.com/photon \
+  --api-version 2026-07-01 \
+  --event message.received
+```
+
+Names are trimmed and limited to 256 characters. Descriptions are limited to
+1,000 characters and are cleared only with `--clear-description`. URLs are
+canonicalized and must use HTTPS, fit in 2,048 characters, and carry no
+credentials or fragment. Photon handles DNS, redirect, and private-network
+checks at delivery time.
+
+Destinations default to `enabled`.
+
+<Warning>
+  `create` returns `signingSecret` exactly once. Store it before the command
+  scrolls away. The secret is flushed to stdout before the local journal record
+  is acknowledged, so if your terminal dies you can recover it with
+  [`photon operation replay`](/cli/operations#replay) — it is never written to
+  the journal itself.
+</Warning>
+
+## Edit and disable
+
+Passing `--event` to `edit` replaces the **complete** subscription rather than
+adding to it.
+
+```sh
+photon project webhook edit pho_whd_... --status disabled
+photon project webhook list --limit 100
+photon project webhook delete pho_whd_... --yes
+```
+
+## Upgrade the API version
+
+The API version is immutable on an existing destination. Run both in parallel
+instead:
+
+<Steps>
+  <Step title="Create a second destination on the new version">
+    Point it at the same or a new endpoint.
+  </Step>
+  <Step title="Accept both payload versions">
+    Your consumer needs to handle both for as long as they run together.
+  </Step>
+  <Step title="Verify the new consumer">
+    Confirm the new version's events are processed correctly.
+  </Step>
+  <Step title="Delete the old destination">
+    ```sh
+    photon project webhook delete pho_whd_old... --yes
+    ```
+  </Step>
+</Steps>
+
+## Rotate the signing secret
+
+Rotation returns a new secret once and keeps the previous one valid for 86,400
+seconds by default:
+
+```sh
+photon project webhook rotate-secret pho_whd_... \
+  --overlap-seconds 86400 \
+  --yes
+```
+
+`--overlap-seconds` accepts `0` through `604800`.
+
+<Warning>
+  `--overlap-seconds 0` invalidates the old secret immediately and will drop
+  deliveries your consumer has not caught up on. Reserve it for emergency
+  rotation after a leak.
+</Warning>
+
+## Verify deliveries
+
+Photon signs deliveries with the
+[Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md)
+format. Verify against the **raw** request body and the `webhook-id`,
+`webhook-timestamp`, and `webhook-signature` headers before you parse the body.
+
+During an overlap window, accept signatures from either configured secret, then
+drop the old one after `previousSecretExpiresAt`.
+
+## JSON output
+
+With `--json`, each command prints the API's response as Photon sends it, with
+every field in it, including a field the API adds after this CLI release:
+
+| Command | JSON |
+| --- | --- |
+| `list` | `{"destinations": [...], "nextPageToken": "..."}` |
+| `view`, `edit`, `delete` | The destination. After `delete`, its `deletedAt` is set. |
+| `create` | `{"destination": {...}, "signingSecret": "whsec_..."}` |
+| `rotate-secret` | `{"previousSecretExpiresAt": "...", "signingSecret": "whsec_..."}` |
+| `api-version list` | `{"apiVersions": [...], "contractNamespace": "...", "packageVersion": "..."}` |
+| `event-type list` | The version's catalog: `{"apiVersion": "...", "events": [...], ...}` |
+
+`list` returns 30 destinations unless you pass `--limit`. `nextPageToken` is
+there only when more destinations remain; pass it to `--page-token` for the
+next page:
+
+```console
+$ photon project webhook list --limit 1 --json
+{"destinations":[{"apiVersion":"2026-07-01","createdAt":"2026-07-31T18:00:00.000Z","deletedAt":null,"description":"Production messages","destinationId":"pho_whd_01h455vb4pex5vsknk084sn02q","enabledEvents":["message.received"],"name":"production-messages","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","status":"enabled","updatedAt":"2026-07-31T18:00:00.000Z","url":"https://hooks.example.com/photon"}],"nextPageToken":"page-2"}
+```
+
+Only `create` and `rotate-secret` print a signing secret, once. Photon's API
+doesn't send it in the response to `list`, `view`, `edit` or `delete`, and
+errors, `--debug` output and the journal never include it.
+
+<Note>
+  The API does not yet offer delivery history, test delivery, or redelivery, so
+  the CLI has no commands for them.
+</Note>
+
+## Catalog metadata
+
+Version discovery reports whether a version is selectable, its successor, and
+retirement guidance, along with the contract namespace and package version.
+Event types include `audience` and `schemaProfile`; `schemaUrl` is a relative API
+path. Resolve it against the same Photon API origin.

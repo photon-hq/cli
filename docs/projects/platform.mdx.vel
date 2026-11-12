@@ -1,0 +1,824 @@
+---
+title: "Platform resources"
+description: "Buy phone numbers, connect email domains and Telegram bots, and configure voice calling."
+---
+
+`photon project platform` manages the resources a project sends and receives on
+— SMS numbers, iMessage lines, email domains, Telegram bots, WhatsApp Business
+numbers, and voice routing.
+
+```text
+photon project platform
+├── list
+├── operation
+│   └── cancel <operation-id> [--yes]
+├── email
+│   ├── list [--limit 30] [--page-token <token>]
+│   ├── connect <domain> [--idempotency-key <key>] [--no-wait] [--no-browser]
+│   ├── dns <operation-id>
+│   └── disconnect <resource-id> [--yes]
+├── sms
+│   ├── list [--limit 30] [--page-token <token>]
+│   ├── purchase [--country US] [--area-code <code>]
+│   │            [--idempotency-key <key>] [--yes]
+│   └── delete <resource-id> [--yes]
+├── telegram
+│   ├── list [--limit 30] [--page-token <token>]
+│   ├── connect [--idempotency-key <key>] [--no-wait] [--no-browser]
+│   ├── view <resource-id>
+│   └── disconnect <resource-id> [--yes]
+├── imessage
+│   ├── view
+│   ├── list [--limit 30] [--page-token <token>]
+│   ├── purchase [--idempotency-key <key>] [--yes]
+│   └── assignment
+│       ├── list [--include-released] [--limit 30] [--page-token]
+│       ├── create --phone-number <E.164> [--email]
+│       │          [--first-name] [--last-name] [--idempotency-key <key>]
+│       ├── view <assignment-id>
+│       └── release <assignment-id> [--yes]
+├── whatsapp-business
+│   ├── account
+│   │   └── list
+│   └── number
+│       ├── list [--limit 30] [--page-token <token>]
+│       ├── view <resource-id>
+│       ├── add [--source <byon|photon>]
+│       │       [--waba-id <id> | --new-waba]
+│       │       [--voip-resource-id <id>] [--display-name <name>]
+│       │       [--idempotency-key <key>] [--no-browser]
+│       └── delete <resource-id> [--yes]
+└── voice
+    ├── list [--limit 30] [--page-token <token>]
+    ├── profile
+    │   ├── list [--default | --additional] [--limit 30] [--page-token]
+    │   ├── view <profile-id|default>
+    │   ├── create (--default | --name <name>)
+    │   │          [--media-encryption <auto|srtp>]
+    │   ├── edit <profile-id|default> [--name <name>]
+    │   │        [--media-encryption <auto|srtp>]
+    │   ├── inbound
+    │   │   ├── set <profile-id|default> --sip-uri <uri>
+    │   │   │       [--sip-username <username> [--sip-password-file <path>]
+    │   │   │        | --clear-sip-credentials] [--yes]
+    │   │   ├── edit <profile-id|default> [--sip-uri <uri>]
+    │   │   │        [--sip-username <username> [--sip-password-file <path>]
+    │   │   │         | --clear-sip-credentials] [--yes]
+    │   │   └── clear <profile-id|default> [--yes]
+    │   ├── outbound
+    │   │   ├── enable <profile-id|default>
+    │   │   │          [--digest-algorithm <sha-256|md5>]
+    │   │   │          [--idempotency-key <key>]
+    │   │   ├── edit <profile-id|default>
+    │   │   │        --digest-algorithm <sha-256|md5> [--yes]
+    │   │   ├── rotate <profile-id|default> [--mode <normal|emergency>]
+    │   │   │          [--idempotency-key <key>] [--yes]
+    │   │   └── revoke <profile-id|default> [--yes]
+    │   └── delete <profile-id> [--unassign-lines] [--yes]
+    └── assignment
+        ├── view <resource-id>
+        ├── set --profile-id <profile-id> --resource-id <id> ... [--yes]
+        └── clear --resource-id <id> ... [--yes]
+```
+
+## List inventory
+
+Each list command asks for a currently enabled ability, so one resource can
+appear in more than one list — a line that does both iMessage and voice shows
+up in both.
+
+```sh
+photon project platform list           # the catalog of available platforms
+photon project platform sms list --limit 100
+photon project platform email list
+photon project platform imessage list
+photon project platform telegram list
+photon project platform voice list --page-token opaque-token
+```
+
+SMS, email, iMessage, and Telegram lists also fetch pending provisioning work
+and show it in a separate section when there is any. Their JSON is Photon's
+page of resources as it sends it, with the operations still setting up a
+resource of that kind under `provisioning`, each as Photon sends it:
+
+```json
+{"resources":[{"resourceId":"pho_res_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"cosmos_line","state":"active","abilities":["imessage","pstn_voice"],"detail":{"imessageHealth":{"account":{"cause":null,"status":"available"},"imessageOnPhoneNumber":{"cause":null,"status":"available"},"mms":{"cause":null,"status":"available"},"newConversations":{"cause":null,"status":"available"},"outboundPhoneCalling":{"cause":null,"status":"available"},"overallStatus":"available","photonSystemComponents":{"cause":null,"status":"available"},"sms":{"cause":null,"status":"available"}},"phoneNumber":"+14155550125","whatsappHealth":{"overallStatus":"available"}},"createdAt":"2026-08-01T18:00:00.000Z","updatedAt":"2026-08-01T18:00:00.000Z"}],"provisioning":[{"operationId":"pho_opr_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"resource.provision","resourceType":"cosmos_line","state":"running","createdAt":"2026-08-01T18:00:00.000Z","startedAt":"2026-08-01T18:00:00.000Z","updatedAt":"2026-08-01T18:00:00.000Z"}],"nextPageToken":"optional-resource-token"}
+```
+
+`nextPageToken` applies to resources only — provisioning operations are
+paginated for you.
+
+Voice lists resources only, and its JSON is Photon's response as it sends it:
+`{"resources": [...], "nextPageToken": "..."}`.
+
+`platform list` prints Photon's catalog of platforms as the API sends it:
+
+```json
+{"platforms":[{"type":"sms","displayName":"SMS","description":"Text messages over a project-owned phone number."}]}
+```
+
+## Buy a number
+
+`sms purchase` provisions one US local SMS number. `--country US` is the default;
+use `--area-code 415` to request a particular area code. `imessage purchase`
+provisions one dedicated iMessage line. Both confirm first unless you pass
+`--yes`:
+
+```sh
+photon project platform sms purchase \
+  --project pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s \
+  --idempotency-key provision-project-123-sms \
+  --yes
+```
+
+<Warning>
+  An idempotency key identifies one logical resource **forever**. Reusing a key
+  resumes that same purchase rather than buying a second number. Use a fresh
+  key when you want another resource.
+</Warning>
+
+The CLI sends the purchase once, then polls the resulting operation until it
+succeeds, fails, or is cancelled. iMessage provisioning can take hours, so
+there is no client-side timeout. Success prints Photon's last operation read,
+with the number or line in `resource`. When that read has no resource yet, the
+CLI reads the operation once more and prints that read:
+
+```json
+{"operation":{"operationId":"pho_opr_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"resource.provision","resourceType":"voip_line","resourceId":"pho_res_...","state":"succeeded","cancellable":false,"createdAt":"2026-08-01T18:00:00.000Z","startedAt":"2026-08-01T18:00:00.000Z","endedAt":"2026-08-01T18:01:00.000Z","updatedAt":"2026-08-01T18:01:00.000Z"},"resource":{"resourceId":"pho_res_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"voip_line","state":"active","abilities":["sms","pstn_voice"],"detail":{"phoneNumber":"+14155550125"},"createdAt":"2026-08-01T18:01:00.000Z","updatedAt":"2026-08-01T18:01:00.000Z"}}
+```
+
+<kbd>Ctrl-C</kbd> stops the local wait only — the purchase keeps running on
+Photon. The journal keeps the remote operation ID, so
+`photon operation replay <local-id>` resumes polling without buying anything
+else. See [Recoverable operations](/cli/operations).
+
+## Release an SMS number
+
+`sms delete` reads the resource to check that it still has SMS ability, then
+releases it with `DELETE /v1/projects/{id}/platforms/resources/{resourceId}`,
+polls the release until it ends, and prints Photon's last operation read:
+
+```sh
+photon project platform sms delete pho_res_... --yes --json
+```
+
+```json
+{"operation":{"operationId":"pho_opr_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"resource.release","resourceType":"voip_line","resourceId":"pho_res_...","state":"succeeded","cancellable":false,"createdAt":"2026-08-01T18:00:00.000Z","startedAt":"2026-08-01T18:00:00.000Z","endedAt":"2026-08-01T18:01:00.000Z","updatedAt":"2026-08-01T18:01:00.000Z"}}
+```
+
+When Photon answers the release as already ended, there's nothing to poll, and
+the command prints that answer under `operation`, as an operation read holds
+it. It's the one place the CLI shapes these documents, so the command keeps
+the operation read's `{operation, resource}` shape on every path. The
+`--no-wait` answers of `email connect` and `telegram connect` print the same
+way.
+
+When [`operation replay`](/cli/operations#replay) gets a 404 from Photon
+because the number is gone, or because the release went through and Photon no
+longer has its operation, the replay's `result` is
+`{"deleted": true, "resourceId": "pho_res_..."}`. When the replay
+has no release operation to read because the number was already retired, its
+`result` is the number as Photon sends it, `{"resource": {...}}`.
+
+There is no dedicated iMessage or voice release command.
+
+## Cancel provisioning in progress
+
+`platform operation cancel` asks Photon to withdraw an in-progress remote
+provision:
+
+```sh
+photon project platform operation cancel pho_opr_... \
+  --project pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s \
+  --yes \
+  --json
+```
+
+Pending email-domain, Telegram bot, and dedicated iMessage provisioning can be
+cancelled; SMS provider orders cannot. Photon returns `OPERATION_NOT_CANCELLABLE` if the
+operation is past the point of no return or finished first. Cancelling here
+does not remove the local journal record.
+
+With `--json` it prints the operation as Photon returns it:
+
+```json
+{"operationId":"pho_opr_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"resource.provision","resourceType":"cosmos_line","state":"cancelled","cancellable":false,"createdAt":"2026-08-01T18:00:00.000Z","startedAt":"2026-08-01T18:00:00.000Z","endedAt":"2026-08-01T18:05:00.000Z","updatedAt":"2026-08-01T18:05:00.000Z"}
+```
+
+## Connect an email domain
+
+`email connect` starts SES and DNS verification. The CLI normalizes case, a
+trailing root dot, and internationalized names before sending, and rejects
+schemes, paths, ports, wildcards, IP addresses, and malformed labels locally:
+
+```sh
+photon project platform email connect bücher.example \
+  --idempotency-key connect-project-123-email
+```
+
+It submits once, then polls until Photon publishes six DNS records and prints
+them straight away. If your DNS provider supports Domain Connect, the CLI also
+prints a signed automatic-setup URL and opens it in a browser — pass
+`--no-browser` to print it without opening. The manual records are always
+printed as a fallback.
+
+The command then keeps waiting until Photon verifies the records, with or
+without `--json`. <kbd>Ctrl-C</kbd> or `--no-wait` stops the local wait
+without cancelling remote verification.
+
+With `--json`, the records and the waiting line go to stderr, and stdout gets
+Photon's last operation read when the command ends,
+`{"operation": {...}, "resource": {...}}`, with the records in
+`operation.detail.dnsRecords` and the email domain in `resource`. Add
+`--no-wait` to get Photon's answer as soon as DNS is prepared: the setup, under
+`operation`, with the six records in `operation.detail.dnsRecords` and
+`automaticSetup` with `applyUrl`, `dnsProviderId`, and `providerDisplayName`
+next to them when Domain Connect is available. When Photon's answer doesn't
+hold the records yet, the CLI reads the operation until it does and prints that
+read, with the `resource` when the read holds it. With or without
+`--json`, the CLI checks the records first and fails with
+`PROJECT_PROTOCOL_ERROR` when they're invalid.
+
+Re-read the published instructions at any time with the remote operation ID —
+this hits Photon directly and needs neither the original idempotency key nor
+the local journal:
+
+```sh
+photon project platform email dns pho_opr_...
+```
+
+With `--json` it prints Photon's response for the operation,
+`{"operation": {...}, "resource": {...}}`. The six records are in
+`operation.detail.dnsRecords`, next to `automaticSetup` and `verification`
+when Photon has them, and `resource` is the email domain once verification
+has finished. With or without `--json`, the CLI checks the records first and
+fails with `PROJECT_PROTOCOL_ERROR` when they're invalid.
+
+Disconnect by resource ID. The command reads the resource to check that it's
+an email domain, releases it with
+`DELETE /v1/projects/{id}/platforms/resources/{resourceId}`, polls the release
+until it ends, and prints Photon's last operation read:
+
+```sh
+photon project platform email disconnect pho_res_... --yes --json
+```
+
+```json
+{"operation":{"operationId":"pho_opr_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"resource.release","resourceType":"email_domain","resourceId":"pho_res_...","state":"succeeded","cancellable":false,"createdAt":"2026-08-01T18:00:00.000Z","startedAt":"2026-08-01T18:00:00.000Z","endedAt":"2026-08-01T18:01:00.000Z","updatedAt":"2026-08-01T18:01:00.000Z"}}
+```
+
+When [`operation replay`](/cli/operations#replay) gets a 404 from Photon
+because the domain is gone, or because the release went through and Photon no
+longer has its operation, the replay's `result` is
+`{"disconnected": true, "resourceId": "pho_res_..."}`.
+
+## Connect a Telegram bot
+
+A project sends and receives on Telegram through a bot that you own. `telegram
+connect` starts a setup and hands it over to Telegram, where you choose one of
+your bots or create a new one and confirm the project:
+
+```sh
+photon project platform telegram connect
+```
+
+The command prints a setup link, shows it as a QR code when it runs in a
+terminal, and opens it in a browser — pass `--no-browser` to print it without
+opening. Open the link on any device that has Telegram; the link stays usable
+until the setup finishes.
+
+`connect` always adds a bot. If the project already has one, the command says
+so and asks before it starts a setup. Without a terminal, pass `--yes`:
+without it the command exits `2` with `CONFIRMATION_REQUIRED` and starts
+nothing. Use `telegram list` to see the bots a project has.
+
+The command then waits until the bot is connected and prints it, with or
+without `--json`. <kbd>Ctrl-C</kbd> or `--no-wait` stops the local wait
+without cancelling the setup. With `--json`, the link and the waiting line go
+to stderr and stdout gets Photon's last operation read when the command ends,
+`{"operation": {...}, "resource": {...}}`, with the bot in `resource`.
+
+With `--no-wait --json`, the command returns as soon as the setup is accepted,
+so automation gets the setup to act on, under `operation`, with the link in
+`operation.detail.setupUrl`: Photon's answer to the request that started it,
+or Photon's read of the setup when the command continues one already in
+progress. It still opens the link unless you pass `--no-browser`:
+
+```json
+{"operation":{"operationId":"pho_opr_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"resource.provision","resourceType":"telegram_bot","state":"pending","cancellable":true,"detail":{"setupUrl":"https://t.me/...?start=..."},"createdAt":"2026-08-01T18:00:00.000Z","updatedAt":"2026-08-01T18:00:00.000Z"}}
+```
+
+The JSON holds the link as Photon sends it. Text shows the link, and the
+command opens it, only after the CLI checks that it's a Telegram setup link.
+
+<Warning>
+  Treat `setupUrl` as a secret. Whoever opens it can connect a bot to the
+  project, so keep it out of logs and shared channels.
+</Warning>
+
+A project has one Telegram setup at a time. If one is already in progress,
+`telegram connect` continues it — it prints the same link again and says
+`Continuing the Telegram bot setup already in progress.` — so running the
+command again is also how you pick a setup back up. The JSON has no `resumed`
+field: no Photon response carries it, and the rule is to print the response as
+sent. `kubectl apply -o json` does the same: it prints the object, and
+`created` or `configured` appears only in text. To start over, cancel the
+setup and connect again:
+
+```sh
+photon project platform operation cancel pho_opr_... --yes
+photon project platform telegram connect
+```
+
+Inspect a connected bot by resource ID. With `--json` it prints the resource
+as Photon sends it. `detail` holds its name, username, and public link, plus
+`connectionIssue` when the connection needs attention — for example after the
+bot changed owner in Telegram:
+
+```sh
+photon project platform telegram view pho_res_... --json
+```
+
+```json
+{"resourceId":"pho_res_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"telegram_bot","state":"active","abilities":["telegram"],"detail":{"displayName":"Alex Support","username":"AlexSupportBot","url":"https://t.me/AlexSupportBot"},"createdAt":"2026-08-01T18:00:00.000Z","updatedAt":"2026-08-01T18:00:00.000Z"}
+```
+
+Disconnect by resource ID. The bot stops sending and receiving through Photon;
+it is not deleted from Telegram and stays yours. The command reads the resource
+to check that it's a Telegram bot, releases it with
+`DELETE /v1/projects/{id}/platforms/resources/{resourceId}`, polls the release
+until it ends, and prints Photon's last operation read:
+
+```sh
+photon project platform telegram disconnect pho_res_... --yes --json
+```
+
+```json
+{"operation":{"operationId":"pho_opr_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"resource.release","resourceType":"telegram_bot","resourceId":"pho_res_...","state":"succeeded","cancellable":false,"createdAt":"2026-08-01T18:00:00.000Z","startedAt":"2026-08-01T18:00:00.000Z","endedAt":"2026-08-01T18:01:00.000Z","updatedAt":"2026-08-01T18:01:00.000Z"}}
+```
+
+When [`operation replay`](/cli/operations#replay) gets a 404 from Photon
+because the bot is gone, or because the release went through and Photon no
+longer has its operation, the replay's `result` is
+`{"disconnected": true, "resourceId": "pho_res_..."}`.
+
+## iMessage shared-line assignments
+
+A dedicated iMessage line can be shared. An **assignment** binds one of your
+users to the line so their messages are attributed to them:
+
+```sh
+photon project platform imessage assignment create \
+  --phone-number +14155550125 \
+  --email ada@example.com \
+  --first-name Ada \
+  --last-name Lovelace \
+  --idempotency-key assign-ada
+
+photon project platform imessage assignment list
+photon project platform imessage assignment view pho_asg_...
+```
+
+`--phone-number` is required and must be E.164. The name and email fields are
+optional and only affect how the user is presented.
+
+`assignment list` shows active assignments. Add `--include-released` to see
+released ones too:
+
+```sh
+photon project platform imessage assignment list --include-released --limit 100
+```
+
+Releasing frees the user's slot on the line and asks for confirmation first:
+
+```sh
+photon project platform imessage assignment release pho_asg_... --yes --json
+```
+
+With `--json`, each command prints Photon's response as the API sends it.
+`assignment list` prints the API's envelope,
+`{"assignments": [...], "nextPageToken": "..."}`, with `nextPageToken` only
+when more assignments remain. `create`, `view` and `release` print the
+assignment itself. Its `handle` is the user's phone number, and after
+`release` its `releasedAt` is set:
+
+```json
+{"assignmentId":"pho_asg_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","platform":"imessage","handle":"+14155550125","assignedPhoneNumber":"+14155550126","email":"ada@example.com","firstName":"Ada","lastName":"Lovelace","createdAt":"2026-08-01T18:00:00.000Z","updatedAt":"2026-08-02T18:00:00.000Z","releasedAt":"2026-08-02T18:00:00.000Z"}
+```
+
+When [`operation replay`](/cli/operations#replay) finds that a release
+already went through, Photon answers 404 and sends no assignment, so the
+replay's `result` is `{"assignmentId": "pho_asg_...", "released": true}`.
+
+`imessage view` shows whether the project's iMessage runs on a shared or a
+dedicated line. With `--json` it prints Photon's settings, such as
+`{"mode": "shared", "maxUserAssignments": 10, "dedicatedLineAvailableNow": true}`.
+
+## WhatsApp Business
+
+Each project has one connected WhatsApp Business account. The `account list`
+command returns zero or one account and includes its capacity, review status,
+restrictions, and alerts. Account pagination is no longer supported.
+
+List the connected account and active senders:
+
+```sh
+photon project platform whatsapp-business account list
+photon project platform whatsapp-business number list
+photon project platform whatsapp-business number view pho_res_...
+```
+
+With `--json`, `account list` prints the account as Photon sends it, in a
+list: `{"accounts": [...]}`. Photon answers with the project's one account,
+or with an error when none is connected, and then the list is empty,
+`{"accounts": []}`, and the command exits `0` with `--json` or without
+it, as `gh pr list --json` prints `[]` and `kubectl get -o json` prints a
+`List` with empty `items`.
+
+`number list` lists active senders only: it asks Photon for them, and its JSON
+is the page Photon sends, so it lists the same senders as the text:
+
+```json
+{"resources":[{"resourceId":"pho_res_01k9yq3m7d2c8x4v6b5n0p1r2t","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"whatsapp_sender","state":"active","abilities":["whatsapp_business"],"detail":{"account":{"wabaId":"123456789012345"},"phoneNumber":"+14155550199","phoneNumberId":"987654321098765","qualityRating":"GREEN","qualityRatingObservedAt":"2026-08-26T20:00:30.000Z","displayName":"Acme Support","displayNameStatus":"APPROVED","voipResourceId":"pho_res_01k9yq3m7d2c8x4v6b5n0p1r2s"},"createdAt":"2026-08-26T20:00:00.000Z","updatedAt":"2026-08-26T20:01:00.000Z"}],"nextPageToken":"optional-resource-token"}
+```
+
+`--limit` counts the senders Photon returns before the CLI leaves out the
+ones that aren't active, so a page can list fewer senders than `--limit`.
+
+### Human onboarding wizard
+
+Run `number add` without `--source` in an interactive terminal. The wizard
+first asks for one simple choice: **Bring Your Own Number** or **Use a Photon
+SMS Number**.
+
+- Bring Your Own Number opens focused dashboard onboarding and stops. Finish
+  Meta Embedded Signup and verification in the browser; the CLI does not wait
+  or refresh inventory.
+- Use a Photon SMS Number lets you select an eligible existing number or buy a
+  new US local SMS number. Purchased numbers remain in the project if you stop
+  onboarding later.
+- The wizard always asks which connected WABA to use, even when there is only
+  one. Selecting a connected WABA provisions directly. Selecting **Connect
+  another WABA with Meta** opens Embedded Signup while the terminal retrieves
+  and displays the SMS OTP.
+
+```sh
+photon project platform whatsapp-business number add \
+  --project pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s
+```
+
+### Automation and agent flows
+
+Automation must pass `--source`; `--json` without it fails instead of opening
+the human wizard.
+
+Bring-your-own-number onboarding is a browser handoff:
+
+```sh
+photon project platform whatsapp-business number add \
+  --project pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s \
+  --source byon \
+  --json
+```
+
+The command attempts to open the dashboard and prints a guide for the person
+who finishes setup: the dashboard URL and the numbered steps. Without `--json`
+the guide is the command's output, on stdout. With `--json` the guide goes to
+stderr as text, and stdout holds one `handoff` object with the dashboard URL,
+which an agent can pass to that person. No Photon response describes a browser
+handoff, so `handoff` is the CLI's own document. Embedded Signup requires human browser
+interaction, and the dashboard owns verification and final connection. Use
+`--no-browser` when an agent cannot launch a browser; the same guide is
+printed, and the object has `browserAttempted: false`.
+
+```json
+{"handoff":{"kind":"whatsapp-embedded-signup","source":"byon","requiresHumanInteraction":true,"browserAttempted":true,"opened":true,"projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","url":"https://app.beta.photon.codes/pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s/platforms/whatsapp-business?onboarding=cli&source=byon"}}
+```
+
+Connect an eligible Photon SMS number directly to an already-connected WABA:
+
+```sh
+photon project platform whatsapp-business number add \
+  --project pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s \
+  --source photon \
+  --waba-id 123456789012345 \
+  --voip-resource-id pho_res_01k9yq3m7d2c8x4v6b5n0p1r2s \
+  --display-name "Acme Support" \
+  --idempotency-key customer-123-photon-wa-1 \
+  --json
+```
+
+Photon owns the SMS-code request, verification, and Meta registration for this
+direct API path. The CLI records the accepted operation and polls it to a
+terminal result, so interrupted work can be resumed with `photon operation
+replay <local-operation-id>`. Success prints Photon's last operation read,
+with the sender in `resource`, as `sms purchase` does:
+
+```json
+{"operation":{"operationId":"pho_opr_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"resource.provision","resourceType":"whatsapp_sender","resourceId":"pho_res_01k9yq3m7d2c8x4v6b5n0p1r2t","state":"succeeded","cancellable":false,"createdAt":"2026-08-26T20:00:00.000Z","startedAt":"2026-08-26T20:00:00.000Z","endedAt":"2026-08-26T20:01:00.000Z","updatedAt":"2026-08-26T20:01:00.000Z"},"resource":{"resourceId":"pho_res_01k9yq3m7d2c8x4v6b5n0p1r2t","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"whatsapp_sender","state":"active","abilities":["whatsapp_business"],"detail":{"account":{"wabaId":"123456789012345"},"phoneNumber":"+14155550199","phoneNumberId":"987654321098765","qualityRating":"GREEN","qualityRatingObservedAt":"2026-08-26T20:00:30.000Z","displayName":"Acme Support","displayNameStatus":"APPROVED","voipResourceId":"pho_res_01k9yq3m7d2c8x4v6b5n0p1r2s"},"createdAt":"2026-08-26T20:00:00.000Z","updatedAt":"2026-08-26T20:01:00.000Z"}}
+```
+
+To use that Photon number with a new or different WABA, hand it to the
+dashboard instead:
+
+```sh
+photon project platform whatsapp-business number add \
+  --project pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s \
+  --source photon \
+  --new-waba \
+  --voip-resource-id pho_res_01k9yq3m7d2c8x4v6b5n0p1r2s \
+  --json
+```
+
+This command validates that the number is active, SMS-capable, belongs to the
+project, and is not already linked. It then opens the dashboard and exits. The
+dashboard owns both Embedded Signup and OTP display; use the dashboard or rerun
+the interactive CLI if you need guided OTP handling. No provisioning mutation
+or local operation record is created by this handoff. The `handoff` object
+holds the SMS number as Photon sends it in `resource`, as the CLI's own
+documents hold API objects whole (`billing overview`, `link` and
+`payment-method setup` do too):
+
+```json
+{"handoff":{"kind":"whatsapp-embedded-signup","source":"photon","requiresHumanInteraction":true,"browserAttempted":true,"opened":true,"projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","resource":{"resourceId":"pho_res_01k9yq3m7d2c8x4v6b5n0p1r2s","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"voip_line","state":"active","abilities":["sms","pstn_voice"],"detail":{"phoneNumber":"+14155550199"},"createdAt":"2026-08-26T20:00:00.000Z","updatedAt":"2026-08-26T20:00:00.000Z"},"url":"https://app.beta.photon.codes/pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s/platforms/whatsapp-business?onboarding=cli&source=photon&voipResourceId=pho_res_01k9yq3m7d2c8x4v6b5n0p1r2s&verification=dashboard","verificationOwner":"dashboard"}}
+```
+
+`--new-waba` and `--waba-id` are mutually exclusive. Photon source always
+requires `--voip-resource-id`. BYON rejects WABA, Photon-resource,
+display-name, and idempotency flags. `--no-browser` applies only to browser
+handoffs.
+
+### WhatsApp sender JSON
+
+`number view` prints the sender as Photon sends it, a retired one too. Text
+shows `phoneNumber` in E.164 form, and JSON as Photon sends it:
+
+```json
+{"resourceId":"pho_res_01k9yq3m7d2c8x4v6b5n0p1r2t","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"whatsapp_sender","state":"active","abilities":["whatsapp_business"],"detail":{"account":{"wabaId":"123456789012345"},"phoneNumber":"+14155550199","phoneNumberId":"987654321098765","qualityRating":"GREEN","qualityRatingObservedAt":"2026-08-26T20:00:30.000Z","displayName":"Acme Support","displayNameStatus":"APPROVED","voipResourceId":"pho_res_01k9yq3m7d2c8x4v6b5n0p1r2s"},"createdAt":"2026-08-26T20:00:00.000Z","updatedAt":"2026-08-26T20:01:00.000Z"}
+```
+
+`number list` displays phone number, display name, name status, quality,
+Photon source, and resource ID. Deletion confirms against
+`phoneNumber`:
+
+```sh
+photon project platform whatsapp-business number delete pho_res_... --yes --json
+```
+
+`number delete` reads the sender to check that it's an active WhatsApp
+Business sender, then releases it with
+`DELETE /v1/projects/{id}/platforms/resources/{resourceId}`, polls the release
+until it ends, and prints Photon's last operation read, with `operation.detail`
+as Photon sends it:
+
+```json
+{"operation":{"operationId":"pho_opr_...","projectId":"pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s","type":"resource.release","resourceType":"whatsapp_sender","resourceId":"pho_res_01k9yq3m7d2c8x4v6b5n0p1r2t","state":"succeeded","cancellable":false,"createdAt":"2026-08-26T20:00:00.000Z","startedAt":"2026-08-26T20:00:00.000Z","endedAt":"2026-08-26T20:01:00.000Z","updatedAt":"2026-08-26T20:01:00.000Z"}}
+```
+
+When Photon answers the release as already ended, the command prints that
+answer under `operation`, as [`sms delete`](#release-an-sms-number) does.
+When [`operation replay`](/cli/operations#replay) gets a 404 from Photon
+because the sender is gone, or because the release went through and Photon no
+longer has its operation, the replay's `result` is
+`{"deleted": true, "resourceId": "pho_res_..."}`. When the replay has no
+release operation to read because the sender was already retired, its
+`result` is the sender as Photon sends it, `{"resource": {...}}`.
+
+## Voice routing profiles
+
+Voice inventory and voice routing answer different questions. `voice list`
+shows resources with an active `pstn_voice` ability. A **profile** describes
+where Photon should send an inbound call once that check passes.
+
+```sh
+photon project platform voice profile create \
+  --default \
+  --project pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s
+
+photon project platform voice profile inbound set default \
+  --sip-uri 'sips:agent@customer.example:5061' \
+  --yes \
+  --project pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s
+
+photon project platform voice profile view default --project pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s
+```
+
+A project has one default profile and any number of additional profiles. Use
+the literal `default` with `profile view`, `profile edit`, or any inbound or
+outbound command.
+The CLI uses `/profiles/default` to read that profile, then sends directional
+changes through `/profiles/{profileId}` with the stable ID returned by the
+read. The default cannot be renamed, deleted, or reassigned, and it must exist
+before you can create an additional profile.
+
+A line with no override follows the project default. Assigning an additional
+profile creates an override; clearing it returns the line to the current
+default. `profile edit` can rename an additional profile and change media
+encryption on either an additional or the default profile. Inbound and
+outbound delivery have dedicated commands beneath the profile. Editing requires
+at least one of `--name` or `--media-encryption`; the default cannot be renamed.
+
+```sh
+photon project platform voice profile edit default --media-encryption srtp
+```
+
+### SIP routes
+
+A profile can carry one inbound SIP destination. The scheme picks the
+transport: bare `sip:` normalizes to UDP, `;transport=tcp` selects TCP,
+`;transport=udp` selects UDP, and `sips:` selects TLS. Photon owns the
+authoritative SIP syntax and public-host validation, so there are no separate
+transport options. Use `--media-encryption auto` or `--media-encryption srtp`
+on profile creation or editing; `srtp` requires encrypted media.
+
+Default creation needs only `--default`; Photon assigns the immutable name
+`Default Profile`. Additional profile creation requires `--name`. Both create
+direction-neutral profiles, so configure delivery afterward. Use
+`inbound set` to create or fully replace the destination, `inbound edit` to
+change selected fields, and `inbound clear` to disable inbound delivery:
+
+```sh
+photon project platform voice profile inbound set default \
+  --sip-uri 'sips:agent@customer.example:5061' \
+  --yes
+
+photon project platform voice profile inbound edit pho_vpf_... \
+  --sip-uri 'sip:agent@customer.example:5061;transport=tcp' \
+  --yes
+
+photon project platform voice profile inbound clear pho_vpf_... --yes
+```
+
+Every command reads the current profile first and sends its latest version.
+Route changes on a profile with assigned lines require confirmation because
+they take effect for those lines immediately.
+
+### Endpoint credentials
+
+Credentials are replaced as an atomic username and password pair. **Passwords
+are never accepted as command-line options.** With `--sip-username` and no
+`--sip-password-file`, an interactive terminal prompts with hidden input.
+Without a terminal, pass `--sip-password-file`, or `--sip-password-file -` to
+read the exact password from stdin.
+
+A password file is read exactly as written — spaces and trailing newlines are
+significant — so create it deliberately:
+
+```sh
+printf %s 'private-password' > /secure/path/sip-password
+photon project platform voice profile inbound edit pho_vpf_... \
+  --sip-username agent-user \
+  --sip-password-file /secure/path/sip-password \
+  --yes
+```
+
+Photon's responses carry the username, not the password.
+Passwords, SIP destinations, and profile bodies are redacted from `--debug`
+output and never written to the local journal. Omitting credential flags
+preserves the existing write-only secret, `--clear-sip-credentials` clears both
+fields, and `--sip-username` replaces the username and password together. The
+CLI never sends a masked password from a previous response back to Photon.
+
+### Outbound credentials
+
+Outbound calling supports credential lifecycle commands and password-preserving
+authentication edits:
+
+```sh
+photon project platform voice profile outbound enable default \
+  --digest-algorithm sha-256 \
+  --idempotency-key enable-default-outbound-1
+
+photon project platform voice profile outbound edit default \
+  --digest-algorithm md5
+
+photon project platform voice profile outbound rotate default \
+  --mode normal \
+  --idempotency-key rotate-default-outbound-1 \
+  --yes
+
+photon project platform voice profile outbound revoke default --yes
+```
+
+`outbound enable` creates the first credential for a profile with no active
+outbound credential. It defaults to SHA-256 and always sends that explicit
+choice to Photon. Select `--digest-algorithm md5` only for weaker legacy
+compatibility. Photon supports MD5 over the UDP, TCP, and TLS transports
+returned in the outbound endpoint list. Enable output reports the active
+algorithm and each endpoint's transport, host, and port so the SIP client can
+use the connection guidance returned by Photon.
+
+`outbound edit` changes the active Digest algorithm while preserving the
+username and password, including existing validity and rotation grace metadata.
+Use it to switch algorithms on an enabled profile. MD5 is the weaker legacy
+option; select it only for compatibility. Selecting SHA-256 can stop a PBX that
+does not support it from authenticating. The command asks for confirmation;
+use `--yes` to skip the prompt in automation.
+
+The CLI resolves `default` to its stable profile ID and sends the current
+profile's top-level `version` as `expectedVersion`. Even a same-value edit goes
+to Photon so the server can validate that version and return its authoritative
+result. A stale version produces `VOICE_PROFILE_VERSION_CONFLICT`: read the
+current profile and retry. `VOICE_OUTBOUND_OPERATION_PENDING` instead means
+credential setup or rotation must finish first. Resume the original enable or
+rotate request with its original idempotency key, or replay its recovery
+record; after it completes, read the current profile and retry the edit.
+
+Edit output contains the returned `outbound` connection and authentication
+metadata and `profileVersion`, with no password or display-once secret warning.
+Algorithm edits require no idempotency key, operation journal entry, or secret
+acknowledgement.
+
+`outbound rotate` replaces an existing credential while preserving the
+active Digest algorithm, so rotation intentionally has no algorithm flag;
+`normal` keeps the previous credential valid for one hour, while `emergency`
+removes that grace period. `outbound revoke` disables outbound calling. It does
+not delete the profile, inbound route, or line assignments.
+
+Enable and rotation output `password` at most once. Save it from stdout
+immediately: the CLI never persists it or writes it to debug output. Before the
+request, the CLI privately journals the exact profile reference, selected
+enablement digest algorithm, rotation mode, and `expectedVersion`. If the
+result is unresolved, rerunning the command with the same supplied idempotency
+key or using `operation replay` resends that exact body without rereading the
+now-mutated profile. An idempotent replay returns
+`password: null`; the mutation succeeded, but the display-once password cannot
+be reproduced.
+
+After successful output is flushed, the recovery record is removed. Do not
+rerun an already-confirmed success with its old key; deliberately rotate with
+the returned `profileVersion` and a new idempotency key to issue another
+password. An omitted idempotency key is generated for the current invocation.
+A supplied key must identify only that same unresolved enable or rotation
+action. The CLI also retries one transport interruption within an invocation
+with the same key and unchanged request body.
+
+### Assignments
+
+```sh
+photon project platform voice assignment set \
+  --profile-id pho_vpf_... \
+  --resource-id pho_res_first... \
+  --resource-id pho_res_second... \
+  --yes
+
+photon project platform voice assignment clear \
+  --resource-id pho_res_first... \
+  --yes
+```
+
+The CLI reads each current assignment before changing it and sends its version,
+so a concurrent change surfaces as a conflict rather than a silent overwrite —
+view the assignment and repeat the command. One changed line uses the
+single-line endpoint; 2 to 100 use the atomic batch endpoint. Duplicate IDs and
+batches over 100 are rejected locally, and already-correct lines are no-ops.
+Assignment output shows `default` when there is no override.
+
+Each change goes to the `--resource-id` given. If Photon answers the read of a
+line with another line's assignment, the command fails with
+`VOICE_PROTOCOL_ERROR` and changes nothing. If Photon's answer to a change
+leaves out a line it changed, the command fails with `VOICE_PROTOCOL_ERROR` and
+names the line, because the change may have been made: check it with
+`assignment view`.
+
+Inbound changes on a profile with assigned lines, outbound algorithm edits,
+rotation or revocation, assignment changes, and profile deletion all require
+confirmation.
+`--yes` skips only that prompt. Deleting an assigned profile additionally
+needs `--unassign-lines`, which asks Photon to atomically clear the overrides,
+return those lines to the default, and delete the profile.
+
+### JSON envelopes
+
+Every Voice command except `profile delete`, `assignment set` and
+`assignment clear` prints Photon's response as it sends it, and a field Photon
+adds shows up in the JSON. The commands that read the profile for its version
+first print the response to the change. Photon answers `profile delete` with no
+body, so it names the profile it deleted. `assignment set` and `clear` change
+one line or several, so they list one assignment for each `--resource-id`, in
+that order. For a line the command changed, it's the assignment Photon returned
+for the change, or, after a `clear` that changes one line, which Photon answers
+with no body, the line as read after the change. A line that already uses the
+profile (for `clear`, one that's already unassigned) isn't changed, and shows
+as read before the change.
+
+| Command | JSON |
+| --- | --- |
+| `profile create`, `view`, `edit` | The profile: `{"profileId": "...", "name": "...", "configuration": {...}, "version": 2, ...}` |
+| `profile list` | `{"profiles": [...], "nextPageToken": "..."}` |
+| `profile inbound set`, `edit`, `clear` | `{"inbound": ... or null, "profileVersion": 2}` |
+| `profile outbound enable` | `{"outbound": {...}, "password": "..." or null, "profileVersion": 3}` |
+| `profile outbound edit` | `{"outbound": {...}, "profileVersion": 4}` |
+| `profile outbound rotate` | `{"password": "..." or null, "previousPasswordValidUntil": "..." or null, "profileVersion": 4}` |
+| `profile outbound revoke` | `{"outbound": null, "profileVersion": 5}` |
+| `profile delete` | `{"deleted": true, "profileId": "...", "returnedToDefaultLineCount": 0}` |
+| `assignment view` | The assignment: `{"resourceId": "...", "profileId": "...", "resourceVersion": 3, ...}` |
+| `assignment set`, `clear` | `{"assignments": [...]}` |
+
+`profile list` accepts mutually exclusive `--default` and `--additional`
+filters.
+
+<Note>
+  The active `pstn_voice` ability remains the source of truth for admission.
+  Saving or assigning a profile does not by itself grant voice access.
+</Note>

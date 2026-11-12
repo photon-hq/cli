@@ -1,0 +1,1059 @@
+$ photon --help
+USAGE:
+  photon <COMMAND> [OPTIONS]
+
+COMMANDS:
+  account            Inspect and manage the Photon account
+  auth               Inspect and manage Photon authentication
+  complete           Generate shell completion script
+  link               Save a project for this folder in .photon/project.json
+  login              Log in with a device code or account service key
+  logout             Remove the local Photon session
+  operation          Inspect and recover local operations
+  org                Manage Photon organizations
+  project            Manage Photon projects
+  unlink             Remove the nearest .photon/project.json
+  update             Update the Photon CLI to the newest version
+  whoami             Show the canonical authenticated Photon account
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon account --help
+Inspect and manage the Photon account
+
+USAGE:
+  photon account <COMMAND> [OPTIONS]
+
+COMMANDS:
+  avatar               Manage the account avatar
+  edit                 Edit the authenticated Photon account
+  oauth                Inspect OAuth scopes and connected applications
+  service-key          Manage account service keys
+  view                 View the authenticated Photon account
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon account avatar --help
+Manage the account avatar
+
+USAGE:
+  photon account avatar <COMMAND> [OPTIONS]
+
+COMMANDS:
+  reset           Reset the account avatar
+  upload          Upload a new account avatar
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon account oauth --help
+Inspect OAuth scopes and connected applications
+
+USAGE:
+  photon account oauth <COMMAND> [OPTIONS]
+
+COMMANDS:
+  connection          Manage applications connected to this account
+  scope               Inspect OAuth scopes advertised by Photon
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon account oauth connection --help
+Manage applications connected to this account
+
+USAGE:
+  photon account oauth connection <COMMAND> [OPTIONS]
+
+COMMANDS:
+  list            List OAuth applications connected to this account
+  revoke          Revoke a connected OAuth application
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon account oauth scope --help
+Inspect OAuth scopes advertised by Photon
+
+USAGE:
+  photon account oauth scope <COMMAND> [OPTIONS]
+
+COMMANDS:
+  list          List scopes advertised by the OAuth authorization server
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon account service-key --help
+Manage account service keys
+
+USAGE:
+  photon account service-key <COMMAND> [OPTIONS]
+
+COMMANDS:
+  create          Create an account service key
+  list            List unrevoked account service keys
+  revoke          Revoke an account service key
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon auth --help
+Inspect and manage Photon authentication
+
+USAGE:
+  photon auth <COMMAND> [OPTIONS]
+
+COMMANDS:
+  status          Verify local storage and the remote Photon session
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon operation --help
+Inspect and recover local operations
+
+USAGE:
+  photon operation <COMMAND> [OPTIONS]
+
+COMMANDS:
+  list            List unresolved local operations
+  remove          Remove a local operation record
+  replay          Safely replay an unresolved operation
+  view            Inspect a local operation
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon org --help
+Manage Photon organizations
+
+USAGE:
+  photon org <COMMAND> [OPTIONS]
+
+COMMANDS:
+  billing               Inspect and manage organization billing
+  clear                 Clear the stored active organization
+  invitation            Manage organization invitations
+  leave                 Leave the current organization (beta)
+  list                  List your organizations (beta)
+  member                Manage organization members
+  oauth-client          Manage organization OAuth clients
+  show                  Show the current organization and how it was selected (beta)
+  use                   Validate and store an active organization (beta)
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon org billing --help
+Inspect and manage organization billing
+
+USAGE:
+  photon org billing <COMMAND> [OPTIONS]
+
+COMMANDS:
+  payment-method          Inspect and configure the organization payment method
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon org billing payment-method --help
+Inspect and configure the organization payment method
+
+USAGE:
+  photon org billing payment-method <COMMAND> [OPTIONS]
+
+COMMANDS:
+  setup           Open hosted payment setup
+  status          Check whether a payment card is on file
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon org invitation --help
+Manage organization invitations
+
+USAGE:
+  photon org invitation <COMMAND> [OPTIONS]
+
+COMMANDS:
+  accept           Accept an invitation token from a file, or from stdin with - (beta)
+  list             List organization invitations (beta)
+  preview          Preview an invitation token from a file, or from stdin with - (beta)
+  revoke           Revoke an organization invitation (beta)
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon org member --help
+Manage organization members
+
+USAGE:
+  photon org member <COMMAND> [OPTIONS]
+
+COMMANDS:
+  edit            Change an organization member role (beta)
+  invite          Invite a member to the current organization (beta)
+  list            List organization members (beta)
+  remove          Remove an organization member (beta)
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon org oauth-client --help
+Manage organization OAuth clients
+
+USAGE:
+  photon org oauth-client <COMMAND> [OPTIONS]
+
+COMMANDS:
+  authorize          Open an OAuth authorization request for a client (beta)
+  create             Create an OAuth client
+  delete             Delete an OAuth client
+  list               List organization OAuth clients (beta)
+  secret             Manage the OAuth client secret
+  update             Update an OAuth client (beta)
+  view               View an OAuth client (beta)
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon org oauth-client secret --help
+Manage the OAuth client secret
+
+USAGE:
+  photon org oauth-client secret <COMMAND> [OPTIONS]
+
+COMMANDS:
+  create          Create the OAuth client's first secret
+  revoke          Revoke the OAuth client's secret
+  rotate          Replace the OAuth client's secret with a new one
+  view            View the OAuth client's secret metadata
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project --help
+Manage Photon projects
+
+USAGE:
+  photon project <COMMAND> [OPTIONS]
+
+COMMANDS:
+  agent-profile          Manage the current project agent profile
+  api-key                Manage project API keys
+  billing                Inspect and manage project billing
+  count                  Count projects in the current organization
+  create                 Create a project in the current organization
+  current                Show the effective project and selection source
+  delete                 Delete a project
+  edit                   Edit the current project
+  list                   List projects in the current organization
+  platform               Inspect and manage project platforms
+  view                   View the current project
+  webhook                Manage project webhook destinations
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project agent-profile --help
+Manage the current project agent profile
+
+USAGE:
+  photon project agent-profile <COMMAND> [OPTIONS]
+
+COMMANDS:
+  avatar          Manage the current project agent avatar
+  edit            Edit the current project agent profile
+  view            View the current project agent profile
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project agent-profile avatar --help
+Manage the current project agent avatar
+
+USAGE:
+  photon project agent-profile avatar <COMMAND> [OPTIONS]
+
+COMMANDS:
+  reset           Reset the agent avatar
+  upload          Upload a new agent avatar
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project api-key --help
+Manage project API keys
+
+USAGE:
+  photon project api-key <COMMAND> [OPTIONS]
+
+COMMANDS:
+  create          Create a project API key
+  list            List live project API keys
+  revoke          Revoke a project API key
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project billing --help
+Inspect and manage project billing
+
+USAGE:
+  photon project billing <COMMAND> [OPTIONS]
+
+COMMANDS:
+  invoice               Inspect invoices for the project's organization
+  operation             Inspect billing operations
+  overview              View subscriptions, entitlements, and usage
+  plan                  Manage project plans
+  subscription          Manage project subscriptions
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project billing invoice --help
+Inspect invoices for the project's organization
+
+USAGE:
+  photon project billing invoice <COMMAND> [OPTIONS]
+
+COMMANDS:
+  list          List invoices for the project's organization
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project billing operation --help
+Inspect billing operations
+
+USAGE:
+  photon project billing operation <COMMAND> [OPTIONS]
+
+COMMANDS:
+  view          View a billing operation
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project billing plan --help
+Manage project plans
+
+USAGE:
+  photon project billing plan <COMMAND> [OPTIONS]
+
+COMMANDS:
+  purchase          Purchase a project plan
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project billing subscription --help
+Manage project subscriptions
+
+USAGE:
+  photon project billing subscription <COMMAND> [OPTIONS]
+
+COMMANDS:
+  cancel          Move to the category's default plan at the end of the billing period
+  resume          Keep the current plan, dropping a change scheduled for the period end
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform --help
+Inspect and manage project platforms
+
+USAGE:
+  photon project platform <COMMAND> [OPTIONS]
+
+COMMANDS:
+  email                      Inspect and manage project email domains
+  imessage                   Inspect and manage project iMessage
+  list                       List platforms available to the project
+  operation                  Manage remote platform operations
+  sms                        Inspect and manage project SMS resources
+  telegram                   Inspect and manage project Telegram bots
+  voice                      Inspect and manage project PSTN voice
+  whatsapp-business          Inspect and manage WhatsApp Business
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform email --help
+Inspect and manage project email domains
+
+USAGE:
+  photon project platform email <COMMAND> [OPTIONS]
+
+COMMANDS:
+  connect             Connect and verify a project email domain
+  disconnect          Disconnect a project email domain
+  dns                 Show DNS records for an email-domain operation
+  list                List project email domains and provisioning
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform imessage --help
+Inspect and manage project iMessage
+
+USAGE:
+  photon project platform imessage <COMMAND> [OPTIONS]
+
+COMMANDS:
+  assignment          Manage iMessage shared-line assignments
+  list                List project iMessage resources and provisioning
+  purchase            Purchase a dedicated iMessage line
+  view                View project iMessage configuration
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform imessage assignment --help
+Manage iMessage shared-line assignments
+
+USAGE:
+  photon project platform imessage assignment <COMMAND> [OPTIONS]
+
+COMMANDS:
+  create           Create a shared-line assignment
+  list             List shared-line assignments
+  release          Release a shared-line assignment
+  view             View a shared-line assignment
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform operation --help
+Manage remote platform operations
+
+USAGE:
+  photon project platform operation <COMMAND> [OPTIONS]
+
+COMMANDS:
+  cancel          Cancel an in-progress platform operation
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform sms --help
+Inspect and manage project SMS resources
+
+USAGE:
+  photon project platform sms <COMMAND> [OPTIONS]
+
+COMMANDS:
+  delete            Delete and release a project SMS number
+  list              List project SMS resources and provisioning
+  purchase          Purchase a US local SMS number
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform telegram --help
+Inspect and manage project Telegram bots
+
+USAGE:
+  photon project platform telegram <COMMAND> [OPTIONS]
+
+COMMANDS:
+  connect             Connect a Telegram bot to the project
+  disconnect          Disconnect a Telegram bot from the project
+  list                List project Telegram bots and setups in progress
+  view                View a project Telegram bot
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform voice --help
+Inspect and manage project PSTN voice
+
+USAGE:
+  photon project platform voice <COMMAND> [OPTIONS]
+
+COMMANDS:
+  assignment          Manage line Voice profile assignments
+  list                List project PSTN voice resources
+  profile             Manage reusable Voice routing profiles
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform voice assignment --help
+Manage line Voice profile assignments
+
+USAGE:
+  photon project platform voice assignment <COMMAND> [OPTIONS]
+
+COMMANDS:
+  clear          Unassign Voice profiles from one or more lines
+  set            Assign one Voice profile to one or more lines
+  view           View a line Voice profile assignment
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform voice profile --help
+Manage reusable Voice routing profiles
+
+USAGE:
+  photon project platform voice profile <COMMAND> [OPTIONS]
+
+COMMANDS:
+  create            Create a reusable Voice routing profile
+  delete            Delete a Voice routing profile
+  edit              Edit Voice profile metadata
+  inbound           Manage inbound SIP delivery
+  list              List project Voice profiles
+  outbound          Manage outbound SIP authentication and credentials
+  view              View a Voice profile
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform voice profile inbound --help
+Manage inbound SIP delivery
+
+USAGE:
+  photon project platform voice profile inbound <COMMAND> [OPTIONS]
+
+COMMANDS:
+  clear          Disable inbound SIP delivery
+  edit           Update selected inbound SIP fields
+  set            Create or replace inbound SIP delivery
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform voice profile outbound --help
+Manage outbound SIP authentication and credentials
+
+USAGE:
+  photon project platform voice profile outbound <COMMAND> [OPTIONS]
+
+COMMANDS:
+  edit            Change the outbound Digest algorithm, preserving username and password
+  enable          Enable outbound calling and create its first credential
+  revoke          Revoke outbound calling
+  rotate          Rotate an existing outbound credential
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform whatsapp-business --help
+Inspect and manage WhatsApp Business
+
+USAGE:
+  photon project platform whatsapp-business <COMMAND> [OPTIONS]
+
+COMMANDS:
+  account          Inspect connected WhatsApp Business accounts
+  number           Inspect and manage WhatsApp Business phone numbers
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform whatsapp-business account --help
+Inspect connected WhatsApp Business accounts
+
+USAGE:
+  photon project platform whatsapp-business account <COMMAND> [OPTIONS]
+
+COMMANDS:
+  list          List connected WhatsApp Business accounts
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project platform whatsapp-business number --help
+Inspect and manage WhatsApp Business phone numbers
+
+USAGE:
+  photon project platform whatsapp-business number <COMMAND> [OPTIONS]
+
+COMMANDS:
+  add             Add a BYON or Photon WhatsApp Business phone number
+  delete          Delete and release a WhatsApp Business phone number
+  list            List active WhatsApp Business phone numbers
+  view            View a WhatsApp Business phone number
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project webhook --help
+Manage project webhook destinations
+
+USAGE:
+  photon project webhook <COMMAND> [OPTIONS]
+
+COMMANDS:
+  api-version            Inspect webhook payload API versions
+  create                 Create a webhook destination
+  delete                 Delete a webhook destination
+  edit                   Edit a webhook destination
+  event-type             Inspect webhook event types
+  list                   List webhook destinations
+  rotate-secret          Rotate a webhook signing secret
+  view                   View a webhook destination
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project webhook api-version --help
+Inspect webhook payload API versions
+
+USAGE:
+  photon project webhook api-version <COMMAND> [OPTIONS]
+
+COMMANDS:
+  list          List webhook payload API versions
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+
+$ photon project webhook event-type --help
+Inspect webhook event types
+
+USAGE:
+  photon project webhook event-type <COMMAND> [OPTIONS]
+
+COMMANDS:
+  list          List webhook event types for an API version
+
+OPTIONS:
+  -h, --help                   Display this help message
+  -v, --version                Display this version
+  --color                      Use color in terminal output (default: true)
+  --no-color                   Negatable of --color
+  --debug                      Include sanitized HTTP and error diagnostics (default: false)
+  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --no-input                   Never ask a question; fail and name the flag instead (default: false)
+  --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
+  --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
+
+Agents and scripts: add --json to any photon command for output a program can read.
+

@@ -1,0 +1,196 @@
+---
+title: "Authentication"
+description: "Sign in to the Photon CLI with a device code and manage your stored session."
+---
+
+Photon CLI signs you in with the OAuth 2.0 device authorization grant
+([RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)). You approve the
+login in a browser, and the CLI stores the resulting tokens in your operating
+system's credential manager.
+
+```sh
+photon login
+photon whoami
+photon auth status
+photon logout
+```
+
+Where no one can approve a sign-in, as in CI, put a Photon key in
+`PHOTON_API_TOKEN` instead. See
+[which credential to use](#which-credential-to-use).
+
+## Which credential to use
+
+| Who or what calls Photon | Use |
+| --- | --- |
+| You, on your own machine | `photon login` |
+| An agent working for you, such as a coding agent | `photon login`. The agent passes the printed link and code to you, and you approve the sign-in in your browser. |
+| CI, a scheduled job, or anywhere else no one can approve a sign-in | A service identity API key in `PHOTON_API_TOKEN`, with only the permissions the job needs. See [the CI example](#use-a-key-from-the-environment). A job that must act as your account, such as one that runs `photon account` commands, needs an [account service key](/cli/service-keys) instead. |
+| An app's own calls to Photon | A [project API key](/cli/projects/api-keys) |
+| Creating or rotating keys | A person, not CI or an agent |
+
+Each kind of key fits one use. Whichever you put in `PHOTON_API_TOKEN`, give
+it only what its commands need:
+
+| Key | Looks like | Use it for |
+| --- | --- | --- |
+| Service identity API key | `pho_scred_...` | CI and other automation in one organization, across its projects. It holds only the permissions a person grants it in the Dashboard, under the organization's service identities, so grant only what the job needs. |
+| [Project API key](/cli/projects/api-keys) | `pho_sk_...` | An app's own calls to Photon, on the one project it belongs to. Photon accepts it only under that project. Give CI its own service identity API key instead, so revoking one doesn't break the other. |
+| [Account service key](/cli/service-keys) | `pho_ask_...` | Automation that must act as your account, across its organizations and projects, such as `photon account` commands. |
+
+## Use a key from the environment
+
+When `PHOTON_API_TOKEN` holds a key, every command sends that key:
+
+- It wins over a stored sign-in, which stays as it is.
+- The CLI saves no credential, no sign-in metadata, and no
+  [operation journal](/cli/operations) for it. So a failed write can't be
+  replayed with `photon operation replay`. Its error's next step repeats the
+  command with the same `--idempotency-key` instead. `photon org use` still
+  saves the organization it selects, under the key's ID, or a digest of a
+  value with no ID (never its secret).
+- The key doesn't choose a project or an organization. Pass `--project` or set
+  `PHOTON_PROJECT_ID` (and `--org` or `PHOTON_ORGANIZATION_ID`). Without a
+  project, a project command exits with code `2` and `PROJECT_NOT_SELECTED`.
+- When Photon refuses the key as missing, expired, or revoked (HTTP 401), the
+  command exits with code `4`, and its next step is to replace the key in
+  `PHOTON_API_TOKEN`. When Photon refuses the key for the request (HTTP 403),
+  often because it's the wrong kind of key for the command, the command exits
+  with code `1`. The error names the key's kind and the variable it came from,
+  and its detail keeps Photon's own words, which may name the kinds the
+  request accepts. Commands that handle secrets, such as
+  `photon account service-key create`, leave Photon's words out.
+- `photon login` refuses while the variable is set (exit code `2`,
+  `AUTH_ENVIRONMENT_KEY_SET`). `photon logout` still removes the stored
+  sign-in, and warns that the key is still in use until you unset the
+  variable.
+- An empty value counts as unset.
+
+In GitHub Actions, with a service identity API key that holds only
+`project:read`, the one permission listing webhooks needs:
+
+```yaml
+- name: List webhooks
+  run: photon project webhook list --json
+  env:
+    PHOTON_API_TOKEN: ${{ secrets.PHOTON_SERVICE_IDENTITY_KEY }}
+    PHOTON_PROJECT_ID: pho_prj_01k9yq3m7d2c8x4v6b5n0p1r2s
+```
+
+`photon auth status` names the key's source, kind, and ID, never its secret.
+It checks an account service key with Photon. A project API key or a service
+identity API key reports `unverified`, because no request checks those keys
+without a project.
+
+## Sign in
+
+<Steps>
+  <Step title="Run `photon login`">
+    The CLI first checks where it can store the sign-in: your operating
+    system's credential manager, or a plain-text file when it can't use one.
+    See [where credentials are stored](#where-credentials-are-stored).
+  </Step>
+  <Step title="Approve in the browser">
+    The CLI prints two links on stderr before it waits: the verification URL
+    with a user code to enter, and a link that already contains the code. Then
+    it opens your browser at the second link. It opens no browser with
+    `--no-browser` or when `CI` is set, and says so; open either printed
+    link on any device.
+  </Step>
+  <Step title="Wait for approval">
+    The CLI polls at the interval Photon selects and backs off when asked to.
+    A spinner shows progress in an interactive terminal, and is omitted in
+    `--json` mode.
+  </Step>
+  <Step title="Credentials are stored">
+    Only after you approve the login does the CLI write the access token and
+    rotating refresh token, to the credential manager or the file.
+  </Step>
+</Steps>
+
+Denial, expiry, and protocol errors end the login immediately. An expired
+code exits with code `4` and `photon login` as its next step. Pressing
+<kbd>Ctrl-C</kbd> aborts the wait, stores nothing, and exits with code `130`.
+
+Useful variants:
+
+```sh
+photon login --no-browser        # print the URL instead of opening a browser
+photon login --force             # replace a healthy session
+photon login --insecure-storage  # store credentials in a file, not a keychain
+```
+
+`photon login` doesn't sign in again when your existing session is already
+healthy. It prints who is signed in and names `photon login --force` for
+signing in as a different account on a `Next:` line on stderr, with or without
+`--json`. With `--force`, the old session stays
+usable throughout the new device flow and is replaced only once the new
+credential is stored.
+
+## Where credentials are stored
+
+The CLI stores the sign-in in your operating system's credential manager:
+
+| Platform | Credential store |
+| --- | --- |
+| macOS | Keychain |
+| Windows | Credential Manager |
+| Linux | Secret Service through `secret-tool` |
+
+On Linux, install the libsecret command-line tools and make sure a Secret
+Service keyring is running and unlocked.
+
+Where there is no usable credential manager (as in most containers and CI
+runners), or it refuses to save a new sign-in (a locked keyring), the CLI saves
+the sign-in in plain text to a file in the configuration directory instead
+(`credentials.json`, or a file under `credential-entries/` with `--service-key`)
+and prints a warning that names the file.
+`--insecure-storage` uses that file even when a credential manager is there.
+On POSIX systems the CLI creates it with mode `0600` inside a `0700` directory,
+and writes it atomically so an interrupted command cannot leave a partial
+credential behind.
+
+Non-secret metadata — the API origin, which storage backend is in use, your
+cached identity, and timestamps — lives in `auth.json` alongside it:
+
+| Platform | Configuration directory |
+| --- | --- |
+| Linux | `${XDG_CONFIG_HOME:-~/.config}/photon-v3-production` |
+| macOS | `~/Library/Preferences/photon-v3-production` |
+| Windows | `%APPDATA%\photon-v3-production\Config` |
+
+<Warning>
+  If the CLI finds an unknown or malformed credential schema, it refuses to
+  overwrite it. `photon auth status` then reports storage as `unavailable`, and
+  `photon logout --force` removes the local files it recognizes while warning
+  that an entry may remain in your secure store.
+</Warning>
+
+## Refresh and concurrent commands
+
+You do not need to refresh anything by hand. The CLI renews the access token
+60 seconds before it expires, and always reads your identity and authorization
+from Photon rather than trusting the token's contents.
+
+You can run several `photon` commands at once. They coordinate through a lock,
+so only one process performs the exchange and the others pick up the rotated
+tokens. A transient refresh failure leaves your credentials intact and asks you
+to retry; only a rejected refresh token deletes them and requires a new login.
+
+## Session commands
+
+| Command | Behavior |
+| --- | --- |
+| `photon login` | Validates the current session and does nothing if it is healthy, except name `photon login --force` for signing in as a different account. |
+| `photon whoami` | Returns your canonical identity from Photon, in compact form. |
+| `photon account view` | Returns the complete account resource. |
+| `photon auth status` | Reports `authenticated`, `not_authenticated`, `unavailable`, or `unverified` (a key in `PHOTON_API_TOKEN` it can't check). |
+| `photon logout` | Deletes local credentials, and succeeds even if you are not signed in. |
+
+`photon logout` is local-only. Photon's authentication service has no
+revocation endpoint, so signing out does not revoke the remote session.
+
+## Limits
+
+The CLI stores one signed-in account. Named profiles and token import and
+export aren't supported.

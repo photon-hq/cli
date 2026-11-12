@@ -1,0 +1,80 @@
+---
+title: "Payment method"
+description: "Manage the payment card on file for your Photon organization."
+---
+
+The organization payment method is the card Photon charges. It is separate
+from the plans, subscriptions, and usage under
+[project billing](/cli/projects/billing). It uses the
+[selected organization](/cli/organizations#select-an-organization).
+
+```text
+photon org billing payment-method
+├── status
+└── setup [--no-browser]
+```
+
+## Check the card on file
+
+```sh
+photon org billing payment-method status
+```
+
+```json
+{"cardOnFile":true,"paymentMethod":{"brand":"visa","expiresMonth":12,"expiresYear":2028,"last4":"4242"}}
+```
+
+With `--json`, the command prints the API's response as Photon sends it.
+Photon's API defines that response as card metadata only: `cardOnFile`, and
+in `paymentMethod` (which can be `null`) the card's brand, expiry month and
+year, and last four digits, with no processor identifiers. Before it prints
+a card on file, the CLI checks the brand, last four digits, and expiry, and
+fails with `ORGANIZATION_PROTOCOL_ERROR` when they aren't valid card details.
+Without `--json`, it shows card details only when `cardOnFile` is true.
+
+## Add or replace a card
+
+`setup` creates a hosted HTTPS checkout and opens it in your browser:
+
+```sh
+photon org billing payment-method setup
+photon org billing payment-method setup --no-browser
+```
+
+With `--json`, it prints the checkout the API returns under `checkout`, and
+whether the browser opened it:
+
+<Tabs>
+  <Tab title="Browser opens">
+    ```json
+    {"checkout":{"checkoutUrl":"https://..."},"opened":true}
+    ```
+  </Tab>
+  <Tab title="--no-browser">
+    ```json
+    {"checkout":{"checkoutUrl":"https://..."},"opened":false}
+    ```
+
+    You get the same document if the browser fails to launch, so you can open
+    the URL yourself.
+  </Tab>
+</Tabs>
+
+When the browser opens, `Opened secure payment setup in your browser.` still
+goes to stderr as text, for the person at the terminal. The checkout URL never
+goes to stderr: with `--json`, it's only in the JSON on stdout.
+
+<Warning>
+  The checkout URL is a bearer credential for the checkout session: anyone
+  who has it can use the session. Text output prints it only when the browser
+  doesn't open, but the JSON always holds it, so keep JSON output out of
+  shared logs.
+</Warning>
+
+Invalid or non-HTTPS checkout URLs are rejected before they are opened or
+displayed.
+
+<Note>
+  This command replaced `photon account billing payment`, which now only
+  points here.
+</Note>

@@ -1,0 +1,13 @@
+{
+  "environment": "production",
+  "releaseChannel": "latest",
+  "apiOrigin": "https://api.photon.codes",
+  "appOrigin": "https://app.beta.photon.codes",
+  "executableName": "photon",
+  "aliases": ["pho"],
+  "stateNamespace": "photon-v3-production",
+  "keychainService": "photon-cli-v3-production",
+  "apiTokenVariable": "PHOTON_API_TOKEN",
+  "releaseRepository": "photon-hq/cli",
+  "packageRegistry": "https://registry.npmjs.org"
+}

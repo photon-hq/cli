@@ -1,0 +1,18 @@
+onlyBuiltDependencies:
+  - bun
+  - esbuild
+
+supportedArchitectures:
+  cpu:
+    - current
+    - x64
+    - arm64
+  libc:
+    - current
+    - glibc
+    - musl
+  os:
+    - current
+    - darwin
+    - linux
+    - win32

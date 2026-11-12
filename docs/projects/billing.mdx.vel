@@ -1,0 +1,125 @@
+---
+title: "Project billing"
+description: "Review invoices and manage a project's plans and subscriptions."
+---
+
+`photon project billing` covers what a project is subscribed to and what it has
+been charged. For the card on file, see
+[the organization payment method](/cli/organizations/billing).
+
+```text
+photon project billing
+├── overview
+├── invoice list [--limit 30] [--page-token <token>]
+├── operation view <operation-id>
+├── plan purchase --category <category> --plan-code <code> [--yes]
+│                 [--idempotency-key <key>]
+└── subscription
+    ├── cancel --category <category> [--yes] [--idempotency-key <key>]
+    └── resume --category <category> [--idempotency-key <key>]
+```
+
+## Review current billing
+
+```sh
+photon project billing overview
+photon project billing invoice list
+```
+
+`overview` shows subscriptions, every entitlement with its version, and
+current-period usage. SCHEDULED shows a plan change waiting for the end of the
+period, such as the move to the default plan that `subscription cancel`
+schedules, as the plan and the time it takes effect. Its JSON is
+`{"billing": {...}, "terms": {...}}`: the project's billing overview and its
+effective terms, each as Photon sends it, with the scheduled change in
+`terms.subscriptions[].scheduledPlanChange`. Invoices are issued to the
+project's organization, so `invoice list` shows the organization's invoices,
+30 at a time unless `--limit` says otherwise. Its JSON is Photon's page,
+`{"invoices": [...], "nextCursor": "..."}`, with the API's `nextCursor`,
+`null` on the last page; pass it to `--page-token` for the next page.
+
+<Note>
+  The API returns amounts in cents. Human output displays them as decimal
+  currency units, so `100` cents appears as `1.00`. JSON keeps the original
+  integer `amountCents` and `totalCents` values, so scripts should read those.
+</Note>
+
+## Purchase a plan
+
+Categories use the API's lowercase format. Plan codes are trimmed and may
+contain any non-control text up to 64 characters.
+
+```sh
+photon project billing plan purchase \
+  --category messaging \
+  --plan-code pro-monthly \
+  --yes
+```
+
+Purchase polls `PENDING` and `RUNNING` snapshots until Photon returns a
+terminal result or you press <kbd>Ctrl-C</kbd>. A terminal failure is reported
+on stderr (with `--json`, as the error document on stdout) and exits `1`, and
+leaves no recovery-queue entry — fix the cause and purchase again with a
+**fresh** idempotency key.
+
+Its JSON is the billing operation it ends on, as Photon sends it: the
+purchase's own response when it's already final, or else the operation read
+while polling.
+
+Check a long-running purchase by its operation ID:
+
+```sh
+photon project billing operation view pho_bop_...
+```
+
+`operation view` polls the same way and prints the first operation Photon
+returns that isn't pending. A failed operation prints like any other, with its
+failure code, detail and whether it can be retried, and exits `0`: to tell it
+failed, read `status` (`failed`) in the `--json` output. Billing operation IDs
+always start with `pho_bop_`.
+
+## Cancel and resume a subscription
+
+```sh
+photon project billing subscription cancel --category messaging --yes
+photon project billing subscription resume --category messaging
+```
+
+Cancelling moves the category to its default plan at the end of the billing
+period, the same plan change the Dashboard makes when you cancel. The project
+keeps its current plan until then. Resuming before the period ends keeps the
+current plan and drops the scheduled change, as the Dashboard's
+**Keep `<plan>`** button does.
+
+Both are plan changes, so they poll and report like `plan purchase`, and take
+`--idempotency-key` the same way. Their JSON puts the billing operation, as
+`plan purchase` prints it, next to what the change means for the
+subscription. For `cancel` that's
+`{"operation": {...}, "subscription": {"cancellationScheduled": true, "cancelsAt": "...", "category": "..."}}`,
+and for `resume`
+`{"operation": {...}, "subscription": {"category": "...", "resumed": true}}`.
+A replay of either from the [recovery queue](/cli/operations) puts the billing
+operation in the replay's `result`, without `subscription`, as a replayed
+`plan purchase` does.
+
+<Warning>
+  If the category is already on its default plan, `cancel` reports
+  `cancellationScheduled: false` and changes nothing. If no change is
+  scheduled for the period end, `resume` reports `resumed: false` and changes
+  nothing. A category with no default plan fails with
+  `BILLING_DEFAULT_PLAN_NOT_FOUND`.
+</Warning>
+
+<Accordion title="API routes used by these commands">
+  | Command | Method and route |
+  | --- | --- |
+  | `billing overview` | `GET /v1/projects/{projectId}/billing` and `GET /v1/organizations/{organizationId}/billing/projects/{projectId}/terms` |
+  | `billing invoice list` | `GET /v1/organizations/{organizationId}/billing/invoices` |
+  | `billing operation view` | `GET /v1/projects/{projectId}/billing/operations/{operationId}` |
+  | `billing plan purchase` | `POST /v1/organizations/{organizationId}/billing/projects/{projectId}/purchase` |
+  | `billing subscription cancel` | `GET /v1/projects/{projectId}/billing/plans` and `GET /v1/projects/{projectId}/billing`, then `POST /v1/organizations/{organizationId}/billing/projects/{projectId}/purchase` |
+  | `billing subscription resume` | `GET /v1/projects/{projectId}/billing` and `GET /v1/organizations/{organizationId}/billing/projects/{projectId}/terms`, then `POST /v1/organizations/{organizationId}/billing/projects/{projectId}/purchase` |
+
+  The organization routes use the project's own organization, read with
+  `GET /v1/projects/{projectId}`, not the selected organization.
+</Accordion>

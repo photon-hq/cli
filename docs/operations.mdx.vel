@@ -1,0 +1,283 @@
+---
+title: "Recoverable operations"
+description: "Replay a mutation whose result you never saw, instead of guessing."
+---
+
+Before it sends the first network request, the CLI writes supported mutations
+to a private local journal. The journal is a **recovery queue for requests
+whose result you don't know** — not a history of everything you have done.
+Successes and definitive rejections leave no record.
+
+With a key in `PHOTON_API_TOKEN`, the CLI keeps no journal on disk, so there is
+nothing to replay. A failed write's next step repeats the same command with the
+same `--idempotency-key` instead.
+
+```text
+photon operation list [--status <awaiting-output-ack|failed|outcome-unknown> ...]
+                      [--limit 30] [--page-token <token>]
+photon operation view <operation-id>
+photon operation replay <operation-id> [--yes]
+photon operation remove <operation-id> [--yes]
+```
+
+## How it works
+
+Each mutation command is one logical request:
+
+- Omit `--idempotency-key` and the CLI generates one.
+- Supply a stable key to identify the same logical request across invocations.
+- Re-running with **the same key and the same input** continues the unresolved
+  operation and returns ordinary success output, not a replay envelope.
+- Re-running with the same key and **different** input fails before any request
+  with `IDEMPOTENCY_KEY_REUSED`.
+- Use `operation replay <id>` when the original arguments or private input are
+  inconvenient or gone. Replay reads the saved input from the journal.
+
+<Note>
+  Photon is the final authority on idempotency. Even if the local record is
+  gone, sending the same key and input can still return the service's cached
+  result.
+</Note>
+
+## Inspect the queue
+
+`list` returns unresolved records only, newest first, and deliberately omits
+idempotency keys:
+
+```console
+$ photon operation list --json
+{"operations":[{"operationId":"op_7f8c...","kind":"organization-member.invite","status":"failed","replayable":true,"updatedAt":"2026-08-01T18:42:10.000Z"}]}
+```
+
+`view` adds the key when there is one, plus safe input metadata, the attempt
+count, the latest failure, and a remote operation ID when server work has
+already been accepted. Retained private payloads — invitation tokens, avatar
+bytes, 10DLC campaign text — are redacted.
+
+## Statuses
+
+| Status | Meaning |
+| --- | --- |
+| `failed` | A request failed with no definitive result. Replay may be safe, depending on the operation's contract. |
+| `outcome-unknown` | No trustworthy final result arrived — a <kbd>Ctrl-C</kbd>, timeout, transport interruption, or invalid response. |
+| `awaiting-output-ack` | A one-time secret came back, but stdout has not confirmed accepting it. The record is deleted only once output is flushed. |
+
+<Warning>
+  `retryable` and `replayable` are different things and need not agree.
+  `retryable` describes the immediate **error**. `replayable` describes whether
+  the saved **mutation** has a safe replay contract.
+</Warning>
+
+`resolved` appears only in the immediate result of an explicit replay — it is
+not a journal status or a valid `--status` filter. Neither is `pending`; most
+commands keep polling rather than returning a pending success.
+
+## Idempotency keys
+
+Supplied keys are 1–255 printable, non-whitespace ASCII characters unless a
+command narrows that further. Key matching happens only for keys **you**
+supply; a generated key always starts a new record.
+
+When an unresolved record matches your key and the request fingerprint agrees,
+the CLI takes over that record and runs your current input under the original
+key. Different input is rejected locally:
+
+```console
+$ photon project create --name production --slug production --idempotency-key deploy-production-v42
+Error: The idempotency key is already associated with a different request. (IDEMPOTENCY_KEY_REUSED)
+Detail: Operation op_7f8c... has a different payload fingerprint.
+Next: Use a new idempotency key for a different logical request.
+```
+
+Successful output never exposes the key. An unresolved error tells you
+everything you need to recover:
+
+```console
+Error: Photon's API could not be reached. (API_CONNECTION_ERROR)
+Next: Replay the operation: photon operation replay op_7f8c...
+Transport code: TransportError
+Operation ID: op_7f8c...
+Idempotency key: deploy-production-v42
+Replayable: yes
+Docs: https://photon.codes/docs/cli/output#errors
+```
+
+## Replay
+
+Replay dispatches a typed operation using the saved input and key. A
+per-operation lease stops two processes replaying the same record at once. It
+does not re-read an input file or ask you for the original values.
+
+```console
+$ photon operation replay op_7f8c...
+Replay org member invite? [y/N] y
+Replayed operation op_7f8c....
+```
+
+JSON replay uses a recovery envelope. Its `result` is what the command prints
+(some results differ, and [Output](/cli/output#envelopes) lists them). Here
+it's the invitation the API returns (shortened):
+
+```json
+{"operation":{"operationId":"op_7f8c...","kind":"organization-member.invite","status":"resolved"},"result":{"invitationId":"pho_oinv_01k9yq3m7d2c8x4v6b5n0p1r2s","email":"ada@example.com","role":"member","status":"pending"}}
+```
+
+A second unresolved failure updates the same record and returns the same
+operation ID. A final success deletes it.
+
+Replay does not send a delete that Photon already accepted: it polls the
+stored remote operation instead. There is one exception. When Photon answers
+the stored operation of an SMS number delete, a WhatsApp Business number
+delete, an email domain disconnect or a Telegram bot disconnect with a 404,
+replay reads the resource. If the resource is gone, or the number or domain
+reads `retired`, the operation is resolved. If the resource still exists, the
+outcome is unknown: replay fails with `PROJECT_OPERATION_OUTCOME_UNKNOWN`, the
+record stays `outcome-unknown` without its remote operation ID, and the next
+replay sends the request again.
+
+<Note>
+  The CLI never stores or executes shell text. A record holds a typed operation
+  definition, not the command line you typed.
+</Note>
+
+## Waiting on server work
+
+Commands never return a successful `{"status": "pending"}` envelope. They show
+a spinner in an interactive terminal, stay silent in JSON or redirected output,
+and keep polling until a terminal result or an interruption.
+
+| Command | Polling behavior |
+| --- | --- |
+| 10DLC campaign create and resubmit | Repeats the same POST body and key, following `retryAfterSeconds` strictly. |
+| SMS and iMessage purchase | One POST, then polls the remote operation. Honors integer `Retry-After`, defaulting to five seconds. |
+| Email domain connect | One POST, then polls until the six DNS records are published — capped at 10 seconds per poll. Then waits for verification, with or without `--json`, unless `--no-wait`. |
+| Email domain disconnect | One release request, then polls if release is asynchronous. |
+| SMS delete | Verifies the resource, sends one release request, then polls if asynchronous. |
+| Billing plan purchase | Polls the remote billing operation after the initial POST. |
+| Billing operation view | Polls until the operation is final. |
+
+Voice outbound algorithm edits preserve the username and password and use no
+operation journal or idempotency key. If an edit reports
+`VOICE_OUTBOUND_OPERATION_PENDING`, resume the original credential request with
+its original idempotency key or recovery record, then read the current profile
+and retry the edit.
+
+Voice outbound enable and rotation use the same journal for their optimistic
+profile version. A same-key continuation of an unresolved request reuses the
+stored `expectedVersion`; it does not fetch the changed profile and construct a
+new request body. Their display-once password is never stored. If the server
+already applied the mutation, recovery succeeds with `password: null` and the
+CLI directs you to rotate with a new key when another password is required.
+
+A network or protocol error while polling is not treated as pending — it goes
+straight to the recovery path. Replay resumes a stored remote operation with a
+GET and never cancels it. A delete whose stored operation Photon cannot find
+is the one case where a later replay sends the request again, as described
+under Replay. There is no client-side total timeout, so interrupt the process
+with a signal if you need to stop waiting.
+
+## Record lifecycle
+
+The record is durable before the first mutation request. If that write fails,
+no request is sent at all.
+
+- A final success deletes the record.
+- A definitive rejection deletes the record and stays an ordinary command
+  error — it never shows up in `operation list`.
+- <kbd>Ctrl-C</kbd>, network interruption, protocol failure, and other
+  ambiguous outcomes keep a record with recovery metadata.
+- One-time service key, API key, webhook-secret, and Voice outbound password
+  output, and a service key revocation, stays in `awaiting-output-ack` until
+  stdout flushes successfully. If stdout fails first, as with a full disk or a
+  closed pipe, the command exits `1`, keeps the record, and the error names
+  the replay. The replay asks Photon for the result again and prints it. If
+  Photon no longer returns the secret, the replay says so and names the next
+  step: for a Voice outbound password, rotate again with a new idempotency
+  key. A replay whose own output fails names itself the same way:
+
+```console
+$ photon project api-key create --name deploy --permission project:read --no-expiry > /dev/full
+Warning: Save this API key secret now. It cannot be retrieved again.
+Error: Photon could not write the result to standard output. (OUTPUT_WRITE_FAILED)
+Detail: Photon made the change, but its result may not have been written.
+Next: Replay the operation: photon operation replay op_7f8c...
+Operation ID: op_7f8c...
+Idempotency key: 0c7baa98-...
+Replayable: yes
+Docs: https://photon.codes/docs/cli/output#errors
+```
+
+Records expire 30 days after their latest unresolved failure and are cleaned up
+opportunistically. A cleanup failure after a remote success produces a warning
+without changing the result.
+
+## What is stored
+
+A replayable record keeps only what is needed to rebuild the request: project
+and resource IDs, normalized change sets, invitation tokens, a private copy of
+a validated avatar before upload completes, and normalized 10DLC campaign
+input. Call Registry records keep the automatic-registration boolean or
+canonical phone-resource IDs — never a profile body or a phone number. Voice
+outbound records keep the user-facing profile reference, resolved stable
+`profileId`, exact `expectedVersion`, enablement digest algorithm, and rotation
+mode when present.
+
+<Warning>
+  Generated one-time secrets are **never** written to the journal. Service key
+  create, API key create, webhook create, webhook secret rotation, and Voice
+  outbound changes rely on the service's idempotent response to recover a
+  secret before output is acknowledged.
+</Warning>
+
+Records are scoped to the API origin and the authenticated identity, and stored
+with owner-only permissions in Photon's configuration directory. Symlinks,
+non-regular files, unsafe permissions, and a scope mismatch all fail closed.
+
+## Unreadable records
+
+Records use only the current strict schema, so an unresolved record written by
+an earlier incompatible release cannot be read.
+
+`operation list` and ordinary mutations skip unreadable records with a warning
+so unrelated work continues. `operation view` and `operation replay` report
+`OPERATION_JOURNAL_CORRUPT` for a record you select directly.
+`operation remove` validates only the ID and deletes the file without parsing
+it, so it can always clear a corrupt record:
+
+```sh
+photon operation remove op_7f8c... --yes
+```
+
+<Note>
+  `operation remove` deletes only the local record. It never cancels, reverses,
+  or deletes anything on the server.
+</Note>
+
+## Operations saved before an API update
+
+If a saved request lacks newly required fields, replay reports
+`OPERATION_CONTRACT_CHANGED` and leaves the record intact. Inspect the remote
+result before starting a new operation. The CLI cannot safely invent a project
+slug, API-key permissions, campaign compliance URLs, or a campaign ETag for an
+old request. An old SMS purchase with a known remote operation ID can still be
+polled without sending the purchase again.
+
+Operations saved before organizations — project member, invitation, and leave
+operations, and project creation or 10DLC operations without an organization —
+also report `OPERATION_CONTRACT_CHANGED`. Check the organization with
+`photon org member list`, `photon org invitation list`, or `photon project list`
+before starting a new operation.
+
+With `--json`, an error is written to stdout inside an `error` object, and the
+command exits with a nonzero status. Selected fields from an incompatible
+replay error:
+
+```json
+{
+  "error": {
+    "code": "OPERATION_CONTRACT_CHANGED",
+    "message": "This saved operation uses an older API contract and cannot be sent again safely.",
+    "replayable": false
+  }
+}
+```

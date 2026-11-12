@@ -1,0 +1,58 @@
+---
+title: "OAuth connections"
+description: "Inspect OAuth scopes and the applications you have authorized."
+---
+
+`photon account oauth` covers the OAuth side of your account:
+
+- **Connections** are applications *you* have authorized to act on your behalf.
+- **Scopes** are the delegated permissions Photon offers.
+
+OAuth clients — applications you build — belong to an organization and are
+managed with [`photon org oauth-client`](/cli/organizations/oauth-clients).
+
+```text
+photon account oauth
+├── connection
+│   ├── list [--page-token <token> | --before <token>] [--limit 30]
+│   │        [--order <normal|desc|asc>]
+│   └── revoke <application-id> [--yes]
+└── scope
+    └── list
+```
+
+## Scopes
+
+```sh
+photon account oauth scope list
+```
+
+This reads the live scope catalogue from Photon's public
+`/v1/auth/oauth/scopes` endpoint. The CLI never exposes Photon's internal scope
+contract or calls the upstream identity provider directly. With `--json` it
+prints the API's response as Photon sends it: `{"scopes": [...]}`.
+
+## Connections
+
+Connections are applications you authorized, not clients you own. Revoking one
+removes your grant without deleting the underlying OAuth client.
+
+```sh
+photon account oauth connection list --limit 25 --order desc
+photon account oauth connection list --page-token connect_app_123
+photon account oauth connection revoke connect_app_123 --yes
+```
+
+`connection list` shows 30 connections unless `--limit` says otherwise, at most
+100. With `--json` it prints the API's response as Photon sends it:
+`{"authorizedApplications": [...], "listMetadata": {"after": ..., "before": ...}}`,
+each connection with its `application`, `grantedScopes` and `oauthResource`.
+Pass `listMetadata.after` to `--page-token` for the next page, or
+`listMetadata.before` to `--before` for the page before. Each is `null` when
+there is no such page.
+
+Revocation prompts interactively and needs `--yes` in scripts. The
+application must be authorized again before it can get another token for you.
+Photon answers a revocation with no body, so with `--json` `connection revoke`
+prints a document the CLI defines, naming what it revoked:
+`{"applicationId": "connect_app_123", "revoked": true}`.
