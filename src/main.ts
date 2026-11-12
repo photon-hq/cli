@@ -1,4 +1,3 @@
-import completion from '@gunshi/plugin-completion'
 import {
   defineSuggestNames,
   levenshtein,
@@ -11,6 +10,7 @@ import {
   isArgsValidationError,
   isCommandNotFoundError
 } from 'gunshi'
+import { completionPlugin } from './app/completion.ts'
 import { printUsage } from './app/help.ts'
 import { createPhotonPlugin, type PhotonPluginOptions } from './app/plugin.ts'
 import type { PhotonExtensions } from './app/services.ts'
@@ -117,7 +117,7 @@ export async function runCli(
       name: CLI_NAME,
       plugins: [
         suggestion(),
-        completion(),
+        completionPlugin(),
         createPhotonPlugin(options, photonCommands)
       ],
       renderHeader: null,

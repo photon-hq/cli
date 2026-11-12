@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.0.2 (2026-11-12)
+
+
+### Bug Fixes
+
+* **cli:** fix four 3.0 defects before 3.0.2 (ENG-5647)
+* **release:** attach the installers to every release (ENG-5637)
+
+
+### Documentation
+
+* **cli:** remove the guides that move to photon-hq/docs (ENG-5498)
+* remove README links to CLI guides that aren't published (ENG-5498)
+
 ## 3.0.1 (2026-11-12)
 
 

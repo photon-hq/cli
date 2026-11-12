@@ -305,6 +305,38 @@ test('photon update downloads, checks and replaces the installer binary', async 
   assert.equal(await versionIn(installed.home), SECOND)
 })
 
+// Root in a user namespace that maps only its own uid, as unshare -r and some
+// sandboxes run, can't give a file another owner. tar run as root restores the
+// archive's owner unless told not to, and the archives belong to 501:20.
+// unshare -r needs unprivileged user namespaces, which Ubuntu 24.04 allows only
+// with kernel.apparmor_restrict_unprivileged_userns=0, as CI sets it.
+test('installs and updates as root in a user namespace that maps one uid', {
+  skip: process.platform !== 'linux'
+}, async () => {
+  await latest(FIRST)
+  const { binary, home } = await freshHome()
+  const env = baseEnv(home)
+  const installation = await run(
+    'unshare',
+    ['-r', 'sh', join(root, 'scripts', 'install.sh')],
+    { env }
+  )
+  console.log(
+    `unshare -r install exited ${installation.status}\n${installation.stdout}${installation.stderr}`
+  )
+  assert.equal(installation.status, 0)
+  assert.equal(existsSync(binary), true)
+  await latest(SECOND)
+  const update = await run('unshare', ['-r', binary, 'update'], { env })
+  console.log(
+    `unshare -r photon update exited ${update.status}\n${update.stdout}${update.stderr}`
+  )
+  assert.equal(update.status, 0)
+  assert.ok(
+    update.stdout.includes(`Updated photon from ${FIRST} to ${SECOND}.`)
+  )
+})
+
 test('installs the version in PHOTON_VERSION', async () => {
   await latest(SECOND)
   const { binary, home } = await freshHome()

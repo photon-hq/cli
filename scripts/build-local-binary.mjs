@@ -53,7 +53,7 @@ export const buildLocalBinary = async ({ config, outfile, target }) => {
         target?.archive ?? hostArchive(config)
       )
     },
-    entrypoints: [join(projectRoot, 'src', 'bin.ts')],
+    entrypoints: [join(projectRoot, 'src', 'cli.ts')],
     minify: true,
     plugins: [bunAliasPlugin(aliases), buildConfigPlugin(config)],
     sourcemap: 'linked'

@@ -212,7 +212,7 @@ else
     fail "The download of $artifact failed its checksum check, so nothing was installed."
   fi
 
-  tar -xzf "$archive" -C "$temporary_directory" "$program"
+  tar -xozf "$archive" -C "$temporary_directory" "$program"
   binary_source="$temporary_directory/$program"
 fi
 

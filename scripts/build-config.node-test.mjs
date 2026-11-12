@@ -180,8 +180,8 @@ test('the JavaScript build writes the same files from any working folder', async
           { cwd: folder }
         )
         return await Promise.all(
-          ['bin.js', 'bin.js.map', 'THIRD_PARTY_NOTICES.txt'].map((name) =>
-            readFile(join(outputDirectory, name), 'utf8')
+          ['bin.js', 'cli.js', 'cli.js.map', 'THIRD_PARTY_NOTICES.txt'].map(
+            (name) => readFile(join(outputDirectory, name), 'utf8')
           )
         )
       })

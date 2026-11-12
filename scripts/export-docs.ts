@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
-import completion from '@gunshi/plugin-completion'
 import { type CliOptions, type Commandable, plugin } from 'gunshi'
 import { generate } from 'gunshi/generator'
 import { getCommandSubCommands } from 'gunshi/utils'
@@ -9,6 +8,7 @@ import {
   type CommandTree,
   commandReference
 } from '../src/app/command-reference.ts'
+import { completionPlugin } from '../src/app/completion.ts'
 import { PHOTON_GLOBAL_OPTIONS } from '../src/app/global-options.ts'
 import { BUILD_CONFIG } from '../src/build-config.ts'
 import { photonCommands } from '../src/commands/registry.ts'
@@ -51,7 +51,7 @@ export async function commandMetadata(
       {
         name: CLI_NAME,
         plugins: [
-          completion(),
+          completionPlugin(),
           plugin({
             id: 'photon-docs',
             setup(context) {

@@ -12,6 +12,7 @@ import {
   type HttpTraceDiagnostic,
   type HttpTraceSource
 } from './http-debug.ts'
+import { CLI_ERROR_REFERENCE_URL, lastFlagValue } from './output-basics.ts'
 import { inert } from './presenter.ts'
 import { canShowSpinner, canUseColor } from './terminal.ts'
 
@@ -72,10 +73,6 @@ export interface DebugCause {
 }
 
 export type OutputTarget = 'stderr' | 'stdout'
-
-/** Where an error with no docs page of its own points: the CLI's error reference. */
-export const CLI_ERROR_REFERENCE_URL =
-  'https://photon.codes/docs/cli/output#errors'
 
 const WEB_URL_PATTERN = /^https?:\/\//u
 const TRAILING_PERIOD_PATTERN = /\.$/u
@@ -173,36 +170,6 @@ export const nextStepLines = (steps: readonly NextStep[]): string[] => {
   ]
 }
 export type TextStyle = Parameters<typeof styleText>[0]
-
-// The last value given for a boolean flag, read the way the parser reads the
-// command line: the first "--" ends the options, and everything after it is an
-// operand even when it starts with a dash (POSIX Utility Syntax Guideline 10).
-// The parser never takes "--" as an option's value ("--org -- x" fails with
-// "Option '--org' requires a value"), so the first one always ends them.
-// Reading past it printed "nosuchcommand -- --json" as a JSON error, while
-// "whoami -- --json", which parses and then fails on the unexpected argument,
-// printed as text.
-const lastFlagValue = (
-  args: readonly string[],
-  name: string,
-  negatable = false
-): boolean | undefined => {
-  let value: boolean | undefined
-  for (const arg of args) {
-    if (arg === '--') {
-      break
-    }
-    if (arg === `--${name}` || arg === `--${name}=true`) {
-      value = true
-    } else if (
-      arg === `--${name}=false` ||
-      (negatable && arg === `--no-${name}`)
-    ) {
-      value = false
-    }
-  }
-  return value
-}
 
 export const outputOptionsFromArgs = (
   args: readonly string[]

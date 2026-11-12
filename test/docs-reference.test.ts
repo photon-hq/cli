@@ -108,6 +108,20 @@ describe('documentation metadata', () => {
     expect(options?.some(({ name }) => name === 'secret-option')).toBe(false)
   })
 
+  it('documents the shell argument of complete', async () => {
+    const commands = await commandMetadata({})
+    const complete = commands.find(
+      ({ path }) => path.join(' ') === `${CLI_NAME} complete`
+    )
+    expect(complete?.options).toContainEqual(
+      expect.objectContaining({
+        name: 'shell',
+        required: false,
+        type: 'positional'
+      })
+    )
+  })
+
   it('keeps the built-in version option available on subcommands like runtime help', async () => {
     const commands = await commandMetadata({
       sample: { description: 'Sample command' }

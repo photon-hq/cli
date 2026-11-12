@@ -11,7 +11,8 @@ import {
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { AuthenticatedRequest } from '../src/auth/authenticated-request.ts'
 import type { CliError } from '../src/core/errors.ts'
-import { CLI_ERROR_REFERENCE_URL, CliOutput } from '../src/core/output.ts'
+import { CliOutput } from '../src/core/output.ts'
+import { CLI_ERROR_REFERENCE_URL } from '../src/core/output-basics.ts'
 import { runCli } from '../src/main.ts'
 import { CLI_NAME } from '../src/meta.ts'
 import {

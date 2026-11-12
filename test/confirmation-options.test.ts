@@ -46,6 +46,11 @@ describe('the option that skips a confirmation', () => {
   test('is named in no message or next step except for login and logout', () => {
     const mentions = readdirSync(SOURCE, { recursive: true })
       .filter((file) => String(file).endsWith('.ts'))
+      // Photon CLI 1.0's commands and options, which include 1.0's
+      // update --force, not this CLI's.
+      .filter(
+        (file) => String(file) !== join('commands', 'legacy-command-line.ts')
+      )
       .flatMap((file) =>
         readFileSync(join(SOURCE, String(file)), 'utf8')
           .split('\n')

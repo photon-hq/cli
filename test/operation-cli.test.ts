@@ -16,7 +16,7 @@ import {
   type InterruptSignal,
   listenForInterrupt
 } from '../src/core/interrupt.ts'
-import { CLI_ERROR_REFERENCE_URL } from '../src/core/output.ts'
+import { CLI_ERROR_REFERENCE_URL } from '../src/core/output-basics.ts'
 import { runCli } from '../src/main.ts'
 import { CLI_NAME } from '../src/meta.ts'
 import { OperationRepository } from '../src/operation/repository.ts'
