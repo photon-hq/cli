@@ -47,13 +47,44 @@ const licenseText = async (packageRoot) => {
     : (await readFile(join(packageRoot, licenseFile), 'utf8')).trim()
 }
 
+// esbuild runs filters as Go regular expressions, which take no JavaScript flags.
+const cliImportPattern = /^\.\/cli\.ts$/
+
+// bin.js loads the CLI from cli.js at run time instead of bundling it.
+const cliModule = {
+  name: 'cli-module',
+  setup: (bundler) => {
+    bundler.onResolve({ filter: cliImportPattern }, () => ({
+      external: true,
+      path: './cli.js'
+    }))
+  }
+}
+
 /**
  * Bundles the CLI for Node.js with the given build config embedded, and writes
- * bin.js, its source map and THIRD_PARTY_NOTICES.txt to outputDirectory.
+ * to outputDirectory cli.js with its source map, THIRD_PARTY_NOTICES.txt, and
+ * bin.js, the package's executable, which checks the Node.js version and then
+ * loads cli.js.
  */
 export const buildJavaScript = async ({ config, outputDirectory }) => {
   const { aliases, conditions } = resolveTarget(validateBuildConfig(config))
   const outputFile = join(outputDirectory, 'bin.js')
+
+  // bin.js tells a Node.js too old for the CLI that it is, so it must run on
+  // one: esbuild writes it for Node.js 14, and fails the build on syntax it
+  // can't write that way, such as a top-level await.
+  await build({
+    absWorkingDir: projectRoot,
+    bundle: true,
+    entryPoints: [join(projectRoot, 'src', 'bin.ts')],
+    format: 'esm',
+    legalComments: 'none',
+    outfile: outputFile,
+    platform: 'node',
+    plugins: [cliModule],
+    target: 'node14'
+  })
 
   const result = await build({
     // esbuild reports metafile inputs relative to its working folder, and
@@ -67,12 +98,12 @@ export const buildJavaScript = async ({ config, outputDirectory }) => {
     },
     bundle: true,
     conditions,
-    entryPoints: [join(projectRoot, 'src', 'bin.ts')],
+    entryPoints: [join(projectRoot, 'src', 'cli.ts')],
     external: ['@napi-rs/keyring'],
     format: 'esm',
     legalComments: 'none',
     metafile: true,
-    outfile: outputFile,
+    outfile: join(outputDirectory, 'cli.js'),
     platform: 'node',
     plugins: [buildConfigPlugin(config)],
     sourcemap: true,

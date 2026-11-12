@@ -6,7 +6,7 @@ import { resolveTarget } from '../scripts/build-config.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /**
- * Bundles `src/bin.ts` for one target with esbuild, with its metafile, into
+ * Bundles `src/cli.ts` for one target with esbuild, with its metafile, into
  * `outfile` or, without one, into memory.
  */
 export const bundle = async (
@@ -18,7 +18,7 @@ export const bundle = async (
     alias: aliases,
     bundle: true,
     conditions,
-    entryPoints: [join(root, 'src', 'bin.ts')],
+    entryPoints: [join(root, 'src', 'cli.ts')],
     external: ['@napi-rs/keyring'],
     format: 'esm',
     logLevel: 'silent',

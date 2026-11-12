@@ -655,7 +655,11 @@ describe('project API key CLI', () => {
         expect(error).toContain(
           Object.keys(env).length === 0 ? 'ARGUMENT_VALIDATION' : 'LEGACY_TOKEN'
         )
-        expect(error).toContain(revocableApiKeyId)
+        expect(error).toContain(
+          Object.keys(env).length === 0
+            ? revocableApiKeyId
+            : 'npx @photon-ai/cli@legacy project --help'
+        )
         expect(stdout.value()).not.toContain(revocationSecret)
         expect(stderr.value()).not.toContain(revocationSecret)
       }

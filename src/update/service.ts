@@ -313,10 +313,13 @@ export class UpdateService {
       const tar = windows
         ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
         : 'tar'
+      // -o: the binary gets this user as its owner, not the archive's. Root
+      // would restore the archive's owner, and can't in a user namespace that
+      // maps only its own uid.
       const extracted = await this.#run(
         tar,
         [
-          asset.endsWith('.zip') ? '-xf' : '-xzf',
+          asset.endsWith('.zip') ? '-xof' : '-xozf',
           archivePath,
           '-C',
           staging,

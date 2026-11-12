@@ -1,10 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { CliError, normalizeCliError } from '../src/core/errors.ts'
-import {
-  CLI_ERROR_REFERENCE_URL,
-  CliOutput,
-  outputOptionsFromArgs
-} from '../src/core/output.ts'
+import { CliOutput, outputOptionsFromArgs } from '../src/core/output.ts'
+import { CLI_ERROR_REFERENCE_URL } from '../src/core/output-basics.ts'
 import { collector } from './project-test-support.ts'
 
 describe('actionable CLI error output', () => {

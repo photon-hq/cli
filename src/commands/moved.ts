@@ -43,7 +43,7 @@ const optionName = (name: string, schema: object): string =>
     ? name.replace(CAPITAL, (letter) => `-${letter.toLowerCase()}`)
     : name
 
-const GLOBAL_VALUE_OPTIONS: ReadonlySet<string> = new Set(
+export const GLOBAL_VALUE_OPTIONS: ReadonlySet<string> = new Set(
   Object.entries(PHOTON_GLOBAL_OPTIONS).flatMap(([name, schema]) =>
     schema.type === 'string' ? [`--${name}`] : []
   )
@@ -71,8 +71,10 @@ const GLOBAL_FLAGS: ReadonlySet<string> = new Set(
   })
 )
 
-const isGlobalValueAssignment = (arg: string): boolean =>
-  [...GLOBAL_VALUE_OPTIONS].some((option) => arg.startsWith(`${option}=`))
+const isValueAssignment = (
+  arg: string,
+  valueOptions: ReadonlySet<string>
+): boolean => [...valueOptions].some((option) => arg.startsWith(`${option}=`))
 
 // The argument after a value option is its value unless there is none or it
 // starts with "-". So in "--org --project pho_prj_x" --org has no value, as
@@ -80,13 +82,17 @@ const isGlobalValueAssignment = (arg: string): boolean =>
 // word. An empty argument is a value, as it is to the parser, so "--org ''"
 // never makes '' a command word. The parser also takes a lone "-" as a value;
 // no ID is "-", so this rule doesn't.
-const isOptionValue = (arg: string | undefined): arg is string =>
+export const isOptionValue = (arg: string | undefined): arg is string =>
   arg !== undefined && !arg.startsWith('-')
 
 // Where the command words are: the arguments before the first
 // command-specific option. Global options may appear anywhere: they are
 // skipped, together with the value of a value option written as "--org <id>".
-export const commandWordPositions = (args: readonly string[]): number[] => {
+// valueOptions names the value options to skip, the global ones by default.
+export const commandWordPositions = (
+  args: readonly string[],
+  valueOptions: ReadonlySet<string> = GLOBAL_VALUE_OPTIONS
+): number[] => {
   const positions: number[] = []
   let skipValue = false
   for (const [position, arg] of args.entries()) {
@@ -94,11 +100,11 @@ export const commandWordPositions = (args: readonly string[]): number[] => {
       skipValue = false
       continue
     }
-    if (GLOBAL_VALUE_OPTIONS.has(arg)) {
+    if (valueOptions.has(arg)) {
       skipValue = isOptionValue(args[position + 1])
       continue
     }
-    if (GLOBAL_FLAGS.has(arg) || isGlobalValueAssignment(arg)) {
+    if (GLOBAL_FLAGS.has(arg) || isValueAssignment(arg, valueOptions)) {
       continue
     }
     if (arg.startsWith('-')) {
@@ -109,8 +115,11 @@ export const commandWordPositions = (args: readonly string[]): number[] => {
   return positions
 }
 
-export const commandWords = (args: readonly string[]): string[] => {
-  const positions = new Set(commandWordPositions(args))
+export const commandWords = (
+  args: readonly string[],
+  valueOptions: ReadonlySet<string> = GLOBAL_VALUE_OPTIONS
+): string[] => {
+  const positions = new Set(commandWordPositions(args, valueOptions))
   return args.filter((_, position) => positions.has(position))
 }
 
@@ -140,7 +149,8 @@ const globalOptionArguments = (args: readonly string[]): string[] => {
     }
     if (
       GLOBAL_FLAGS.has(arg) ||
-      (isGlobalValueAssignment(arg) && arg.split('=', 2)[1] !== '')
+      (isValueAssignment(arg, GLOBAL_VALUE_OPTIONS) &&
+        arg.split('=', 2)[1] !== '')
     ) {
       options.push(arg)
     }

@@ -3,6 +3,10 @@ import { CliError, type NextStep } from '../core/errors.ts'
 import { shellArgument } from '../core/presenter.ts'
 import { CLI_NAME } from '../meta.ts'
 import { withoutApiKeySecrets } from '../project/validation.ts'
+import {
+  LEGACY_VALUE_OPTIONS,
+  legacyCommandLine
+} from './legacy-command-line.ts'
 import { commandWords } from './moved.ts'
 
 // Top-level commands only Photon CLI 1.0 has. A 1.0 user who reaches this CLI
@@ -29,13 +33,25 @@ const HELP_OR_VERSION: ReadonlySet<string> = new Set([
   '-v'
 ])
 
-const legacyStep = (args: readonly string[]): NextStep => ({
-  description: 'Use Photon CLI 1.0',
-  run: [
-    'npx @photon-ai/cli@legacy',
-    ...args.map((arg) => shellArgument(withoutApiKeySecrets(arg)))
-  ].join(' ')
-})
+// The step to run the command line on Photon CLI 1.0, and the detail that says
+// what the step changes beyond the order of the arguments.
+const legacyPointer = (
+  args: readonly string[]
+): { detail: string | undefined; step: NextStep } => {
+  const commandLine = legacyCommandLine(args)
+  return {
+    detail: commandLine.detail,
+    step: {
+      description: 'Use Photon CLI 1.0',
+      run: [
+        'npx @photon-ai/cli@legacy',
+        ...commandLine.args.map((arg) =>
+          shellArgument(withoutApiKeySecrets(arg))
+        )
+      ].join(' ')
+    }
+  }
+}
 
 const isSet = (value: string | undefined): boolean =>
   value !== undefined && value !== ''
@@ -50,13 +66,13 @@ export const legacyCliError = (
   args: readonly string[],
   env: NodeJS.ProcessEnv
 ): CliError | undefined => {
-  const words = commandWords(args)
-  const [first] = words
+  const [first] = commandWords(args, LEGACY_VALUE_OPTIONS)
   if (first !== undefined && LEGACY_COMMANDS.has(first)) {
+    const { detail, step } = legacyPointer(args)
     return new CliError(
       'LEGACY_COMMAND',
       `"${CLI_NAME} ${first}" is a Photon CLI 1.0 command.`,
-      { exitCode: 2, next: [legacyStep(args)] }
+      { detail, exitCode: 2, next: [step] }
     )
   }
   const tokens = LEGACY_TOKEN_VARIABLES.filter((name) => isSet(env[name]))
@@ -65,18 +81,20 @@ export const legacyCliError = (
   if (
     tokens.length === 0 ||
     isSet(env[API_TOKEN_VARIABLE]?.trim()) ||
-    words.length === 0 ||
+    commandWords(args).length === 0 ||
     options.some((arg) => HELP_OR_VERSION.has(arg))
   ) {
     return
   }
+  const { detail, step } = legacyPointer(args)
   return new CliError(
     'LEGACY_TOKEN',
     `${tokens.join(' and ')} ${tokens.length === 1 ? 'is a Photon CLI 1.0 credential' : 'are Photon CLI 1.0 credentials'}, which this CLI does not read.`,
     {
+      detail,
       exitCode: 2,
       next: [
-        legacyStep(args),
+        step,
         {
           description: `To use ${CLI_NAME} instead, unset ${tokens.join(' and ')}.`
         }

@@ -109,6 +109,9 @@ const ROW_WITH_SYMBOLS = /^ {2}\S+ [<[]/mu
 const LIMIT_ROW =
   /^ {2}--limit <limit> +Maximum number of records to return \(default: 30\)$/mu
 
+const COMPLETE_SHELL_ROW =
+  /^ {2}shell +Shell to print the completion script for: bash, fish, powershell or zsh$/mu
+
 const OPTION_WITH_BRACKETED_VALUE = /^ +(?:-\S, )?--\S+ \[/u
 
 const NAMED_OPTION = /(?:^| )--\S+/gu
@@ -250,6 +253,16 @@ describe('help', () => {
       expect(rows.map(rowName)).not.toContain(path.at(-1))
       expect(rows.join('\n')).not.toMatch(ROW_WITH_SYMBOLS)
     }
+  })
+
+  test('shows the shell argument of complete', async () => {
+    const help = await runSignedOut(['complete', '--help'])
+
+    expect(help.printed).toContain(
+      `USAGE:\n  ${CLI_NAME} complete [OPTIONS] [<shell>]`
+    )
+    expect(help.printed).toMatch(COMPLETE_SHELL_ROW)
+    expect(help.exitCodes).toEqual([])
   })
 
   test('shows the value of an option with a default as <name>, and the default', async () => {

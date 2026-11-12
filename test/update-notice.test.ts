@@ -59,7 +59,7 @@ beforeAll(async () => {
     alias: aliases,
     bundle: true,
     conditions,
-    entryPoints: [join(import.meta.dirname, '..', 'src', 'bin.ts')],
+    entryPoints: [join(import.meta.dirname, '..', 'src', 'cli.ts')],
     external: ['@napi-rs/keyring'],
     format: 'esm',
     logLevel: 'silent',

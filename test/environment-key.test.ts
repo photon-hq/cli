@@ -1075,7 +1075,7 @@ const buildBundle = async (
     alias: aliases,
     bundle: true,
     conditions,
-    entryPoints: [join(root, 'src', 'bin.ts')],
+    entryPoints: [join(root, 'src', 'cli.ts')],
     external: ['@napi-rs/keyring'],
     format: 'esm',
     logLevel: 'silent',

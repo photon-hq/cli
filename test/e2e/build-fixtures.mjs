@@ -30,6 +30,9 @@ export const fixturesDirectory = (env = process.env) =>
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const windows = process.platform === 'win32'
+// The release archives are packed on the macOS runner, so their files belong
+// to its runner:staff, 501:20. GNU tar gives the Linux fixtures that owner too.
+const RELEASE_OWNER = ['--numeric-owner', '--owner=501', '--group=20']
 const tar = windows
   ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
   : 'tar'
@@ -95,6 +98,7 @@ const build = async (output) => {
       )
       run(tar, [
         windows ? '-a' : '-z',
+        ...(process.platform === 'linux' ? RELEASE_OWNER : []),
         '-c',
         '-f',
         join(release, asset),

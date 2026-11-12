@@ -42,7 +42,7 @@ the tests on the production target.
   `definition.ts`, read it from `context.values` in `run.ts`, and test it in
   the command's `test/<area>-cli.test.ts`. If the command changes something,
   also check the intent it records in `src/operation/types.ts`. Update the
-  command's page in `docs/`.
+  command's guide in photon-hq/docs (see `docs/README.md`).
 - Options several commands share are in `src/commands/args.ts`. The global
   options (`--json`, `--debug`, `--no-color`, `--org`, `--project`) are in
   `src/app/global-options.ts`.
@@ -79,10 +79,11 @@ the tests on the production target.
   `src/commands/legacy.ts` points Photon CLI 1.0 commands back to 1.0.
 - `src/commands/beta.ts` labels beta commands (`beta()`), and
   `test/beta.test.ts` lists them.
-- `docs/*.mdx.vel` and `docs/nav.json` are the user docs, published through
-  the docs repository (`docs/README.md` says how). `scripts/export-docs.ts`
-  exports the command reference. Internal notes go in `notes/`, never in
-  `docs/`.
+- The user guides live in photon-hq/docs under `cli/`, not in this repository
+  (`docs/README.md` says how they and the command reference are published). A
+  change that changes what a guide says comes with a photon-hq/docs pull
+  request. `scripts/export-docs.ts` exports the command reference. Internal
+  notes go in `notes/`.
 
 ## Commands
 
