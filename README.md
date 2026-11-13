@@ -55,8 +55,9 @@ Open a new terminal so it picks up the new `PATH`, then check that it runs:
 photon --version
 ```
 
-A `2.x` version is Photon CLI 1.0. pnpm and Yarn install a release only once it
-has been on npm for a day, and an older `photon` on your `PATH` can run first.
+A `2.x` version is Photon CLI 1.0. By default, pnpm and Yarn install a release
+only once it has been on npm for a day, and an older `photon` on your `PATH` can
+run first.
 The installation guide's
 [troubleshooting](https://photon.codes/docs/cli/installation#troubleshooting)
 covers both.
