@@ -21,7 +21,8 @@ pnpm add --global @photon-ai/cli
 bun add --global @photon-ai/cli
 ```
 
-With Yarn, add it to a project and run it as `yarn photon`:
+With Yarn, add it to a project, and run every `photon` command in this README
+as `yarn photon` from that project's folder:
 
 ```sh
 yarn add --dev @photon-ai/cli
@@ -44,18 +45,21 @@ On Windows, in PowerShell:
 irm https://github.com/photon-hq/cli/releases/latest/download/install.ps1 | iex
 ```
 
+To install the binary by hand, download the archive for your platform from the
+[latest release](https://github.com/photon-hq/cli/releases/latest), check it
+against the release's `checksums.txt`, and put `photon` on your `PATH`.
+
 Open a new terminal so it picks up the new `PATH`, then check that it runs:
 
 ```sh
 photon --version
 ```
 
-To install the binary by hand, download the archive for your platform from the
-[latest release](https://github.com/photon-hq/cli/releases/latest), check it
-against the release's `checksums.txt`, and put `photon` on your `PATH`.
-
-The [installation guide](https://photon.codes/docs/cli/installation) covers
-troubleshooting.
+A `2.x` version is Photon CLI 1.0. pnpm and Yarn install a release only once it
+has been on npm for a day, and an older `photon` on your `PATH` can run first.
+The installation guide's
+[troubleshooting](https://photon.codes/docs/cli/installation#troubleshooting)
+covers both.
 
 ## Get started
 
