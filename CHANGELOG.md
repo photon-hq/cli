@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.1.0 (2026-11-13)
+
+
+### Features
+
+* **completion:** add photon completion and reject unknown shells (ENG-5739)
+
 ## 3.0.2 (2026-11-12)
 
 

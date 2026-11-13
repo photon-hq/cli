@@ -67,7 +67,7 @@
     "test:release": "node --test scripts/build-config.production.node-test.mjs"
   },
   "type": "module",
-  "version": "3.0.2",
+  "version": "3.1.0",
   "description": "Photon CLI built with Gunshi for Node.js and standalone binaries.",
   "bin": {
     "photon": "./dist/bin.js",

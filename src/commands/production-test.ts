@@ -41,5 +41,5 @@ export const productionTestOf = (
 // Commands a Gunshi plugin adds have no definition here, so they are declared
 // by name.
 export const pluginCommandTests: Readonly<Record<string, ProductionTest>> = {
-  complete: runs
+  completion: runs
 }

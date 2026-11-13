@@ -76,7 +76,7 @@ describe('documentation metadata', () => {
     })
     expect(commands.map(({ path }) => path.join(' '))).toEqual([
       CLI_NAME,
-      `${CLI_NAME} complete`,
+      `${CLI_NAME} completion`,
       `${CLI_NAME} parent`,
       `${CLI_NAME} parent alias`,
       `${CLI_NAME} parent nested`
@@ -108,15 +108,19 @@ describe('documentation metadata', () => {
     expect(options?.some(({ name }) => name === 'secret-option')).toBe(false)
   })
 
-  it('documents the shell argument of complete', async () => {
+  it('documents the shell argument of completion, with a link to the setup guide', async () => {
     const commands = await commandMetadata({})
-    const complete = commands.find(
-      ({ path }) => path.join(' ') === `${CLI_NAME} complete`
+    const paths = commands.map(({ path }) => path.join(' '))
+    const completion = commands.find(
+      ({ path }) => path.join(' ') === `${CLI_NAME} completion`
     )
-    expect(complete?.options).toContainEqual(
+    expect(paths).not.toContain(`${CLI_NAME} complete`)
+    expect(completion?.options).toContainEqual(
       expect.objectContaining({
+        description:
+          'Shell to print the completion script for: bash, fish, powershell or zsh. Setup: https://photon.codes/docs/cli/shell-completion',
         name: 'shell',
-        required: false,
+        required: true,
         type: 'positional'
       })
     )

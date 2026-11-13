@@ -244,7 +244,7 @@ describe('production test declarations', () => {
     expect(
       commands.map(({ path, productionTest }) => [path, productionTest])
     ).toEqual([
-      ['complete', runs],
+      ['completion', runs],
       ['declared', runs],
       ['undeclared', undefined]
     ])

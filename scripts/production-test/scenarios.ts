@@ -170,14 +170,14 @@ const localState: Scenario = {
       'org clear removed the stored organization',
       (json) => fieldOf(json, 'cleared') === true
     )
-    const completion = await context.photon(
-      ['complete', '--', 'project', 'pl'],
-      { json: false, org: false }
-    )
+    const completion = await context.photon(['completion', 'zsh'], {
+      json: false,
+      org: false
+    })
     context.check(
       completion,
-      'completing "project pl" offers platform',
-      (text) => typeof text === 'string' && text.includes('platform')
+      'the zsh script calls back into complete',
+      (text) => typeof text === 'string' && text.includes(' complete -- ')
     )
     const update = await context.photon(['update', '--check'], { org: false })
     context.check(

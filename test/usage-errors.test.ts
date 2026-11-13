@@ -104,7 +104,7 @@ describe('usage errors', () => {
   )
 
   test.each([
-    [['complete', 'bash'], 'bash completion'],
+    [['completion', 'bash'], 'bash completion'],
     [['complete', '--', 'project', 'li'], 'list']
   ])(
     'leaves the arguments of %j to the completion command',
