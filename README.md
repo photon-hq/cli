@@ -4,12 +4,77 @@ Photon CLI is the command-line client for [Photon](https://photon.codes). It
 signs you in, manages your organizations and projects, and calls the Photon API
 from a terminal, a script or an agent.
 
-Install it and get started with the [CLI guide](https://photon.codes/docs/cli).
+## Install
 
-This repository holds the CLI's source as published with each release. Changes
-are made in Photon's private repository and reach this one with the next
-release, so pull requests aren't accepted here; see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Install the npm package with your package manager. It runs on Node.js 22 or
+newer.
+
+```sh
+npm install --global @photon-ai/cli
+```
+
+```sh
+pnpm add --global @photon-ai/cli
+```
+
+```sh
+bun add --global @photon-ai/cli
+```
+
+With Yarn, add it to a project and run it as `yarn photon`:
+
+```sh
+yarn add --dev @photon-ai/cli
+yarn photon --version
+```
+
+Or install the standalone binary, which doesn't need Node.js. The installer
+downloads the latest [release](https://github.com/photon-hq/cli/releases),
+checks its SHA-256 checksum and installs `photon` in `~/.local/bin` by default.
+
+On macOS and Linux:
+
+```sh
+curl -fsSL https://github.com/photon-hq/cli/releases/latest/download/install.sh | sh
+```
+
+On Windows, in PowerShell:
+
+```powershell
+irm https://github.com/photon-hq/cli/releases/latest/download/install.ps1 | iex
+```
+
+Open a new terminal so it picks up the new `PATH`, then check that it runs:
+
+```sh
+photon --version
+```
+
+To install the binary by hand, download the archive for your platform from the
+[latest release](https://github.com/photon-hq/cli/releases/latest), check it
+against the release's `checksums.txt`, and put `photon` on your `PATH`.
+
+The [installation guide](https://photon.codes/docs/cli/installation) covers
+troubleshooting.
+
+## Get started
+
+```sh
+photon login                         # sign in, approving the device code in a browser
+photon project list                  # list the projects in your organization
+photon link --project <project-id>   # use that project for commands in this folder
+```
+
+Where no one can approve a sign-in, as in CI, put a Photon key in
+`PHOTON_API_TOKEN` instead of running `photon login`. Add `--json` to any
+command for output a program can read, and `--help` to see its options.
+
+## Documentation
+
+- [CLI guide](https://photon.codes/docs/cli): installation, sign-in, projects,
+  JSON output and automation.
+- [Command reference](https://photon.codes/docs/cli/reference): every command
+  and option.
 
 ## Photon CLI 1.0
 
@@ -27,6 +92,13 @@ npm i -g @photon-ai/cli@legacy
 Report bugs and request features in
 [issues](https://github.com/photon-hq/cli/issues). Report security problems
 privately, as [SECURITY.md](SECURITY.md) describes.
+
+## Contributing
+
+This repository holds the CLI's source as published with each release. Changes
+are made in Photon's private repository and reach this one with the next
+release, so pull requests aren't accepted here; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
