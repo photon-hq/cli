@@ -3,18 +3,18 @@ USAGE:
   photon <COMMAND> [OPTIONS]
 
 COMMANDS:
-  account            Inspect and manage the Photon account
-  auth               Inspect and manage Photon authentication
-  complete           Generate shell completion script
-  link               Save a project for this folder in .photon/project.json
-  login              Log in with a device code or account service key
-  logout             Remove the local Photon session
-  operation          Inspect and recover local operations
-  org                Manage Photon organizations
-  project            Manage Photon projects
-  unlink             Remove the nearest .photon/project.json
-  update             Update the Photon CLI to the newest version
-  whoami             Show the canonical authenticated Photon account
+  account             Inspect and manage the Photon account
+  auth                Inspect and manage Photon authentication
+  completion          Generate shell completion script
+  link                Save a project for this folder in .photon/project.json
+  login               Log in with a device code or account service key
+  logout              Remove the local Photon session
+  operation           Inspect and recover local operations
+  org                 Manage Photon organizations
+  project             Manage Photon projects
+  unlink              Remove the nearest .photon/project.json
+  update              Update the Photon CLI to the newest version
+  whoami              Show the canonical authenticated Photon account
 
 OPTIONS:
   -h, --help                   Display this help message

@@ -1,3 +1,5 @@
+import { commandAgent } from './user-agent.ts'
+
 /**
  * A stream as the terminal rules read it: whether it is a terminal, and
  * whether it can move its cursor.
@@ -43,11 +45,12 @@ export const isTerminal = (stream: TerminalStream): boolean =>
   stream.isTTY === true
 
 /**
- * Why the CLI may not ask a question, or `undefined` when it may. It asks only
- * when standard input, output and error are all terminals, `CI` isn't on, and
- * there's no `--json`, `--no-input` or `PHOTON_NO_INPUT`.
+ * Why no person may be answering at the terminal, or `undefined` when one may:
+ * standard input, output and error are all terminals, `CI` isn't on, and
+ * there's no `--json`, `--no-input` or `PHOTON_NO_INPUT`. Output meant for a
+ * person at the terminal, such as a QR code, follows it.
  */
-export const promptBlocker = (
+export const terminalBlocker = (
   streams: TerminalStreams,
   options: PromptOptions
 ): string | undefined => {
@@ -71,6 +74,26 @@ export const promptBlocker = (
   }
   if (!isTerminal(streams.stderr)) {
     return 'standard error is not a terminal'
+  }
+}
+
+/**
+ * Why the CLI may not ask a question, or `undefined` when it may: what
+ * `terminalBlocker` says, or else that an AI agent is running the command
+ * (`commandAgent`), which `PHOTON_AGENT` set to `0`, `false`, `no` or `off`
+ * overrides.
+ */
+export const promptBlocker = (
+  streams: TerminalStreams,
+  options: PromptOptions
+): string | undefined => {
+  const blocker = terminalBlocker(streams, options)
+  if (blocker !== undefined) {
+    return blocker
+  }
+  const agent = commandAgent(options.env)
+  if (agent !== undefined) {
+    return `an AI agent is running this command (${agent})`
   }
 }
 

@@ -4,7 +4,7 @@ import { select as clackSelect, isCancel } from '@clack/prompts'
 import { argumentValidationError, CliError } from './errors.ts'
 import type { WritableOutput } from './output.ts'
 import { inert } from './presenter.ts'
-import { promptBlocker } from './terminal.ts'
+import { promptBlocker, terminalBlocker } from './terminal.ts'
 
 const DEFAULT_MAXIMUM_TEXT_INPUT_BYTES = 4096
 const BRACKETED_PASTE_SEQUENCES = ['\x1b[200~', '\x1b[201~'] as const
@@ -60,11 +60,20 @@ export interface TextSource {
 }
 
 /**
- * The error a confirmation raises when Photon can't ask, given why. A command
- * passes its own, which names what it would have done and the flag that
- * confirms it.
+ * The error a confirmation raises when Photon can't ask, given why. When an AI
+ * agent is the reason, `askTheUser` is the sentence that tells it to ask the
+ * user before it confirms with `--yes`, said after the reason: the CLI stops
+ * asking, but never confirms on anyone's behalf. A command passes its own,
+ * which names what it would have done and the flag that confirms it; the
+ * default assumes that flag is `--yes`, so a command without one passes its
+ * own.
  */
-export type BlockedConfirmation = (reason: string) => CliError
+export type BlockedConfirmation = (
+  reason: string,
+  askTheUser?: string
+) => CliError
+
+const ASK_THE_USER = 'Ask the user before you run the command again with --yes.'
 
 /** The path that names standard input instead of a file. */
 export const STANDARD_INPUT_PATH = '-'
@@ -72,10 +81,12 @@ export const STANDARD_INPUT_PATH = '-'
 const argumentError = (message: string, cause?: unknown): CliError =>
   argumentValidationError(message, { cause })
 
-const confirmationError = (reason: string): CliError =>
+const confirmationError: BlockedConfirmation = (reason, askTheUser) =>
   new CliError(
     'CONFIRMATION_REQUIRED',
-    `Photon can't ask for confirmation: ${reason}.`,
+    [`Photon can't ask for confirmation: ${reason}.`, askTheUser]
+      .filter((part) => part !== undefined)
+      .join(' '),
     { exitCode: 2 }
   )
 
@@ -318,6 +329,22 @@ export class CliInput {
   }
 
   /**
+   * `interactive` without the AI agent rule (`terminalBlocker`), since a
+   * person can watch the terminal an agent runs a command in. Output for a
+   * person, such as a QR code, follows it. While it holds, a question Photon
+   * can't ask was stopped by the agent rule alone, so a confirmation's error
+   * tells the agent to ask the user first.
+   */
+  get atTerminal(): boolean {
+    return (
+      terminalBlocker(
+        { stderr: this.#stderr, stdin: this.#stdin, stdout: this.#stdout },
+        { env: this.#env, json: this.#json, noInput: this.#noInput }
+      ) === undefined
+    )
+  }
+
+  /**
    * Fails as reading would when a value has no file or `-` and Photon can't
    * ask for it, or never asks for it (`asks` false). A command checks this
    * before its confirmation, so a rerun needs only `--yes`, and still reads
@@ -350,7 +377,7 @@ export class CliInput {
     }
     const reason = this.blocker
     if (reason !== undefined) {
-      throw blocked(reason)
+      throw blocked(reason, this.atTerminal ? ASK_THE_USER : undefined)
     }
 
     this.#beforeQuestion()
@@ -417,7 +444,10 @@ export class CliInput {
   ): Promise<boolean> {
     const reason = this.blocker
     if (reason !== undefined) {
-      throw (options.blocked ?? confirmationError)(reason)
+      throw (options.blocked ?? confirmationError)(
+        reason,
+        this.atTerminal ? ASK_THE_USER : undefined
+      )
     }
 
     this.#beforeQuestion()

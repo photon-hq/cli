@@ -96,6 +96,44 @@ export const detectAgent = (env: Environment): string | undefined => {
   return name !== undefined && AGENT_NAME_PATTERN.test(name) ? name : undefined
 }
 
+/**
+ * Markers that an agent sets for the commands it runs, and the agent each
+ * names. Unlike `KNOWN_AGENTS`, which names an agent for the User-Agent, the
+ * list leaves out what people's own terminals carry too: `CLAUDECODE`
+ * (IDE extensions set it in their integrated terminals), `CURSOR_TRACE_ID`,
+ * `REPL_ID` (set throughout a Replit environment), `GOOSE_PROVIDER` and
+ * `TERM_PROGRAM=kiro`.
+ */
+const COMMAND_AGENT_MARKERS: readonly Required<KnownAgent>[] = [
+  { detect: isSet('CLAUDE_CODE_CHILD_SESSION'), name: 'claude-code' },
+  { detect: isSet('CODEX_CI', 'CODEX_THREAD_ID'), name: 'codex' },
+  { detect: isSet('GEMINI_CLI'), name: 'gemini-cli' },
+  { detect: isSet('OPENCODE'), name: 'opencode' },
+  { detect: isSet('CURSOR_AGENT'), name: 'cursor' },
+  { detect: isSet('COPILOT_AGENT'), name: 'github-copilot' },
+  { detect: isSet('CLINE_ACTIVE'), name: 'cline' },
+  { detect: isSet('ROO_ACTIVE'), name: 'roo-code' },
+  { detect: (env) => env.AGENT === 'goose', name: 'goose' }
+]
+
+/**
+ * The AI agent running this command, which may not be asked anything, or
+ * `undefined` when none is. `AI_AGENT` names it unless it is `0`, `false`,
+ * `no` or `off`; otherwise a marker in `COMMAND_AGENT_MARKERS` does.
+ * `PHOTON_AGENT` set to `0`, `false`, `no` or `off` says a person is running
+ * it, whatever the markers say.
+ */
+export const commandAgent = (env: Environment): string | undefined => {
+  if (NOT_AN_AGENT.has((env.PHOTON_AGENT ?? '').trim().toLowerCase())) {
+    return
+  }
+  const aiAgent = (env.AI_AGENT ?? '').trim()
+  if (aiAgent !== '' && !NOT_AN_AGENT.has(aiAgent.toLowerCase())) {
+    return detectAgent(env) ?? UNKNOWN_AGENT
+  }
+  return COMMAND_AGENT_MARKERS.find(({ detect }) => detect(env))?.name
+}
+
 const runtime = (versions: UserAgentHost['versions']): string =>
   versions.bun === undefined ? `node/${versions.node}` : `bun/${versions.bun}`
 

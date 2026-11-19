@@ -4,7 +4,8 @@ import {
   canShowSpinner,
   canUseColor,
   isOn,
-  promptBlocker
+  promptBlocker,
+  terminalBlocker
 } from '../src/core/terminal.ts'
 
 const terminal = {
@@ -70,6 +71,141 @@ describe('promptBlocker', () => {
         { stderr: pipe, stdin: pipe, stdout: pipe },
         { env: { CI: '1', PHOTON_NO_INPUT: '1' }, json: true, noInput: true }
       )
+    ).toBe('--json is set')
+  })
+})
+
+describe('promptBlocker when an AI agent runs the command', () => {
+  const agentReason = (agent: string): string =>
+    `an AI agent is running this command (${agent})`
+
+  test.each([
+    [{ AI_AGENT: 'codex' }, 'codex'],
+    [{ AI_AGENT: 'claude-code_2-1-284_agent' }, 'claude-code'],
+    [{ AI_AGENT: 'github_copilot_vscode_agent' }, 'github-copilot'],
+    [{ AI_AGENT: 'opencode', OPENCODE: '1' }, 'opencode'],
+    [{ AI_AGENT: '!!!' }, 'unknown'],
+    [{ CLAUDE_CODE_CHILD_SESSION: '1' }, 'claude-code'],
+    [{ CODEX_CI: '1' }, 'codex'],
+    [{ CODEX_THREAD_ID: 'thread_1' }, 'codex'],
+    [{ GEMINI_CLI: '1' }, 'gemini-cli'],
+    [{ OPENCODE: '1' }, 'opencode'],
+    [{ CURSOR_AGENT: '1' }, 'cursor'],
+    [{ COPILOT_AGENT: '1' }, 'github-copilot'],
+    [{ CLINE_ACTIVE: 'true' }, 'cline'],
+    [{ ROO_ACTIVE: 'true' }, 'roo-code'],
+    [{ AGENT: 'goose' }, 'goose'],
+    [{ AI_AGENT: 'off', GEMINI_CLI: '1' }, 'gemini-cli'],
+    [{ CLAUDE_CODE_CHILD_SESSION: '1', CLAUDECODE: '1' }, 'claude-code']
+  ])('blocks at a terminal with %j, naming %s', (env, agent) => {
+    expect(promptBlocker(terminals, { ...asked, env })).toBe(agentReason(agent))
+  })
+
+  test.each([
+    { CLAUDECODE: '1' },
+    { CURSOR_TRACE_ID: 'trace_1' },
+    { REPL_ID: 'repl_1' },
+    { GOOSE_PROVIDER: 'openai' },
+    { TERM_PROGRAM: 'kiro' },
+    { AGENT: '1' },
+    { AI_AGENT: '' },
+    { AI_AGENT: ' ' },
+    { AI_AGENT: '0' },
+    { AI_AGENT: 'false' },
+    { AI_AGENT: 'No' },
+    { AI_AGENT: 'OFF' },
+    { CODEX_CI: '', GEMINI_CLI: '' },
+    { PHOTON_AGENT: 'yes' }
+  ])('lets the CLI ask at a terminal with only %j', (env) => {
+    expect(promptBlocker(terminals, { ...asked, env })).toBeUndefined()
+  })
+
+  test.each(['no', 'NO', ' no ', '0', 'false', 'False', 'off', ' OFF '])(
+    'PHOTON_AGENT=%j lifts the agent reason',
+    (value) => {
+      expect(
+        promptBlocker(terminals, {
+          ...asked,
+          env: { AI_AGENT: 'codex', CODEX_CI: '1', PHOTON_AGENT: value }
+        })
+      ).toBeUndefined()
+    }
+  )
+
+  test.each(['', ' ', 'yes', 'YES', '1', 'true', 'on', 'nope'])(
+    'PHOTON_AGENT=%j leaves the agent reason',
+    (value) => {
+      expect(
+        promptBlocker(terminals, {
+          ...asked,
+          env: { CODEX_CI: '1', PHOTON_AGENT: value }
+        })
+      ).toBe(agentReason('codex'))
+    }
+  )
+
+  test.each([
+    ['--json is set', terminals, { ...asked, json: true }],
+    ['--no-input is set', terminals, { ...asked, noInput: true }],
+    [
+      'PHOTON_NO_INPUT is set',
+      terminals,
+      { ...asked, env: { PHOTON_NO_INPUT: '1' } }
+    ],
+    ['CI is set', terminals, { ...asked, env: { CI: 'true' } }],
+    ['standard input is not a terminal', { ...terminals, stdin: pipe }, asked],
+    [
+      'standard output is not a terminal',
+      { ...terminals, stdout: pipe },
+      asked
+    ],
+    ['standard error is not a terminal', { ...terminals, stderr: pipe }, asked]
+  ])('PHOTON_AGENT=no still blocks: "%s"', (reason, streams, options) => {
+    expect(
+      promptBlocker(streams, {
+        ...options,
+        env: { ...options.env, AI_AGENT: 'codex', PHOTON_AGENT: 'no' }
+      })
+    ).toBe(reason)
+  })
+
+  test('leaves terminalBlocker, which output for a person follows, to the other reasons', () => {
+    expect(
+      terminalBlocker(terminals, {
+        ...asked,
+        env: { AI_AGENT: 'codex', CODEX_CI: '1' }
+      })
+    ).toBeUndefined()
+    expect(
+      terminalBlocker(
+        { ...terminals, stdout: pipe },
+        { ...asked, env: { CODEX_CI: '1' } }
+      )
+    ).toBe('standard output is not a terminal')
+    expect(
+      terminalBlocker(terminals, { ...asked, env: { CI: '1', CODEX_CI: '1' } })
+    ).toBe('CI is set')
+  })
+
+  test('names the reason a run already had before the agent', () => {
+    expect(
+      promptBlocker(
+        { ...terminals, stdin: pipe },
+        { ...asked, env: { CODEX_CI: '1' } }
+      )
+    ).toBe('standard input is not a terminal')
+    expect(
+      promptBlocker(terminals, {
+        ...asked,
+        env: { AI_AGENT: 'codex', CI: '1' }
+      })
+    ).toBe('CI is set')
+    expect(
+      promptBlocker(terminals, {
+        ...asked,
+        env: { AI_AGENT: 'codex', CODEX_CI: '1' },
+        json: true
+      })
     ).toBe('--json is set')
   })
 })

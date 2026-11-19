@@ -94,7 +94,7 @@ const telegramSetupQr = async (
   photon: PhotonCommandServices,
   setupUrl: string
 ): Promise<string[]> => {
-  if (!photon.input.interactive) {
+  if (!photon.input.atTerminal) {
     return []
   }
   try {
