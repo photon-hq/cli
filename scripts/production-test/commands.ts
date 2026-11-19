@@ -46,6 +46,16 @@ const isPrefix = (prefix: readonly string[], path: readonly string[]) =>
   prefix.length < path.length &&
   prefix.every((name, index) => path[index] === name)
 
+// The commands that run something: not the root, and not a group that only
+// prints help.
+export const leafCommands = <Command extends { path: readonly string[] }>(
+  commands: readonly Command[]
+): Command[] =>
+  commands.filter(
+    ({ path }) =>
+      path.length > 0 && !commands.some((other) => isPrefix(path, other.path))
+  )
+
 // The commands the docs exporter lists, less the root and the groups, which
 // only print help, each with the declaration its definition carries.
 export const publicCommands = async (
@@ -54,31 +64,26 @@ export const publicCommands = async (
   const metadata = (await commandMetadata(subCommands)).map(
     ({ options, path }) => ({ options, path: path.slice(1) })
   )
-  return metadata
-    .filter(
-      ({ path }) =>
-        path.length > 0 && !metadata.some((other) => isPrefix(path, other.path))
-    )
-    .map(({ options, path }) => {
-      const name = path.join(' ')
-      const command = commandAt(subCommands, path)
-      return {
-        options: options.map((option) => ({
-          global: option.global,
-          multiple: option.multiple ?? false,
-          name: option.name,
-          negatable: option.negatable ?? false,
-          required: option.required ?? false,
-          ...(option.short === undefined ? {} : { short: option.short }),
-          type: option.type
-        })),
-        path: name,
-        productionTest:
-          command === undefined
-            ? pluginCommandTests[name]
-            : productionTestOf(command)
-      }
-    })
+  return leafCommands(metadata).map(({ options, path }) => {
+    const name = path.join(' ')
+    const command = commandAt(subCommands, path)
+    return {
+      options: options.map((option) => ({
+        global: option.global,
+        multiple: option.multiple ?? false,
+        name: option.name,
+        negatable: option.negatable ?? false,
+        required: option.required ?? false,
+        ...(option.short === undefined ? {} : { short: option.short }),
+        type: option.type
+      })),
+      path: name,
+      productionTest:
+        command === undefined
+          ? pluginCommandTests[name]
+          : productionTestOf(command)
+    }
+  })
 }
 
 export const undeclaredCommands = (

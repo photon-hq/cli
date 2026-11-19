@@ -43,13 +43,18 @@ const question = (risky: RiskyAction): string =>
 const confirmationRequired = (
   command: ConfirmingCommand,
   risky: RiskyAction,
-  reason: string
+  reason: string,
+  askTheUser: string | undefined
 ): CliError =>
   new CliError(
     'CONFIRMATION_REQUIRED',
     `This would ${risky.action}. Confirm it with --yes.`,
     {
-      detail: [risky.consequence, `Photon can't ask because ${reason}.`]
+      detail: [
+        risky.consequence,
+        `Photon can't ask because ${reason}.`,
+        askTheUser
+      ]
         .filter((part) => part !== undefined)
         .join(' '),
       exitCode: 2,
@@ -70,7 +75,8 @@ const confirmationRequired = (
  * Whether to go ahead with a risky action: `--yes` says so; at a terminal
  * the person answers y/N, or types what `typed` names. Where Photon can't
  * ask, it fails with `CONFIRMATION_REQUIRED`, whose next step is the same
- * command with `--yes`.
+ * command with `--yes`; when an AI agent is why, the detail tells it to ask
+ * the user first.
  */
 export const confirmRiskyAction = async (
   command: ConfirmingCommand,
@@ -80,8 +86,8 @@ export const confirmRiskyAction = async (
     return true
   }
   const { input } = command.extensions.photon
-  const blocked = (reason: string): CliError =>
-    confirmationRequired(command, risky, reason)
+  const blocked = (reason: string, askTheUser?: string): CliError =>
+    confirmationRequired(command, risky, reason, askTheUser)
   if (risky.typed !== undefined) {
     return await input.confirmExact(risky.typed, {
       blocked,

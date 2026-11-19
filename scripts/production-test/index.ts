@@ -15,6 +15,12 @@ import { type VerifiedFile, verifyFiles } from './files.ts'
 import { latestReleaseSkip } from './latest.ts'
 import { planPass, planProblems } from './plan.ts'
 import {
+  commandSkew,
+  referenceCommands,
+  skewMarkdown,
+  sourceTag
+} from './release.ts'
+import {
   countsLine,
   type JobReport,
   jobMarkdown,
@@ -100,6 +106,45 @@ const latest = (args: string[]) => {
   process.stdout.write(
     `${JSON.stringify(reason === undefined ? { run: true } : { reason, run: false })}\n`
   )
+}
+
+// Prints the tag of this repository that holds the test a published release
+// shipped with, for the workflow to check out.
+const sourceTagOf = (args: string[]) => {
+  process.stdout.write(
+    `${sourceTag(args[0] ?? fail('Usage: source-tag <version>'))}\n`
+  )
+}
+
+// Lists the commands main has that a published release doesn't, and the
+// other way round, from the release's docs-reference.json. The run itself
+// uses the release's own test, so this only reports what it leaves out.
+const skew = async (args: string[]) => {
+  const { values } = parseArgs({
+    args,
+    options: {
+      output: { type: 'string' },
+      reference: { type: 'string' },
+      version: { type: 'string' }
+    }
+  })
+  const version = values.version ?? fail('--version <version> is required')
+  const reference =
+    values.reference ?? fail('--reference <docs-reference.json> is required')
+  const output = values.output ?? fail('--output <directory> is required')
+  const result = commandSkew(
+    (await publicCommands()).map(({ path }) => path),
+    referenceCommands(await readFile(reference, 'utf8'), version)
+  )
+  const markdown = skewMarkdown(version, result)
+  await mkdir(output, { recursive: true })
+  await writeFile(
+    join(output, 'command-skew.json'),
+    `${JSON.stringify({ schemaVersion: 1, version, ...result }, null, 2)}\n`
+  )
+  await writeFile(join(output, 'command-skew.md'), `${markdown.join('\n')}\n`)
+  await writeSummary(markdown)
+  process.stdout.write(`${markdown.join('\n')}\n`)
 }
 
 const childEnvironment = (home: string): NodeJS.ProcessEnv => ({
@@ -243,11 +288,17 @@ switch (subcommand) {
   case 'plan':
     await plan()
     break
+  case 'skew':
+    await skew(rest)
+    break
+  case 'source-tag':
+    sourceTagOf(rest)
+    break
   case 'run':
     await run(rest)
     break
   default:
     fail(
-      'Usage: production-test check | plan | files <directory> | latest <version> | run'
+      'Usage: production-test check | plan | files <directory> | latest <version> | source-tag <version> | skew | run'
     )
 }

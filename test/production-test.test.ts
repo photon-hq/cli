@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -21,6 +21,12 @@ import {
   latestReleaseSkip
 } from '../scripts/production-test/latest.ts'
 import { planPass, planProblems } from '../scripts/production-test/plan.ts'
+import {
+  commandSkew,
+  referenceCommands,
+  skewMarkdown,
+  sourceTag
+} from '../scripts/production-test/release.ts'
 import {
   counts,
   failureLines,
@@ -244,7 +250,7 @@ describe('production test declarations', () => {
     expect(
       commands.map(({ path, productionTest }) => [path, productionTest])
     ).toEqual([
-      ['complete', runs],
+      ['completion', runs],
       ['declared', runs],
       ['undeclared', undefined]
     ])
@@ -760,6 +766,178 @@ describe('production test of the latest release', () => {
       run: false
     })
     expect(await decision('3.0.0')).toEqual({ run: true })
+  })
+})
+
+// A release's docs-reference.json, as photon-hq/cli attaches it: the root,
+// the groups and the commands, each as a path that starts with the CLI's name.
+const releaseReference = (version: string, paths: readonly string[]): string =>
+  JSON.stringify({
+    commands: [
+      { path: ['photon'] },
+      ...paths.map((path) => ({ path: ['photon', ...path.split(' ')] }))
+    ],
+    family: 'cli-stable',
+    schemaVersion: 1,
+    source: { package: '@photon-ai/cli', version }
+  })
+
+describe('production test of a published release', () => {
+  it("names the tag that holds the release's own test", () => {
+    expect(sourceTag('3.0.2')).toBe('cli-v3.0.2')
+    expect(sourceTag('3.1.0-rc.1')).toBe('cli-v3.1.0-rc.1')
+    for (const version of ['', '3.0', 'v3.0.2', '3.0.2/../main', '3.0.2 x']) {
+      expect(() => sourceTag(version), version).toThrow(
+        `"${version}" isn't a release version.`
+      )
+    }
+  })
+
+  it('lists the commands a release ships, without the root and the groups', () => {
+    const reference = releaseReference('3.0.2', [
+      'account',
+      'account view',
+      'complete',
+      'org',
+      'org oauth-client',
+      'org oauth-client secret',
+      'org oauth-client secret rotate',
+      'update'
+    ])
+    expect(referenceCommands(reference, '3.0.2')).toEqual([
+      'account view',
+      'complete',
+      'org oauth-client secret rotate',
+      'update'
+    ])
+  })
+
+  it("refuses a command list that is another release's or malformed", () => {
+    expect(() =>
+      referenceCommands(releaseReference('3.0.1', ['update']), '3.0.2')
+    ).toThrow('docs-reference.json is for 3.0.1, not 3.0.2.')
+    expect(() =>
+      referenceCommands(
+        JSON.stringify({
+          commands: [{ description: 'no path' }],
+          source: { version: '3.0.2' }
+        }),
+        '3.0.2'
+      )
+    ).toThrow('docs-reference.json has a command with no path.')
+  })
+
+  it('leaves out what only main has, and still runs what only the release has', () => {
+    const skew = commandSkew(
+      ['account view', 'completion', 'update'],
+      ['account view', 'complete', 'update']
+    )
+    expect(skew).toEqual({
+      onlyInRelease: ['complete'],
+      onlyOnMain: ['completion']
+    })
+    expect(skewMarkdown('3.0.2', skew)).toEqual([
+      '## Commands in 3.0.2 and on main',
+      '',
+      "The test is the one in cli-v3.0.2, not main's, so it runs the commands 3.0.2 ships, as 3.0.2 declares them.",
+      '',
+      'On main but not in 3.0.2, so not run: `completion`.',
+      '',
+      'In 3.0.2 but not on main, and run: `complete`.',
+      ''
+    ])
+    expect(
+      skewMarkdown('3.0.2', commandSkew(['update'], ['update']))
+    ).toContain('Every command on main is in 3.0.2.')
+  })
+
+  it("reports the commands main has that a release lacks, from the release's reference", async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'production-test-skew-'))
+    const reference = join(directory, 'docs-reference.json')
+    await writeFile(reference, releaseReference('3.0.2', ['retired command']))
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        PRODUCTION_TEST_COMMAND,
+        'skew',
+        '--reference',
+        reference,
+        '--version',
+        '3.0.2',
+        '--output',
+        directory
+      ],
+      { cwd: ROOT }
+    )
+    const written = JSON.parse(
+      await readFile(join(directory, 'command-skew.json'), 'utf8')
+    )
+    expect(written).toMatchObject({
+      onlyInRelease: ['retired command'],
+      schemaVersion: 1,
+      version: '3.0.2'
+    })
+    expect(written.onlyOnMain).toContain('update')
+    expect(stdout).toContain('On main but not in 3.0.2, so not run: ')
+    expect(stdout).toContain(
+      'In 3.0.2 but not on main, and run: `retired command`.'
+    )
+    expect(await readFile(join(directory, 'command-skew.md'), 'utf8')).toBe(
+      `${stdout}`
+    )
+  })
+
+  it('prints the tag for the workflow', async () => {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      ['--import', 'tsx', PRODUCTION_TEST_COMMAND, 'source-tag', '3.0.2'],
+      { cwd: ROOT }
+    )
+    expect(stdout).toBe('cli-v3.0.2\n')
+  })
+
+  it('tests a release without the commands main added, as the release declares them', async () => {
+    const releaseScenario: Scenario = {
+      name: 'things',
+      passes: ['first', 'second'],
+      async run(context) {
+        const created = await context.photon([
+          'thing',
+          'create',
+          '--name',
+          context.name('thing')
+        ])
+        context.defer(['thing', 'delete', context.value(created, 'thing.id')])
+        await context.photon(['thing', 'list'])
+      }
+    }
+    const released = fixtureCommands.filter(({ path }) => path !== 'thing buy')
+    const run = async (commands: readonly PublicCommand[]) => {
+      const invocations = await runScenarios({
+        commands,
+        executor: fakePhoton().executor,
+        namePrefix: 'photon-cli-test-1',
+        organizationId: ORGANIZATION,
+        pass: 'first',
+        scenarios: [releaseScenario],
+        serviceKey: SERVICE_KEY
+      })
+      return passReport('first', commands, new Set(), invocations)
+    }
+    const withReleaseCommands = await run(released)
+    expect(passFailed(withReleaseCommands)).toBe(false)
+    expect(counts(withReleaseCommands)).toEqual({
+      'expected error': 0,
+      failed: 0,
+      passed: 3,
+      skipped: 1
+    })
+    const withMainCommands = await run(fixtureCommands)
+    expect(failureLines(withMainCommands)).toEqual([
+      '- Not reached, because an earlier step failed: `thing buy`'
+    ])
   })
 })
 

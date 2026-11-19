@@ -10,7 +10,7 @@ import {
   isArgsValidationError,
   isCommandNotFoundError
 } from 'gunshi'
-import { completionPlugin } from './app/completion.ts'
+import { completionPlugin, requireCompletionShell } from './app/completion.ts'
 import { printUsage } from './app/help.ts'
 import { createPhotonPlugin, type PhotonPluginOptions } from './app/plugin.ts'
 import type { PhotonExtensions } from './app/services.ts'
@@ -115,6 +115,7 @@ export async function runCli(
     const usage = await cli(commandArgs, entry, {
       description: CLI_DESCRIPTION,
       name: CLI_NAME,
+      onBeforeCommand: requireCompletionShell,
       plugins: [
         suggestion(),
         completionPlugin(),

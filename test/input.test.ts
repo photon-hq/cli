@@ -47,6 +47,7 @@ describe('CLI input', () => {
   test('rejects confirmation on non-interactive stdin', async () => {
     const input = new CliInput({ stdin: inputStream('', false) })
 
+    expect(input.atTerminal).toBe(false)
     await expect(input.confirm('Continue?')).rejects.toMatchObject({
       code: 'CONFIRMATION_REQUIRED',
       exitCode: 2
@@ -134,6 +135,105 @@ describe('CLI input', () => {
 
       await expect(input.confirmExact('+14155550199')).resolves.toBe(expected)
       expect(stderr.value()).toBe('Type +14155550199 to confirm: ')
+    }
+  )
+
+  test('asks nothing at a terminal when an AI agent runs the command, and names it', async () => {
+    const reason = 'an AI agent is running this command (codex)'
+    const question = 'Which WhatsApp onboarding path should be used?'
+    const stderr = collector(true)
+    const input = new CliInput({
+      env: { AI_AGENT: 'codex' },
+      stderr,
+      stdin: inputStream('y\n', true),
+      stdout: collector(true)
+    })
+
+    expect(input.blocker).toBe(reason)
+    expect(input.interactive).toBe(false)
+    expect(input.atTerminal).toBe(true)
+    await expect(input.confirm('Continue?')).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      exitCode: 2,
+      message: `Photon can't ask for confirmation: ${reason}. Ask the user before you run the command again with --yes.`
+    })
+    await expect(input.confirmExact('+14155550199')).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      exitCode: 2,
+      message: `Photon can't ask for confirmation: ${reason}. Ask the user before you run the command again with --yes.`
+    })
+    await expect(
+      input.select(question, [{ label: 'BYON', value: 'byon' }], '--source')
+    ).rejects.toMatchObject({
+      code: 'ARGUMENT_VALIDATION',
+      detail: `Photon can't ask "${question}": ${reason}. Pass the answer with --source.`,
+      exitCode: 2
+    })
+    await expect(input.prompt('Project name')).rejects.toMatchObject({
+      code: 'ARGUMENT_VALIDATION',
+      detail: `Photon can't ask for Project name: ${reason}.`
+    })
+    await expect(input.promptSecret('Token')).rejects.toMatchObject({
+      code: 'ARGUMENT_VALIDATION',
+      detail: `Photon can't ask for Token: ${reason}.`
+    })
+    await expect(input.promptOptional('Description')).rejects.toMatchObject({
+      code: 'ARGUMENT_VALIDATION',
+      detail: `Photon can't ask for Description: ${reason}.`
+    })
+    const missingSource = `Pass --key-file with a file, or --key-file - to read it from standard input. Photon can't ask for it: ${reason}.`
+    expect(() => input.requireSource(undefined, '--key-file')).toThrowError(
+      expect.objectContaining({
+        code: 'ARGUMENT_VALIDATION',
+        detail: missingSource
+      })
+    )
+    await expect(
+      input.readExactSecret(undefined, {
+        fileDescription: 'key file',
+        label: 'Key',
+        maximumBytes: 4096,
+        option: '--key-file'
+      })
+    ).rejects.toMatchObject({
+      code: 'ARGUMENT_VALIDATION',
+      detail: missingSource
+    })
+    expect(stderr.value()).toBe('')
+  })
+
+  test('tells an AI agent to ask the user only when the agent is the reason', async () => {
+    const input = new CliInput({
+      env: { AI_AGENT: 'codex' },
+      noInput: true,
+      stderr: collector(true),
+      stdin: inputStream('y\n', true),
+      stdout: collector(true)
+    })
+
+    await expect(input.confirm('Continue?')).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      message: "Photon can't ask for confirmation: --no-input is set."
+    })
+    await expect(input.confirmExact('+14155550199')).rejects.toMatchObject({
+      code: 'CONFIRMATION_REQUIRED',
+      message: "Photon can't ask for confirmation: --no-input is set."
+    })
+  })
+
+  test.each(['no', '0', 'false', 'off'])(
+    'asks at a terminal when PHOTON_AGENT=%j, even with an agent marker',
+    async (value) => {
+      const stderr = collector(true)
+      const input = new CliInput({
+        env: { CODEX_CI: '1', PHOTON_AGENT: value },
+        stderr,
+        stdin: inputStream('y\n', true),
+        stdout: collector(true)
+      })
+
+      await expect(input.confirm('Continue?')).resolves.toBe(true)
+      expect(stderr.value()).toBe('Continue? [y/N] ')
     }
   )
 

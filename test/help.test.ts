@@ -109,8 +109,8 @@ const ROW_WITH_SYMBOLS = /^ {2}\S+ [<[]/mu
 const LIMIT_ROW =
   /^ {2}--limit <limit> +Maximum number of records to return \(default: 30\)$/mu
 
-const COMPLETE_SHELL_ROW =
-  /^ {2}shell +Shell to print the completion script for: bash, fish, powershell or zsh$/mu
+const COMPLETION_SHELL_ROW =
+  /^ {2}shell +Shell to print the completion script for: bash, fish, powershell or zsh\. Setup: https:\/\/photon\.codes\/docs\/cli\/shell-completion$/mu
 
 const OPTION_WITH_BRACKETED_VALUE = /^ +(?:-\S, )?--\S+ \[/u
 
@@ -234,7 +234,7 @@ describe('help', () => {
     const names = commandRows(help).map(rowName)
 
     expect(names).toEqual(
-      [...Object.keys(photonCommands), 'complete'].sort((left, right) =>
+      [...Object.keys(photonCommands), 'completion'].sort((left, right) =>
         left.localeCompare(right, 'en')
       )
     )
@@ -255,13 +255,13 @@ describe('help', () => {
     }
   })
 
-  test('shows the shell argument of complete', async () => {
-    const help = await runSignedOut(['complete', '--help'])
+  test('shows the shell argument of completion, with the setup guide', async () => {
+    const help = await runSignedOut(['completion', '--help'])
 
     expect(help.printed).toContain(
-      `USAGE:\n  ${CLI_NAME} complete [OPTIONS] [<shell>]`
+      `USAGE:\n  ${CLI_NAME} completion [OPTIONS] <shell>`
     )
-    expect(help.printed).toMatch(COMPLETE_SHELL_ROW)
+    expect(help.printed).toMatch(COMPLETION_SHELL_ROW)
     expect(help.exitCodes).toEqual([])
   })
 

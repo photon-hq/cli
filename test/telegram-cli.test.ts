@@ -108,6 +108,7 @@ interface InvokeOptions {
   /** A signed-in configuration to share between runs; a fresh one without. */
   configDirectory?: string
   confirm?: (message: string) => Promise<boolean>
+  env?: NodeJS.ProcessEnv
   interactive?: boolean
   stdout?: WritableOutput
 }
@@ -147,6 +148,7 @@ const invoke = async (
       configDirectory: authenticated.configDirectory,
       ...(options.confirm === undefined ? {} : { confirm: options.confirm }),
       deviceScope: unusedDeviceScope(),
+      ...(options.env === undefined ? {} : { env: options.env }),
       mfaQr,
       now: () => TEST_NOW,
       organizationScope: asOrganizationScope(),
@@ -304,6 +306,24 @@ describe(`${CLI_NAME} project platform telegram connect`, () => {
     expect(result.stdout).toContain('Connected @AlexSupportBot.')
     expect(result.stdout).toContain('Alex Support')
     expect(result.clock.sleeps).toEqual([5000, 5000])
+    expect(result.exitCodes).toEqual([])
+  })
+
+  test('still shows the code to scan when an AI agent runs it in a terminal', async () => {
+    const scope = createScope()
+    scope.platforms.listResources.mockResolvedValueOnce({ resources: [] })
+    scope.platforms.getOperation.mockResolvedValueOnce({
+      operation: operation('running')
+    })
+
+    const result = await invoke(['connect'], scope, {
+      env: { CODEX_CI: '1' },
+      interactive: true
+    })
+
+    expect(result.mfaQr).toHaveBeenCalledExactlyOnceWith(SETUP_URL)
+    expect(result.stdout).toContain(QR)
+    expect(result.stdout).toContain('Connected @AlexSupportBot.')
     expect(result.exitCodes).toEqual([])
   })
 

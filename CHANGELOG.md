@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.1.0 (2026-11-19)
+
+
+### Features
+
+* **completion:** add photon completion and reject unknown shells (ENG-5739)
+
+
+### Bug Fixes
+
+* **cli:** don't wait for an answer when an AI agent runs the CLI in a terminal (ENG-6107)
+
 ## 3.0.2 (2026-11-12)
 
 
