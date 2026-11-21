@@ -1,0 +1,191 @@
+name: Installers
+
+# Checks the installers that the latest release serves, with the commands the
+# install page gives: install.sh on Linux and macOS, and install.ps1 on
+# Windows under both Windows PowerShell and PowerShell 7. Each job starts on a
+# fresh GitHub-hosted runner with no Photon CLI and downloads the installer
+# from github.com. It passes only when the installer says it installed the
+# released version and `photon --version` prints exactly that version. Both
+# installers print "Installed Photon CLI <version> at <path>" only after the
+# downloaded archive's SHA-256 matched the release's checksums.txt, and stop
+# with an error otherwise, so that line and the exit code show the checksum
+# was checked.
+#
+# It runs after each run of release.yml, the workflow that publishes releases,
+# and checks the release of the tag that run ran on, once it is published: a
+# run that failed after publishing (in its docs job) is checked, and a run on
+# a tag with no published release has nothing to check. It can't run on the
+# release event: release.yml
+# publishes the release with its GITHUB_TOKEN, and GitHub starts no workflow
+# for events that token causes. Run this by hand (gh workflow run
+# installers.yml) to check the current latest release. It also runs on pull
+# requests that change it.
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+  pull_request:
+    paths: [.github/workflows/installers.yml]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  version:
+    name: Find the released version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      # After release.yml, the release is the tag it ran on, if that run
+      # published it (GitHub finds a release by its tag only once it is
+      # published); otherwise the latest release.
+      - id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_RUN: ${{ github.event.workflow_run.html_url }}
+          RELEASED_TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ]; then
+            tag="$RELEASED_TAG"
+            published=false
+            if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --silent 2> "$RUNNER_TEMP/lookup.log"; then
+                published=true
+              elif ! grep -q 'HTTP 404' "$RUNNER_TEMP/lookup.log"; then
+                cat "$RUNNER_TEMP/lookup.log"
+                echo "::error::Could not look up the $tag release"
+                exit 1
+              fi
+            fi
+            if [ "$published" = false ]; then
+              echo "::notice::The Release run $RELEASE_RUN published no release, so there is nothing to check"
+              exit 0
+            fi
+          else
+            tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          fi
+          [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || { echo "::error::Expected a v<version> release tag, got '$tag'"; exit 1; }
+          version="${BASH_REMATCH[1]}"
+          for installer in install.sh install.ps1; do
+            url="https://github.com/photon-hq/cli/releases/latest/download/$installer"
+            location="$(curl -fsS -o /dev/null -w '%{redirect_url}' "$url")" || { echo "::error::$url failed"; exit 1; }
+            test "$location" = "https://github.com/photon-hq/cli/releases/download/$tag/$installer" || { echo "::error::$url leads to '$location', not $tag's $installer"; exit 1; }
+            status="$(curl -fsSL -o /dev/null -w '%{http_code}' "$url")" || { echo "::error::$url failed"; exit 1; }
+            echo "$url serves $tag's $installer: HTTP $status"
+          done
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  install-sh:
+    name: install.sh (${{ matrix.os }})
+    needs: version
+    if: needs.version.outputs.version != ''
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      CHECK: install.sh with sh on ${{ matrix.os }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Check that the runner has no Photon CLI
+        run: |
+          if found="$(command -v photon)"; then
+            echo "::error::$CHECK: the runner already has photon at $found"
+            exit 1
+          fi
+
+      - name: Install with the latest release's install.sh
+        id: install
+        run: |
+          if ! curl -fsSL https://github.com/photon-hq/cli/releases/latest/download/install.sh | sh | tee "$RUNNER_TEMP/install.log"; then
+            echo "::error::$CHECK: the installer failed, see its output above"
+            exit 1
+          fi
+          installed="Installed Photon CLI $VERSION at "
+          line="$(grep -m 1 '^Installed Photon CLI ' "$RUNNER_TEMP/install.log" || true)"
+          case "$line" in
+            "$installed"/*) ;;
+            *) echo "::error::$CHECK: expected the installer to print '$installed<path>', got '$line'"; exit 1 ;;
+          esac
+          binary="${line#"$installed"}"
+          echo "binary=$binary" >> "$GITHUB_OUTPUT"
+          dirname "$binary" >> "$GITHUB_PATH"
+
+      - name: Check photon --version
+        env:
+          BINARY: ${{ steps.install.outputs.binary }}
+        run: |
+          found="$(command -v photon || true)"
+          test "$found" = "$BINARY" || { echo "::error::$CHECK: photon on PATH is '$found', not the installed $BINARY"; exit 1; }
+          printed="$(photon --version)" || { echo "::error::$CHECK: photon --version failed"; exit 1; }
+          test "$printed" = "$VERSION" || { echo "::error::$CHECK: photon --version printed '$printed', expected $VERSION"; exit 1; }
+          echo "photon --version printed $printed"
+
+  install-ps1:
+    name: install.ps1 (windows-latest, ${{ matrix.shell }})
+    needs: version
+    if: needs.version.outputs.version != ''
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    env:
+      CHECK: install.ps1 with ${{ matrix.shell }} on windows-latest
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Check that the runner has no Photon CLI
+        run: |
+          $found = Get-Command photon -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($found) {
+            Write-Output "::error::${env:CHECK}: the runner already has photon at $($found.Source)"
+            exit 1
+          }
+
+      - name: Install with the latest release's install.ps1
+        id: install
+        run: |
+          try {
+            irm https://github.com/photon-hq/cli/releases/latest/download/install.ps1 | iex | Tee-Object -Variable installerOutput
+          } catch {
+            Write-Output "::error::${env:CHECK}: the installer failed: $($_.Exception.Message)"
+            exit 1
+          }
+          $installed = "Installed Photon CLI $env:VERSION at "
+          $line = @($installerOutput) | Where-Object { "$_".StartsWith('Installed Photon CLI ') } | Select-Object -First 1
+          if ($null -eq $line -or -not "$line".StartsWith($installed, [StringComparison]::Ordinal)) {
+            Write-Output "::error::${env:CHECK}: expected the installer to print '$installed<path>', got '$line'"
+            exit 1
+          }
+          $binary = "$line".Substring($installed.Length)
+          "binary=$binary" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Split-Path -Parent $binary | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Check photon --version
+        env:
+          BINARY: ${{ steps.install.outputs.binary }}
+        run: |
+          $found = (Get-Command photon -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+          if ($found -ne $env:BINARY) {
+            Write-Output "::error::${env:CHECK}: photon on PATH is '$found', not the installed $env:BINARY"
+            exit 1
+          }
+          $printed = @(& photon --version)
+          if ($LASTEXITCODE -ne 0 -or $printed.Count -ne 1 -or $printed[0] -cne $env:VERSION) {
+            Write-Output "::error::${env:CHECK}: photon --version printed '$($printed -join ' ')' and exited $LASTEXITCODE, expected $env:VERSION"
+            exit 1
+          }
+          Write-Output "photon --version printed $($printed[0])"
