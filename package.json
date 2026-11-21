@@ -68,17 +68,7 @@
   },
   "type": "module",
   "version": "3.1.0",
-  "description": "Command-line client for Photon: sign in, manage organizations and projects, and call the Photon API from a terminal, a script or an agent.",
-  "keywords": [
-    "photon",
-    "cli",
-    "imessage",
-    "imessage-api",
-    "whatsapp",
-    "ai-agent",
-    "messaging",
-    "terminal"
-  ],
+  "description": "Photon CLI built with Gunshi for Node.js and standalone binaries.",
   "bin": {
     "photon": "./dist/bin.js",
     "pho": "./dist/bin.js"
