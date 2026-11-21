@@ -6,10 +6,15 @@ name: Build release files
 # all of them. Photon's release process downloads exactly these files, runs
 # its production test on them and records their SHA-256s; after approval, the
 # release workflow publishes them unchanged. Every file gets a GitHub build
-# attestation here.
+# attestation here. A pull request that changes this workflow runs it too,
+# without the release files job, so the change is checked before a candidate
+# uses it.
 on:
   push:
     branches: [release-candidate]
+  pull_request:
+    branches: [main]
+    paths: [.github/workflows/build.yml]
 
 permissions:
   contents: read
@@ -100,10 +105,70 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+  # Bun cross-compiles the Windows binaries on macOS above, where they can't
+  # run. Each Windows zip runs here, on Windows on its own architecture, before
+  # checksums.txt and the attestations exist, so a binary that can't start
+  # stops the release.
+  windows-binaries:
+    name: Windows binary (${{ matrix.arch }})
+    needs: binaries
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+            os-architecture: X64
+          - arch: arm64
+            runner: windows-11-arm
+            os-architecture: Arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-binaries
+          path: release-binaries
+      - name: Run photon --version and photon --help
+        shell: pwsh
+        env:
+          ARCH: ${{ matrix.arch }}
+          OS_ARCHITECTURE: ${{ matrix.os-architecture }}
+        run: |
+          $architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+          if ($architecture -ne $env:OS_ARCHITECTURE) {
+            Write-Output "::error::This runner's Windows is $architecture, not $env:OS_ARCHITECTURE"
+            exit 1
+          }
+          $expected = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $directory = Join-Path $env:RUNNER_TEMP photon
+          Expand-Archive -LiteralPath "release-binaries/photon-windows-$env:ARCH.zip" -DestinationPath $directory
+          $photon = Join-Path $directory photon.exe
+          $version = (& $photon --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output "::error::photon-windows-$env:ARCH.zip: photon --version exited with $LASTEXITCODE"
+            exit 1
+          }
+          if ($version -ne $expected) {
+            Write-Output "::error::photon-windows-$env:ARCH.zip: photon --version printed '$version', expected $expected"
+            exit 1
+          }
+          & $photon --help
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output "::error::photon-windows-$env:ARCH.zip: photon --help exited with $LASTEXITCODE"
+            exit 1
+          }
+
   # checksums.txt and the build attestations. No dependency code runs here.
   release-files:
     name: Release files
-    needs: [npm, binaries]
+    if: github.event_name == 'push'
+    needs: [npm, binaries, windows-binaries]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
