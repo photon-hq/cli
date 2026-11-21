@@ -2,7 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { stripVTControlCharacters } from 'node:util'
-import type { GetBillingOperationOutput } from '@photon-ai/api'
+import { ApiError, type GetBillingOperationOutput } from '@photon-ai/api'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ReadableInput } from '../src/core/input.ts'
 import { runCli } from '../src/main.ts'
@@ -236,6 +236,43 @@ const subscriptionTermsFixture = (
   planSource: 'catalog',
   scheduledPlanChange
 })
+
+// A preview of a plan change: when it applies, and the held fixed charges the
+// target plan doesn't sell.
+const planChangePreviewFixture = (
+  timing: 'immediate' | 'period_end',
+  unsoldFixedCharges: { fixedChargeCode: string; quantity: number }[],
+  effectiveAt: null | string = timing === 'period_end' ? PERIOD_END : null
+) => ({
+  balanceAfterCents: null,
+  change: {
+    effectiveAt,
+    minimumCommitment: null,
+    timing,
+    type: 'plan_change' as const,
+    unsoldFixedCharges,
+    unusedTimeCredit: null
+  },
+  dueLater: { currency: 'USD', lines: [], totalCents: 0 },
+  dueNow: {
+    creditsCents: 0,
+    currency: 'USD',
+    discountCents: 0,
+    feesCents: 0,
+    lines: [],
+    taxesCents: 0,
+    totalCents: 0
+  },
+  nextCharge: null,
+  nextInvoiceAt: null,
+  timeZone: 'UTC',
+  upcomingInvoices: []
+})
+
+const DEDICATED_LINES = [
+  { fixedChargeCode: 'whatsapp_personal_dedicated_line', quantity: 1 },
+  { fixedChargeCode: 'imessage_dedicated_line', quantity: 5 }
+]
 
 const billingOperationFixture = (
   operationId: string,
@@ -511,6 +548,9 @@ const createScope = () => {
           ],
           nextCursor: null
         })
+      ),
+      previewProjectChange: vi.fn(() =>
+        Promise.resolve(planChangePreviewFixture('period_end', []))
       )
     },
     listOrganizations: vi.fn(singleOrganizationList),
@@ -2991,6 +3031,268 @@ describe('project CLI command tree', () => {
     )
     expect(spies.billing.changePlan).toHaveBeenCalledTimes(2)
     await authenticated.remove()
+  })
+
+  // A plan change the API schedules for the period end releases the held
+  // fixed charges the target plan doesn't sell; the confirmation reads them
+  // from the preview.
+  const BILLING_PROJECT = 'pho_prj_00000000000000000000000001'
+  const RELEASES =
+    'Photon then releases whatsapp_personal_dedicated_line x1 and imessage_dedicated_line x5.'
+
+  const runBilling = async (
+    args: string[],
+    preview: ApiError | ReturnType<typeof planChangePreviewFixture>,
+    terminalAnswer?: string
+  ) => {
+    const authenticated = await createAuthenticatedConfig()
+    const { organizationScope, rawScope, scope, spies } = createScope()
+    if (preview instanceof ApiError) {
+      spies.billing.previewProjectChange.mockRejectedValue(preview)
+    } else {
+      spies.billing.previewProjectChange.mockResolvedValue(preview)
+    }
+    const atTerminal = terminalAnswer !== undefined
+    const stdin = Readable.from(
+      atTerminal ? [terminalAnswer] : []
+    ) as ReadableInput
+    stdin.isTTY = atTerminal
+    const stdout = collector(atTerminal)
+    const stderr = collector(atTerminal)
+    const exitCodes: number[] = []
+    await runCli(
+      ['project', 'billing', ...args, '--project', BILLING_PROJECT],
+      {
+        clock: instantPollClock(),
+        configDirectory: authenticated.configDirectory,
+        deviceScope: unusedDeviceScope(),
+        env: {},
+        now: () => TEST_NOW,
+        organizationScope,
+        platform: 'linux',
+        projectRawScope: rawScope,
+        projectScope: scope,
+        setExitCode: (code) => exitCodes.push(code),
+        stderr,
+        stdin,
+        stdout
+      }
+    )
+    await authenticated.remove()
+    return {
+      changes: spies.billing.changePlan.mock.calls.length,
+      exitCodes,
+      previews: spies.billing.previewProjectChange.mock.calls,
+      stderr: stripVTControlCharacters(stderr.value()),
+      stdout: stdout.value()
+    }
+  }
+
+  const previewOf = (planCode: string) => [
+    {
+      body: { category: 'platforms', planCode },
+      path: { organizationId: TEST_ORGANIZATION_ID, projectId: BILLING_PROJECT }
+    },
+    undefined
+  ]
+
+  test('subscription cancel names the lines the move releases, and changes nothing without --yes', async () => {
+    const preview = planChangePreviewFixture('period_end', DEDICATED_LINES)
+    const consequence = `It moves to Free on ${PERIOD_END}, and ${RELEASES}`
+    const cancel = ['subscription', 'cancel', '--category', 'platforms']
+
+    const json = await runBilling([...cancel, '--json'], preview)
+    expect(json.exitCodes).toEqual([2])
+    expect(json.stderr).toBe('')
+    const document = JSON.parse(json.stdout) as { error: object }
+    expect(document).toStrictEqual({
+      error: {
+        code: 'CONFIRMATION_REQUIRED',
+        detail: `${consequence} Photon can't ask because --json is set.`,
+        docsUrl: 'https://photon.codes/docs/cli/output#errors',
+        message: `This would cancel the Business plan for project ${BILLING_PROJECT}. Confirm it with --yes.`,
+        next: [
+          {
+            description: 'Run it again with --yes',
+            run: `${CLI_NAME} project billing subscription cancel --json --category platforms --project ${BILLING_PROJECT} --yes`
+          }
+        ],
+        retryable: false
+      }
+    })
+    // The error is the one a cancel that releases nothing fails with, but
+    // for the sentence.
+    const releasesNothing = await runBilling(
+      [...cancel, '--json'],
+      planChangePreviewFixture('period_end', [])
+    )
+    expect({
+      error: {
+        ...(JSON.parse(releasesNothing.stdout) as { error: object }).error,
+        detail: `${consequence} Photon can't ask because --json is set.`
+      }
+    }).toStrictEqual(document)
+    expect(json.previews).toEqual([previewOf('free')])
+    expect(json.changes).toBe(0)
+
+    const piped = await runBilling(cancel, preview)
+    expect(piped.exitCodes).toEqual([2])
+    expect(piped.stderr).toContain(
+      `Detail: ${consequence} Photon can't ask because standard input is not a terminal.`
+    )
+    expect(piped.changes).toBe(0)
+
+    const asked = await runBilling(cancel, preview, 'y\n')
+    expect(asked.exitCodes).toEqual([])
+    expect(asked.stderr).toContain(
+      `Cancel the Business plan for project ${BILLING_PROJECT}? ${consequence} [y/N] `
+    )
+    expect(asked.previews).toEqual([previewOf('free')])
+    expect(asked.changes).toBe(1)
+  })
+
+  test('plan purchase of a lower plan names the lines it releases, and changes nothing without --yes', async () => {
+    const preview = planChangePreviewFixture('period_end', DEDICATED_LINES)
+    const json = await runBilling(
+      [
+        'plan',
+        'purchase',
+        '--category',
+        'platforms',
+        '--plan-code',
+        'free',
+        '--json'
+      ],
+      preview
+    )
+    expect(json.exitCodes).toEqual([2])
+    expect(JSON.parse(json.stdout)).toMatchObject({
+      error: {
+        code: 'CONFIRMATION_REQUIRED',
+        detail: `It takes effect on ${PERIOD_END}, and ${RELEASES} Photon can't ask because --json is set.`,
+        message: `This would purchase plan free in category platforms for project ${BILLING_PROJECT}. Confirm it with --yes.`
+      }
+    })
+    expect(json.previews).toEqual([previewOf('free')])
+    expect(json.changes).toBe(0)
+
+    const asked = await runBilling(
+      ['plan', 'purchase', '--category', 'platforms', '--plan-code', 'free'],
+      preview,
+      'y\n'
+    )
+    expect(asked.stderr).toContain(
+      `Purchase plan free in category platforms for project ${BILLING_PROJECT}? It takes effect on ${PERIOD_END}, and ${RELEASES} [y/N] `
+    )
+    expect(asked.changes).toBe(1)
+  })
+
+  test('the confirmation stays as it was when a change releases nothing or applies now', async () => {
+    const detailOf = async (
+      args: string[],
+      preview: ReturnType<typeof planChangePreviewFixture>
+    ) => {
+      const result = await runBilling([...args, '--json'], preview)
+      expect(result.exitCodes).toEqual([2])
+      expect(result.changes).toBe(0)
+      return (JSON.parse(result.stdout) as { error: { detail: string } }).error
+        .detail
+    }
+    const cancel = ['subscription', 'cancel', '--category', 'platforms']
+    const purchase = (planCode: string) => [
+      'plan',
+      'purchase',
+      '--category',
+      'platforms',
+      '--plan-code',
+      planCode
+    ]
+
+    await expect(
+      detailOf(cancel, planChangePreviewFixture('period_end', []))
+    ).resolves.toBe(
+      "It moves to Free at the end of the billing period. Photon can't ask because --json is set."
+    )
+    await expect(
+      detailOf(purchase('free'), planChangePreviewFixture('period_end', []))
+    ).resolves.toBe("Photon can't ask because --json is set.")
+    await expect(
+      detailOf(purchase('business'), planChangePreviewFixture('immediate', []))
+    ).resolves.toBe("Photon can't ask because --json is set.")
+    // A change that applies now is refused until the charges it doesn't
+    // sell are released, so confirming it releases nothing.
+    await expect(
+      detailOf(
+        purchase('business'),
+        planChangePreviewFixture('immediate', DEDICATED_LINES)
+      )
+    ).resolves.toBe("Photon can't ask because --json is set.")
+    // Without the date, the move is at the end of the billing period.
+    await expect(
+      detailOf(
+        cancel,
+        planChangePreviewFixture('period_end', DEDICATED_LINES, null)
+      )
+    ).resolves.toBe(
+      `It moves to Free at the end of the billing period, and ${RELEASES} Photon can't ask because --json is set.`
+    )
+  })
+
+  test('a preview that fails fails the command before the confirmation, and changes nothing', async () => {
+    const unavailable = new ApiError('service unavailable', {
+      body: { code: 'SERVICE_UNAVAILABLE' },
+      headers: new Headers(),
+      operationId: 'previewProjectChange',
+      status: 503
+    })
+    const commands = [
+      ['subscription', 'cancel', '--category', 'platforms'],
+      ['plan', 'purchase', '--category', 'platforms', '--plan-code', 'free']
+    ]
+    for (const args of commands) {
+      // biome-ignore lint/performance/noAwaitInLoops: each command is an independent invocation.
+      const json = await runBilling([...args, '--json'], unavailable)
+      expect(json.exitCodes).toEqual([1])
+      expect(json.stderr).toBe('')
+      expect(JSON.parse(json.stdout)).toMatchObject({
+        error: { code: 'SERVICE_UNAVAILABLE', retryable: true }
+      })
+      expect(json.previews).toHaveLength(1)
+      expect(json.changes).toBe(0)
+
+      const asked = await runBilling(args, unavailable, 'y\n')
+      expect(asked.exitCodes).toEqual([1])
+      expect(asked.stderr).toContain('(SERVICE_UNAVAILABLE)')
+      expect(asked.stderr).not.toContain('[y/N]')
+      expect(asked.previews).toHaveLength(1)
+      expect(asked.changes).toBe(0)
+    }
+  })
+
+  test('--yes confirms without reading the preview', async () => {
+    const preview = planChangePreviewFixture('period_end', DEDICATED_LINES)
+    const cancelled = await runBilling(
+      ['subscription', 'cancel', '--category', 'platforms', '--yes', '--json'],
+      preview
+    )
+    const purchased = await runBilling(
+      [
+        'plan',
+        'purchase',
+        '--category',
+        'platforms',
+        '--plan-code',
+        'free',
+        '--yes',
+        '--json'
+      ],
+      preview
+    )
+    for (const result of [cancelled, purchased]) {
+      expect(result.exitCodes).toEqual([])
+      expect(result.previews).toEqual([])
+      expect(result.changes).toBe(1)
+    }
   })
 
   test('writes rejected billing operations as actionable errors', async () => {

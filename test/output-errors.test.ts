@@ -85,6 +85,35 @@ describe('actionable CLI error output', () => {
     })
   })
 
+  test('names an overridden API version in invalid-version errors', () => {
+    const error = new CliError(
+      'INVALID_API_VERSION',
+      'The version must match a catalog entry exactly.',
+      { httpStatus: 400 }
+    )
+    const expectedMessage =
+      'The version must match a catalog entry exactly. The request sent PHOTON_API_VERSION="1999-01-01". Unset PHOTON_API_VERSION to use the CLI default, or set it to a supported catalog version.'
+    const stderr = collector()
+    new CliOutput({
+      env: { PHOTON_API_VERSION: ' 1999-01-01 ' },
+      json: false,
+      stderr
+    }).error(error)
+    expect(stderr.value()).toContain(
+      `Error: ${expectedMessage} (INVALID_API_VERSION)`
+    )
+
+    const stdout = collector()
+    new CliOutput({
+      env: { PHOTON_API_VERSION: ' 1999-01-01 ' },
+      json: true,
+      stdout
+    }).error(error)
+    expect(JSON.parse(stdout.value())).toMatchObject({
+      error: { code: 'INVALID_API_VERSION', message: expectedMessage }
+    })
+  })
+
   test('redacts diagnostics and suppresses sensitive cause chains', () => {
     const secret = 'super-secret-access-token'
     const cause = new Error(

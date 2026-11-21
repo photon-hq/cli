@@ -8,6 +8,6 @@ export default defineConfig({
   resolve: { alias: aliases },
   test: {
     exclude: [...configDefaults.exclude, 'test/internal/**'],
-    setupFiles: ['test/setup-terminal-env.ts']
+    setupFiles: ['test/setup-env.ts']
   }
 })

@@ -22,7 +22,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -48,7 +48,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -71,7 +71,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -94,7 +94,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -117,7 +117,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -139,7 +139,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -163,7 +163,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -185,7 +185,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -210,7 +210,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -240,7 +240,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -262,7 +262,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -285,7 +285,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -310,7 +310,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -335,7 +335,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -363,7 +363,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -388,7 +388,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -421,7 +421,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -445,7 +445,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -468,7 +468,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -492,7 +492,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -518,7 +518,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -540,7 +540,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -562,7 +562,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -584,7 +584,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -607,7 +607,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -636,7 +636,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -661,7 +661,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -686,7 +686,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -711,7 +711,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -733,7 +733,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -757,7 +757,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -782,7 +782,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -806,7 +806,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -830,7 +830,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -858,7 +858,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -882,7 +882,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -907,7 +907,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -930,7 +930,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -952,7 +952,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -977,7 +977,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -1006,7 +1006,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -1028,7 +1028,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)
@@ -1050,7 +1050,7 @@ OPTIONS:
   --color                      Use color in terminal output (default: true)
   --no-color                   Negatable of --color
   --debug                      Include sanitized HTTP and error diagnostics (default: false)
-  --json                       Emit stable JSON instead of human-readable output (default: false)
+  --json                       Print one JSON object instead of human-readable output (default: false)
   --no-input                   Never ask a question; fail and name the flag instead (default: false)
   --org <org>                  Organization ID for this command (or set PHOTON_ORGANIZATION_ID)
   --project <project>          Project ID for this command (or set PHOTON_PROJECT_ID)

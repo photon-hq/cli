@@ -16,6 +16,7 @@ import { AuthRepository } from '../src/auth/storage/repository.ts'
 import type { DeviceAuthScope } from '../src/auth/types.ts'
 import type { ReadableInput } from '../src/core/input.ts'
 import { runCli } from '../src/main.ts'
+import { expectPinnedApiRequests } from './api-version-test-support.ts'
 import { photonKey } from './key-support.ts'
 import { collector, TEST_NOW } from './project-test-support.ts'
 
@@ -113,6 +114,7 @@ const startServer = async (
 ): Promise<{ origin: string }> => {
   const server = createServer(handler)
   servers.push(server)
+  expectPinnedApiRequests(server)
   await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', resolve)
   })

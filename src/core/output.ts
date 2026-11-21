@@ -1,8 +1,11 @@
 import { styleText } from 'node:util'
 import ora from 'ora'
+import { photonApiVersionOverride } from './api-version.ts'
 import {
   CliError,
   type CliIssue,
+  copyCliError,
+  joinSentences,
   type NextStep,
   type ProblemDetails
 } from './errors.ts'
@@ -90,6 +93,29 @@ const SERVER_ERROR_HINT =
 const WRITE_FAILURE_CODE = 'OUTPUT_WRITE_FAILED'
 const WRITE_FAILURE_MESSAGE =
   'Photon could not write the result to standard output.'
+
+const apiVersionOverrideError = (
+  error: CliError,
+  env: NodeJS.ProcessEnv
+): CliError => {
+  if (error.code !== 'INVALID_API_VERSION' || error.httpStatus !== 400) {
+    return error
+  }
+  const value = photonApiVersionOverride(env)
+  if (value === undefined) {
+    return error
+  }
+  return copyCliError(
+    error,
+    {},
+    joinSentences(
+      error.message,
+      'The request sent PHOTON_API_VERSION=' +
+        JSON.stringify(value) +
+        '. Unset PHOTON_API_VERSION to use the CLI default, or set it to a supported catalog version.'
+    )
+  )
+}
 
 // The streams a command waited on when one of its writes failed. That command
 // reports the failure itself, so the stream's error event adds nothing.
@@ -450,15 +476,16 @@ export class CliOutput {
       this.writeFailure(error.cause)
       return
     }
+    const reportedError = apiVersionOverrideError(error, this.#env)
     if (this.#json) {
       this.#write(
         this.#wroteDocument ? this.#stderr : this.#stdout,
-        JSON.stringify({ error: this.#errorPayload(error) })
+        JSON.stringify({ error: this.#errorPayload(reportedError) })
       )
       return
     }
 
-    this.#writeHumanError(error)
+    this.#writeHumanError(reportedError)
   }
 
   #writeHumanError(error: CliError): void {

@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 import { BUILD_CONFIG } from '../src/build-config.ts'
 import { runCli } from '../src/main.ts'
+import { expectPinnedApiRequests } from './api-version-test-support.ts'
 import {
   collector,
   createAuthenticatedConfig,
@@ -201,6 +202,7 @@ const listen = async (captured: CapturedRequest[]): Promise<string> => {
     }
   })
   servers.push(server)
+  expectPinnedApiRequests(server)
   await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', resolve)
   })

@@ -12,17 +12,34 @@ import { afterEach, describe, expect, test } from 'vitest'
 import type { PollClock } from '../src/auth/device-flow.ts'
 import type { WritableOutput } from '../src/core/output.ts'
 import { runCli } from '../src/main.ts'
+import { captureApiVersions } from './api-version-test-support.ts'
+import { createAuthenticatedConfig, TEST_NOW } from './project-test-support.ts'
 
 interface CapturedRequest {
   authorization?: string
   body: unknown
   method?: string
   url?: string
+  versions: string[]
 }
 
 const servers: ReturnType<typeof createServer>[] = []
 const temporaryDirectories: string[] = []
 const wallClock = Date.parse('2026-07-30T20:00:00.000Z')
+
+const account = {
+  accountId: 'account_123',
+  createdAt: null,
+  deletedAt: null,
+  email: 'ada@example.test',
+  firstName: 'Ada',
+  lastName: 'Lovelace',
+  onboarded: true,
+  phoneNumber: null,
+  phoneVerifiedAt: null,
+  pictureUrl: 'https://images.example.test/ada.png',
+  updatedAt: null
+}
 
 const collector = (): WritableOutput & { value: () => string } => {
   let contents = ''
@@ -67,6 +84,16 @@ const writeJson = (
   response.end(JSON.stringify(body))
 }
 
+const listen = async (
+  server: ReturnType<typeof createServer>
+): Promise<string> => {
+  servers.push(server)
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', resolve)
+  })
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+}
+
 afterEach(async () => {
   await Promise.all(
     servers.splice(0).map(
@@ -99,7 +126,8 @@ describe('generated Photon SDK integration', () => {
           : { authorization: request.headers.authorization }),
         body: undefined,
         ...(request.method === undefined ? {} : { method: request.method }),
-        ...(request.url === undefined ? {} : { url: request.url })
+        ...(request.url === undefined ? {} : { url: request.url }),
+        versions: request.headersDistinct['photon-version'] ?? []
       })
 
       if (request.url === '/v1/projects/pho_prj_00000000000000000000000109') {
@@ -132,13 +160,8 @@ describe('generated Photon SDK integration', () => {
 
       writeJson(response, { error: 'not_found' }, 404)
     })
-    servers.push(server)
-    await new Promise<void>((resolve) => {
-      server.listen(0, '127.0.0.1', resolve)
-    })
-    const address = server.address() as AddressInfo
     const photon = new Photon({
-      baseUrl: `http://127.0.0.1:${address.port.toString()}`,
+      baseUrl: await listen(server),
       headers: { authorization: 'Bearer redirect-token' },
       retry: false
     })
@@ -155,13 +178,15 @@ describe('generated Photon SDK integration', () => {
         authorization: 'Bearer redirect-token',
         body: undefined,
         method: 'GET',
-        url: '/v1/projects/pho_prj_00000000000000000000000109'
+        url: '/v1/projects/pho_prj_00000000000000000000000109',
+        versions: []
       },
       {
         authorization: 'Bearer redirect-token',
         body: undefined,
         method: 'GET',
-        url: '/redirected/project'
+        url: '/redirected/project',
+        versions: []
       }
     ])
   })
@@ -178,7 +203,8 @@ describe('generated Photon SDK integration', () => {
             : { authorization: request.headers.authorization }),
           body,
           ...(request.method === undefined ? {} : { method: request.method }),
-          ...(request.url === undefined ? {} : { url: request.url })
+          ...(request.url === undefined ? {} : { url: request.url }),
+          versions: request.headersDistinct['photon-version'] ?? []
         })
 
         if (request.url === '/v1/auth/device/code') {
@@ -234,19 +260,7 @@ describe('generated Photon SDK integration', () => {
             writeJson(response, { code: 'UNAUTHORIZED' }, 401)
             return
           }
-          writeJson(response, {
-            accountId: 'account_123',
-            createdAt: null,
-            deletedAt: null,
-            email: 'ada@example.test',
-            firstName: 'Ada',
-            lastName: 'Lovelace',
-            onboarded: true,
-            phoneNumber: null,
-            phoneVerifiedAt: null,
-            pictureUrl: 'https://images.example.test/ada.png',
-            updatedAt: null
-          })
+          writeJson(response, account)
           return
         }
 
@@ -255,12 +269,7 @@ describe('generated Photon SDK integration', () => {
         writeJson(response, { error: 'invalid_json' }, 400)
       }
     })
-    servers.push(server)
-    await new Promise<void>((resolve) => {
-      server.listen(0, '127.0.0.1', resolve)
-    })
-    const address = server.address() as AddressInfo
-    const baseUrl = `http://127.0.0.1:${address.port}`
+    const baseUrl = await listen(server)
     const configDirectory = await mkdtemp(join(tmpdir(), 'photon-sdk-'))
     temporaryDirectories.push(configDirectory)
     const exitCodes: number[] = []
@@ -323,7 +332,8 @@ describe('generated Photon SDK integration', () => {
       {
         body: undefined,
         method: 'POST',
-        url: '/v1/auth/device/code'
+        url: '/v1/auth/device/code',
+        versions: []
       },
       {
         body: {
@@ -331,13 +341,15 @@ describe('generated Photon SDK integration', () => {
           grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
         },
         method: 'POST',
-        url: '/v1/auth/device/token'
+        url: '/v1/auth/device/token',
+        versions: []
       },
       {
         authorization: 'Bearer initial-access',
         body: undefined,
         method: 'GET',
-        url: '/v1/account'
+        url: '/v1/account',
+        versions: ['2026-07-01']
       },
       {
         body: {
@@ -345,18 +357,21 @@ describe('generated Photon SDK integration', () => {
           refresh_token: 'initial-refresh'
         },
         method: 'POST',
-        url: '/v1/auth/device/token'
+        url: '/v1/auth/device/token',
+        versions: []
       },
       {
         authorization: 'Bearer rotated-access',
         body: undefined,
         method: 'GET',
-        url: '/v1/account'
+        url: '/v1/account',
+        versions: ['2026-07-01']
       },
       {
         body: undefined,
         method: 'POST',
-        url: '/v1/auth/device/code'
+        url: '/v1/auth/device/code',
+        versions: []
       },
       {
         body: {
@@ -364,8 +379,91 @@ describe('generated Photon SDK integration', () => {
           grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
         },
         method: 'POST',
-        url: '/v1/auth/device/token'
+        url: '/v1/auth/device/token',
+        versions: []
       }
     ])
   })
+
+  test.each([
+    {
+      env: {},
+      exitCodes: [],
+      expectedOutput: { accountId: account.accountId },
+      name: 'sends the default once on each SDK attempt',
+      responses: [
+        { body: { code: 'UPSTREAM_UNAVAILABLE' }, status: 503 },
+        { body: account, status: 200 }
+      ],
+      versions: [['2026-07-01'], ['2026-07-01']]
+    },
+    {
+      env: { PHOTON_API_VERSION: '1999-01-01' },
+      exitCodes: [1],
+      expectedOutput: { error: { code: 'INVALID_API_VERSION' } },
+      name: 'sends the environment override unchanged without retrying a 400',
+      responses: [{ body: { code: 'INVALID_API_VERSION' }, status: 400 }],
+      versions: [['1999-01-01']]
+    },
+    {
+      env: { PHOTON_API_VERSION: '' },
+      exitCodes: [],
+      expectedOutput: { accountId: account.accountId },
+      name: 'uses the default when the environment override is empty',
+      responses: [{ body: account, status: 200 }],
+      versions: [['2026-07-01']]
+    },
+    {
+      env: { PHOTON_API_VERSION: ' 2026-07-01 ' },
+      exitCodes: [],
+      expectedOutput: { accountId: account.accountId },
+      name: 'trims the environment override',
+      responses: [{ body: account, status: 200 }],
+      versions: [['2026-07-01']]
+    }
+  ])(
+    '$name',
+    async ({ env, exitCodes, expectedOutput, responses, versions }) => {
+      let attempts = 0
+      const server = createServer((request, response) => {
+        if (request.method !== 'GET' || request.url !== '/v1/account') {
+          writeJson(response, { code: 'NOT_FOUND' }, 404)
+          return
+        }
+        attempts += 1
+        const result = responses[attempts - 1] ?? responses.at(-1)
+        if (result?.status === 503) {
+          response.setHeader('Retry-After', '0')
+        }
+        writeJson(response, result?.body, result?.status ?? 500)
+      })
+      const captured = captureApiVersions(server)
+      const baseUrl = await listen(server)
+      const { configDirectory } = await createAuthenticatedConfig(
+        'user_ada',
+        baseUrl
+      )
+      const stdout = collector()
+      const actualExitCodes: number[] = []
+      await runCli(['whoami', '--json'], {
+        baseUrl,
+        configDirectory,
+        env,
+        now: () => TEST_NOW,
+        platform: 'linux',
+        setExitCode: (code) => actualExitCodes.push(code),
+        stderr: collector(),
+        stdout
+      })
+      expect(captured).toEqual(
+        versions.map((headers) => ({
+          method: 'GET',
+          url: '/v1/account',
+          versions: headers
+        }))
+      )
+      expect(actualExitCodes).toEqual(exitCodes)
+      expect(JSON.parse(stdout.value())).toMatchObject(expectedOutput)
+    }
+  )
 })

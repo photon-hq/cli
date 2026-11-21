@@ -54,6 +54,11 @@ export const buildLocalBinary = async ({ config, outfile, target }) => {
       )
     },
     entrypoints: [join(projectRoot, 'src', 'cli.ts')],
+    // With bytecode and no format, Bun emits CommonJS, which bakes this
+    // machine's source paths into import.meta.url. ESM keeps the executable's
+    // own /$bunfs (Windows: B:/~BUN) paths, so a Windows binary cross-compiled
+    // here can start.
+    format: 'esm',
     minify: true,
     plugins: [bunAliasPlugin(aliases), buildConfigPlugin(config)],
     sourcemap: 'linked'

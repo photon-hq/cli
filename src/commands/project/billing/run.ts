@@ -10,7 +10,11 @@ import {
   validateBillingPlanCode,
   validatePagination
 } from '../../../project/validation.ts'
-import { cancelled, confirmRiskyAction } from '../../helpers.ts'
+import {
+  type ConfirmingCommand,
+  cancelled,
+  confirmRiskyAction
+} from '../../helpers.ts'
 import type { PhotonCommandParams } from '../../types.ts'
 import type {
   BillingOperationViewParams,
@@ -21,6 +25,8 @@ import type {
 } from './definition.ts'
 
 type BillingOverviewParams = PhotonCommandParams
+
+const releasedCharges = new Intl.ListFormat('en', { type: 'conjunction' })
 
 const formatCents = (amountCents: number): string => {
   const sign = amountCents < 0 ? '-' : ''
@@ -172,8 +178,18 @@ export const runPlanPurchase: CommandRunner<PlanPurchaseParams> = async (
   const category = validateBillingCategory(context.values.category)
   const planCode = validateBillingPlanCode(context.values.planCode)
   const projectId = await resolveProjectId(photon)
+  const release = await periodEndRelease(context, {
+    category,
+    planCode,
+    projectId
+  })
   const confirmed = await confirmRiskyAction(context, {
     action: `purchase plan ${planCode} in category ${category} for project ${projectId}`,
+    ...(release === undefined
+      ? {}
+      : {
+          consequence: `It takes effect ${release.when}, and Photon then releases ${release.charges}.`
+        }),
     scope: { project: projectId }
   })
   if (!confirmed) {
@@ -255,9 +271,17 @@ export const runSubscriptionCancel: CommandRunner<
     )
     return
   }
+  const release = await periodEndRelease(context, {
+    category,
+    planCode: defaultPlan.planCode,
+    projectId
+  })
   const confirmed = await confirmRiskyAction(context, {
     action: `cancel the ${held.planName} plan for project ${projectId}`,
-    consequence: `It moves to ${defaultPlan.name} at the end of the billing period.`,
+    consequence:
+      release === undefined
+        ? `It moves to ${defaultPlan.name} at the end of the billing period.`
+        : `It moves to ${defaultPlan.name} ${release.when}, and Photon then releases ${release.charges}.`,
     scope: { project: projectId }
   })
   if (!confirmed) {
@@ -332,6 +356,52 @@ export const runSubscriptionResume: CommandRunner<
       )
     )
   )
+}
+
+// A plan change the API schedules for the period end releases, when it
+// applies, the held fixed charges the target plan doesn't sell. The
+// confirmation names them from the read-only preview; with --yes there is no
+// confirmation, so the preview isn't read. A preview that fails fails the
+// command, where Photon can't ask too: the question, or the
+// CONFIRMATION_REQUIRED detail an agent shows the user, mustn't read as if the
+// change releases nothing.
+const periodEndRelease = async (
+  context: ConfirmingCommand,
+  change: { category: string; planCode: string; projectId: string }
+): Promise<{ charges: string; when: string } | undefined> => {
+  if (context.values.yes === true) {
+    return
+  }
+  const { photon } = context.extensions
+  const preview = await photon.output.withLoading(
+    'Previewing the plan change…',
+    async () =>
+      await photon.projects.previewPlanChange(
+        change.projectId,
+        change.category,
+        change.planCode
+      ),
+    { nonInteractive: 'silent' }
+  )
+  const effect = preview.change
+  if (
+    effect.type !== 'plan_change' ||
+    effect.timing !== 'period_end' ||
+    effect.unsoldFixedCharges.length === 0
+  ) {
+    return
+  }
+  return {
+    charges: releasedCharges.format(
+      effect.unsoldFixedCharges.map(
+        (charge) => `${charge.fixedChargeCode} x${charge.quantity.toString()}`
+      )
+    ),
+    when:
+      effect.effectiveAt === null
+        ? 'at the end of the billing period'
+        : `on ${effect.effectiveAt}`
+  }
 }
 
 // A plan change is journaled as a plan purchase: the same keyed request, so a

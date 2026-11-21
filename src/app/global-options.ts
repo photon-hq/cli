@@ -17,7 +17,7 @@ export const PHOTON_GLOBAL_OPTIONS = {
   },
   json: {
     default: false,
-    description: 'Emit stable JSON instead of human-readable output',
+    description: 'Print one JSON object instead of human-readable output',
     type: 'boolean'
   },
   noInput: {

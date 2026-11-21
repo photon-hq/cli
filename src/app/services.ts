@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { Photon, type PhotonOptions } from '@photon-ai/api'
+import type { Photon } from '@photon-ai/api'
 import {
   createInternalServices,
   type InternalCommandServices,
@@ -8,7 +8,6 @@ import {
 import { type AccountScope, AccountService } from '../account/service.ts'
 import { AccountServiceKeyInput } from '../auth/account-service-key.ts'
 import { AuthenticatedRequest } from '../auth/authenticated-request.ts'
-import { API_ORIGIN } from '../auth/constants.ts'
 import {
   type BearerCredentialProvider,
   EnvironmentBearerCredentialProvider,
@@ -32,23 +31,14 @@ import {
   browserCountdown,
   launchBrowser
 } from '../core/browser.ts'
-import { CliError } from '../core/errors.ts'
-import {
-  HttpDebugRecorder,
-  type HttpTraceSource,
-  registerSecret
-} from '../core/http-debug.ts'
+import { type HttpTraceSource, registerSecret } from '../core/http-debug.ts'
 import {
   CliInput,
   type ConfirmationHandler,
   type ReadableInput,
   type SelectionHandler
 } from '../core/input.ts'
-import { withNetworkErrors } from '../core/network.ts'
 import { CliOutput, type WritableOutput } from '../core/output.ts'
-import { withEnvironmentProxy } from '../core/proxy.ts'
-import { DEFAULT_REQUEST_TIMEOUT_MS } from '../core/request.ts'
-import { photonUserAgent, withUserAgent } from '../core/user-agent.ts'
 import {
   type OauthCatalogScope,
   type OauthRawScope,
@@ -69,7 +59,6 @@ import {
 } from '../organization/service.ts'
 import { ProjectContextService } from '../project/context-service.ts'
 import { ProjectFolderRepository } from '../project/folder-repository.ts'
-import { installPhotonSdkHeaderCompatibility } from '../project/sdk-compatibility.ts'
 import {
   type ProjectRawScope,
   type ProjectScope,
@@ -77,12 +66,11 @@ import {
 } from '../project/service.ts'
 import { type VoiceScope, VoiceService } from '../project/voice-service.ts'
 import { type UpdateDependencies, UpdateService } from '../update/service.ts'
+import {
+  createPhotonTransport,
+  type PhotonTransportOptions
+} from './photon-transport.ts'
 import { TargetNotice } from './target-notice.ts'
-
-type PhotonTransportOptions = Pick<
-  PhotonOptions,
-  'baseUrl' | 'fetch' | 'timeoutMs'
->
 
 export interface PhotonServiceOptions
   extends AuthRepositoryOptions,
@@ -99,13 +87,10 @@ export interface PhotonServiceOptions
   // The folder whose .photon/project.json (or its nearest parent's) selects
   // the project. Defaults to the process's working directory.
   cwd?: string
-  debug?: boolean
   deviceScope?: DeviceAuthScope
-  env?: NodeJS.ProcessEnv
   json: boolean
   mfaQr?: MfaQrRenderer
   noInput?: boolean
-  now?: () => number
   oauthCatalogScope?: OauthCatalogScope
   oauthRawScope?: OauthRawScope
   oauthScope?: OauthScope
@@ -202,50 +187,8 @@ const createRepository = (
       : { secureBackend: options.secureBackend })
   })
 
-const createTransportOptions = (
-  options: PhotonServiceOptions,
-  fetch: typeof globalThis.fetch
-): PhotonTransportOptions => {
-  const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
-  return {
-    baseUrl: options.baseUrl ?? API_ORIGIN,
-    fetch: withNetworkErrors(fetch, { timeoutMs }),
-    timeoutMs
-  }
-}
-
-interface Transport {
-  fetch: typeof globalThis.fetch
-  httpTrace: HttpTraceSource | undefined
-}
-
 const effectivePollClock = (clock: PollClock | undefined): PollClock =>
   clock ?? systemPollClock
-
-const createTransport = (
-  options: PhotonServiceOptions,
-  apiOrigin: string
-): Transport => {
-  const env = options.env ?? process.env
-  const userAgent = photonUserAgent(env)
-  const fetch: typeof globalThis.fetch =
-    options.fetch ??
-    withEnvironmentProxy(
-      async (input, init) => await globalThis.fetch(input, init),
-      env
-    )
-  if (options.debug !== true) {
-    return { fetch: withUserAgent(fetch, userAgent), httpTrace: undefined }
-  }
-  const httpTrace = new HttpDebugRecorder({
-    trustedOrigin: apiOrigin,
-    ...(options.now === undefined ? {} : { now: options.now })
-  })
-  return {
-    fetch: withUserAgent(httpTrace.wrap(fetch), userAgent),
-    httpTrace
-  }
-}
 
 const createInput = (
   options: PhotonServiceOptions,
@@ -274,24 +217,6 @@ const createAccountServiceKeyInput = (
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.stdin === undefined ? {} : { stdin: options.stdin })
   })
-
-const createAccountServiceKeyVerifier = (
-  options: PhotonServiceOptions,
-  transportOptions: PhotonTransportOptions
-): AccountServiceKeyVerifier => {
-  if (options.accountServiceKeyVerifier !== undefined) {
-    return options.accountServiceKeyVerifier
-  }
-  return async (credential) =>
-    await new Photon({
-      ...transportOptions,
-      headers: { authorization: `Bearer ${credential}` },
-      retry: false
-    }).account.get(
-      {},
-      options.signal === undefined ? undefined : { signal: options.signal }
-    )
-}
 
 interface AccountServiceDependencies {
   account: AccountScope
@@ -323,17 +248,6 @@ const createAccountService = (
     warning: dependencies.warning
   })
 
-const createAuthenticatedPhoton = (
-  transportOptions: PhotonTransportOptions,
-  credentialProvider: BearerCredentialProvider
-): Photon =>
-  new Photon({
-    ...transportOptions,
-    headers: async () => ({
-      authorization: `Bearer ${await credentialProvider.getBearer()}`
-    })
-  })
-
 const createAuthenticatedRequest = (
   credentialProvider: BearerCredentialProvider,
   signal: AbortSignal | undefined
@@ -362,19 +276,6 @@ const createOauthService = (
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs })
   })
-
-const projectApiOrigin = (baseUrl: string | undefined): string => {
-  try {
-    return new URL(baseUrl ?? API_ORIGIN).origin
-  } catch (error) {
-    // biome-ignore lint/style/useErrorCause: CliError forwards this cause through its options object.
-    throw new CliError(
-      'ARGUMENT_VALIDATION',
-      'Photon API base URL must be a valid URL.',
-      { cause: error, exitCode: 2 }
-    )
-  }
-}
 
 const createProjectContext = (
   options: PhotonServiceOptions,
@@ -520,16 +421,12 @@ const createOperationJournal = (
 export const createPhotonCommandServices = (
   options: PhotonServiceOptions
 ): PhotonCommandServices => {
-  installPhotonSdkHeaderCompatibility()
-  const apiOrigin = projectApiOrigin(options.baseUrl)
-  const { fetch, httpTrace } = createTransport(options, apiOrigin)
+  const { apiOrigin, createApiClient, unversionedDevice, fetch, httpTrace } =
+    createPhotonTransport(options)
   const output = createOutput(options, httpTrace)
   const warning = (message: string): void => output.warning(message)
   const repository = createRepository(options, apiOrigin)
-  const transportOptions = createTransportOptions(options, fetch)
-  const publicPhoton = new Photon({ ...transportOptions, retry: false })
-  const device: DeviceAuthScope =
-    options.deviceScope ?? publicPhoton.auth.device
+  const device = options.deviceScope ?? unversionedDevice
   const apiKey = environmentKey(options.env ?? process.env)
   const credentialProvider = createCredentialProvider(options, {
     apiKey,
@@ -541,10 +438,9 @@ export const createPhotonCommandServices = (
     credentialProvider,
     options.signal
   )
-  const authenticatedPhoton = createAuthenticatedPhoton(
-    transportOptions,
-    credentialProvider
-  )
+  const authenticatedPhoton = createApiClient({
+    getBearer: () => credentialProvider.getBearer()
+  })
   const browserLauncher = options.browserLauncher ?? launchBrowser
   const organizationScope =
     options.organizationScope ?? authenticatedPhoton.organizations
@@ -560,10 +456,16 @@ export const createPhotonCommandServices = (
   const auth = new AuthLifecycleService({
     accountService,
     accountServiceKeyInput: createAccountServiceKeyInput(options),
-    accountServiceKeyVerifier: createAccountServiceKeyVerifier(
-      options,
-      transportOptions
-    ),
+    accountServiceKeyVerifier:
+      options.accountServiceKeyVerifier ??
+      (async (credential) =>
+        await createApiClient({
+          getBearer: () => credential,
+          retry: false
+        }).account.get(
+          {},
+          options.signal === undefined ? undefined : { signal: options.signal }
+        )),
     apiOrigin,
     browserLauncher,
     device,
@@ -578,7 +480,7 @@ export const createPhotonCommandServices = (
   const oauth = createOauthService(
     options,
     authenticatedRequest,
-    publicPhoton.auth,
+    createApiClient({ retry: false }).auth,
     authenticatedPhoton.raw.organizations,
     { ...authenticatedPhoton.account, ...organizationScope },
     apiOrigin,

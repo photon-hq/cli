@@ -8,6 +8,7 @@ import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 import { runCli } from '../src/main.ts'
+import { expectPinnedApiRequests } from './api-version-test-support.ts'
 import {
   collector,
   createAuthenticatedConfig,
@@ -149,6 +150,7 @@ describe('generated account SDK integration', () => {
       }
     })
     servers.push(server)
+    expectPinnedApiRequests(server)
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', resolve)
     })
@@ -288,8 +290,8 @@ describe('generated account SDK integration', () => {
     ])
     expect(storageRequests).toHaveLength(1)
     expect(storageRequests[0]?.body).toBeInstanceOf(FormData)
-    expect(new Headers(storageRequests[0]?.headers).has('authorization')).toBe(
-      false
-    )
+    const storageHeaders = new Headers(storageRequests[0]?.headers)
+    expect(storageHeaders.has('authorization')).toBe(false)
+    expect(storageHeaders.has('photon-version')).toBe(false)
   })
 })

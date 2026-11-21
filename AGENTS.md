@@ -143,6 +143,14 @@ exported public repository can.
 
 - Work on a branch from `main`, and open a pull request. Run `pnpm check`
   before pushing.
+- While Photon 2.0 is in beta, a breaking change ships in a 3.x minor. Its
+  commit (the pull request title) carries `!`, and its body ends with the
+  footer `Release-As: 3.y.0` for the next minor, because Release Please would
+  otherwise cut `4.0.0`. GitHub ends a squash of several commits with a
+  `---------` line and `Co-authored-by` trailers, and Release Please ignores
+  a footer above that line, so whoever merges puts the footer last in the
+  squash message. Update the help, the error messages and the photon-hq/docs
+  guide in the same release.
 - Never publish packages, push tags or create releases.
 - Never run commands against production or use real credentials unless the
   issue says to. The one exception is the GitHub Packages token that
