@@ -34,6 +34,7 @@ import type {
   ListWebhookEventTypesOutput,
   PhotonNamespaces,
   PhotonRawNamespaces,
+  PreviewProjectChangeOutput,
   RawResponse,
   RequestOptions,
   ResetAgentProfileAvatarOutput,
@@ -1915,6 +1916,23 @@ export class ProjectService {
       provisioningPromise
     ])
     return { ...resourcePage, provisioning }
+  }
+
+  async previewPlanChange(
+    projectId: string,
+    category: string,
+    planCode: string
+  ): Promise<PreviewProjectChangeOutput> {
+    const organizationId = await this.organizationIdOf(projectId)
+    return await this.#execute((options) =>
+      this.#organizationScope.billing.previewProjectChange(
+        {
+          body: { category, planCode },
+          path: { organizationId, projectId }
+        },
+        options
+      )
+    )
   }
 
   async purchasePlan(

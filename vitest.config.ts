@@ -15,6 +15,6 @@ export default defineConfig({
     }
   },
   test: {
-    setupFiles: ['test/setup-terminal-env.ts']
+    setupFiles: ['test/setup-env.ts']
   }
 })

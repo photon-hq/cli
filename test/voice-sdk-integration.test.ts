@@ -7,6 +7,7 @@ import {
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, test } from 'vitest'
 import { runCli } from '../src/main.ts'
+import { expectPinnedApiRequests } from './api-version-test-support.ts'
 import {
   collector,
   createAuthenticatedConfig,
@@ -206,6 +207,7 @@ describe('generated Voice SDK integration', () => {
         writeJson(response, { code: 'NOT_FOUND' }, 404)
       })
       servers.push(server)
+      expectPinnedApiRequests(server)
       await new Promise<void>((resolve) => {
         server.listen(0, '127.0.0.1', resolve)
       })
@@ -333,6 +335,7 @@ describe('generated Voice SDK integration', () => {
         })
       })
       servers.push(server)
+      expectPinnedApiRequests(server)
       await new Promise<void>((resolve) => {
         server.listen(0, '127.0.0.1', resolve)
       })
@@ -475,6 +478,7 @@ describe('generated Voice SDK integration', () => {
       writeJson(response, { code: 'NOT_FOUND' }, 404)
     })
     servers.push(server)
+    expectPinnedApiRequests(server)
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', resolve)
     })

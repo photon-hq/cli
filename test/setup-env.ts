@@ -2,7 +2,8 @@
  * Each test decides the terminal it runs in, passing any terminal variable it
  * needs in `env`. The shell or CI sets some of these otherwise (GitHub Actions
  * sets `CI=true`, and an AI agent running the tests sets its markers), so they
- * are cleared before every test file.
+ * are cleared before every test file. Tests also clear the API version
+ * override so each case can choose it explicitly.
  */
 for (const name of [
   'AGENT',
@@ -14,12 +15,13 @@ for (const name of [
   'CODEX_THREAD_ID',
   'COPILOT_AGENT',
   'CURSOR_AGENT',
-  'FORCE_COLOR',
   'GEMINI_CLI',
+  'FORCE_COLOR',
   'NODE_DISABLE_COLORS',
   'NO_COLOR',
   'NO_COLORS',
   'OPENCODE',
+  'PHOTON_API_VERSION',
   'PHOTON_AGENT',
   'PHOTON_NO_INPUT',
   'ROO_ACTIVE',

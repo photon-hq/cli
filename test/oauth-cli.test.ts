@@ -279,10 +279,11 @@ describe('OAuth CLI', () => {
 
   test('opens a discovered authorization request for an owned client', async () => {
     const browserLauncher = vi.fn(() => Promise.resolve())
+    const fetch = discoveryFetch()
     const { invoke, mocks } = await createInvoke({
       baseUrl: apiOrigin,
       browserLauncher,
-      fetch: discoveryFetch()
+      fetch
     })
 
     const result = await invoke(['org', 'oauth-client', 'authorize', clientId])
@@ -325,6 +326,10 @@ describe('OAuth CLI', () => {
     expect(browserLauncher).toHaveBeenCalledWith(
       payload.authorization.authorizationUrl
     )
+    expect(fetch.mock.calls).toHaveLength(2)
+    for (const [input, init] of fetch.mock.calls) {
+      expect(new Request(input, init).headers.has('photon-version')).toBe(false)
+    }
     expect(mocks.getOauthClient).toHaveBeenCalledWith(
       {
         path: { clientId, organizationId: 'pho_org_00000000000000000000000001' }

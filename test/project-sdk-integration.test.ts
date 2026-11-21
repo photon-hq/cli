@@ -11,6 +11,7 @@ import type { DeviceTokenOutput } from '@photon-ai/api'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { DeviceAuthScope } from '../src/auth/types.ts'
 import { runCli } from '../src/main.ts'
+import { expectPinnedApiRequests } from './api-version-test-support.ts'
 import {
   collector,
   createAuthenticatedConfig,
@@ -628,6 +629,7 @@ describe('generated project SDK integration', () => {
       response.end(JSON.stringify({ code: 'NOT_FOUND' }))
     })
     servers.push(server)
+    expectPinnedApiRequests(server)
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', resolve)
     })
@@ -994,6 +996,7 @@ describe('generated project SDK integration', () => {
       ({ pathname }) => pathname === '/storage/avatar'
     )
     expect(storageRequest?.headers.authorization).toBeUndefined()
+    expect(storageRequest?.headers['photon-version']).toBeUndefined()
     expect(storageRequest?.headers['content-type']).toContain(
       'multipart/form-data; boundary='
     )
@@ -1223,6 +1226,146 @@ describe('generated project SDK integration', () => {
       ])
     )
     expect(timeoutSpy).toHaveBeenCalledWith(60_000)
+    await authenticated.remove()
+  })
+
+  test('reads the plan-change preview before it confirms a cancel, and stops there without --yes', async () => {
+    const PROJECT_PATH = '/v1/projects/pho_prj_00000000000000000000000001'
+    const PREVIEW_PATH =
+      '/v1/organizations/pho_org_00000000000000000000000001/billing/projects/pho_prj_00000000000000000000000001/preview'
+    const captured: CapturedRequest[] = []
+    const routes: Record<string, unknown> = {
+      [`GET ${PROJECT_PATH}`]: project('pho_prj_00000000000000000000000001'),
+      [`GET ${PROJECT_PATH}/billing`]: {
+        entitlementsVersion: 1,
+        subscriptions: [
+          {
+            baseAmountCents: 25_000,
+            cancelsAt: null,
+            category: 'platforms',
+            currency: 'USD',
+            currentPeriodEnd: periodEnd,
+            entitlements: [],
+            fixedCharges: [],
+            minimumCommitment: null,
+            planCode: 'business',
+            planName: 'Business',
+            status: 'active',
+            tierDisplayName: 'Business'
+          }
+        ],
+        usage: []
+      },
+      [`GET ${PROJECT_PATH}/billing/plans`]: {
+        plans: {
+          platforms: [billingPlan('free', true), billingPlan('business', false)]
+        }
+      },
+      [`POST ${PREVIEW_PATH}`]: {
+        balanceAfterCents: null,
+        change: {
+          effectiveAt: periodEnd,
+          minimumCommitment: null,
+          timing: 'period_end',
+          type: 'plan_change',
+          unsoldFixedCharges: [
+            { fixedChargeCode: 'imessage_dedicated_line', quantity: 2 }
+          ],
+          unusedTimeCredit: null
+        },
+        dueLater: { currency: 'USD', lines: [], totalCents: 0 },
+        dueNow: {
+          creditsCents: 0,
+          currency: 'USD',
+          discountCents: 0,
+          feesCents: 0,
+          lines: [],
+          taxesCents: 0,
+          totalCents: 0
+        },
+        nextCharge: null,
+        nextInvoiceAt: null,
+        timeZone: 'UTC',
+        upcomingInvoices: []
+      }
+    }
+    const server = createServer(async (request, response) => {
+      const url = new URL(request.url ?? '/', 'http://127.0.0.1')
+      const method = request.method ?? 'GET'
+      captured.push({
+        body: await readBody(request),
+        headers: request.headers,
+        method,
+        pathname: url.pathname,
+        searchParams: new URLSearchParams(url.searchParams)
+      })
+      const body = routes[`${method} ${url.pathname}`]
+      if (body === undefined) {
+        writeJson(response, { code: 'NOT_FOUND' }, 404)
+        return
+      }
+      writeJson(response, body)
+    })
+    servers.push(server)
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve)
+    })
+    const address = server.address() as AddressInfo
+    const origin = `http://127.0.0.1:${address.port.toString()}`
+    const authenticated = await createAuthenticatedConfig('user_ada', origin)
+    const stdout = collector()
+    const stderr = collector()
+    const exitCodes: number[] = []
+
+    await runCli(
+      [
+        'project',
+        'billing',
+        'subscription',
+        'cancel',
+        '--category',
+        'platforms',
+        '--project',
+        'pho_prj_00000000000000000000000001',
+        '--json'
+      ],
+      {
+        baseUrl: origin,
+        clock: instantPollClock(),
+        configDirectory: authenticated.configDirectory,
+        deviceScope: refreshingDeviceScope,
+        now: () => TEST_NOW,
+        platform: 'linux',
+        setExitCode: (code) => exitCodes.push(code),
+        stderr,
+        stdout
+      }
+    )
+
+    expect(exitCodes).toEqual([2])
+    expect(stderr.value()).toBe('')
+    expect(JSON.parse(stdout.value())).toMatchObject({
+      error: {
+        code: 'CONFIRMATION_REQUIRED',
+        detail: `It moves to Free on ${periodEnd}, and Photon then releases imessage_dedicated_line x2. Photon can't ask because --json is set.`
+      }
+    })
+    const preview = captured.filter(({ method }) => method === 'POST')
+    expect(
+      preview.map(({ body, pathname }) => ({
+        body: JSON.parse(body) as unknown,
+        pathname
+      }))
+    ).toEqual([
+      {
+        body: { category: 'platforms', planCode: 'free' },
+        pathname: PREVIEW_PATH
+      }
+    ])
+    expect(preview[0]?.headers['idempotency-key']).toBeUndefined()
+    expect(
+      captured.some(({ pathname }) => pathname.endsWith('/purchase'))
+    ).toBe(false)
     await authenticated.remove()
   })
 })

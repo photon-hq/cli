@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.2.0 (2026-11-21)
+
+
+### Features
+
+* **billing:** name the held fixed charges a plan downgrade releases in the confirmation (ENG-6251)
+* **cli:** send Photon-Version on public API requests (ENG-5359)
+
+
+### Bug Fixes
+
+* **release:** build the standalone binaries as ESM so Windows binaries start (ENG-6298)
+
+
+### Documentation
+
+* **package:** describe the CLI and add npm keywords (ENG-6304)
+* say any 3.x release may break the CLI while Photon 2.0 is in beta (ENG-6295)
+
 ## 3.1.0 (2026-11-19)
 
 

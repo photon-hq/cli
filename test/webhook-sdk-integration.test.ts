@@ -9,6 +9,7 @@ import type { DeviceTokenOutput } from '@photon-ai/api'
 import { afterEach, describe, expect, test } from 'vitest'
 import type { DeviceAuthScope } from '../src/auth/types.ts'
 import { runCli } from '../src/main.ts'
+import { expectPinnedApiRequests } from './api-version-test-support.ts'
 import {
   collector,
   createAuthenticatedConfig,
@@ -239,6 +240,7 @@ describe('generated project webhook SDK integration', () => {
       }
     })
     servers.push(server)
+    expectPinnedApiRequests(server)
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', resolve)
     })

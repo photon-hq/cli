@@ -9,10 +9,15 @@ const run = async (args: string[], latest = '3.1.0') => {
   let stdout = ''
   let stderr = ''
   const exitCodes: number[] = []
+  const requests: Request[] = []
   await runCli(args, {
-    env: { npm_config_registry: REGISTRY },
-    fetch: async () =>
-      Response.json({ 'dist-tags': { [PHOTON_PACKAGE.tag]: latest } }),
+    env: { npm_config_registry: REGISTRY, PHOTON_API_VERSION: '2099-12-31' },
+    fetch: (input, init) => {
+      requests.push(new Request(input, init))
+      return Promise.resolve(
+        Response.json({ 'dist-tags': { [PHOTON_PACKAGE.tag]: latest } })
+      )
+    },
     setExitCode: (code) => exitCodes.push(code),
     stderr: {
       write: (chunk: string) => {
@@ -26,13 +31,20 @@ const run = async (args: string[], latest = '3.1.0') => {
     },
     updateDependencies: { binary: undefined, currentVersion: '0.3.0' }
   })
-  return { exitCodes, stderr, stdout }
+  return { exitCodes, requests, stderr, stdout }
 }
 
 describe('photon update --check --json', () => {
   test('returns the 1.0 fields', async () => {
-    const { exitCodes, stdout } = await run(['update', '--check', '--json'])
+    const { exitCodes, requests, stdout } = await run([
+      'update',
+      '--check',
+      '--json'
+    ])
     expect(exitCodes).toEqual([])
+    expect(
+      requests.map((request) => request.headers.get('photon-version'))
+    ).toEqual([null])
     expect(stdout).toBe(
       '{"currentVersion":"0.3.0","installer":null,"latestVersion":"3.1.0","status":"update-available"}\n'
     )

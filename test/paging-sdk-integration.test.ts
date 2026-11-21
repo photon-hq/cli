@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { runCli } from '../src/main.ts'
 import { CLI_NAME } from '../src/meta.ts'
+import { expectPinnedApiRequests } from './api-version-test-support.ts'
 import { printed } from './help-support.ts'
 import {
   collector,
@@ -172,6 +173,7 @@ const fakeApi = async (total: number): Promise<FakeApi> => {
     writeJson(response, { code: 'NOT_FOUND' }, 404)
   })
   servers.push(server)
+  expectPinnedApiRequests(server)
   await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', resolve)
   })
