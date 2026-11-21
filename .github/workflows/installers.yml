@@ -15,11 +15,10 @@ name: Installers
 # and checks the release of the tag that run ran on, once it is published: a
 # run that failed after publishing (in its docs job) is checked, and a run on
 # a tag with no published release has nothing to check. It can't run on the
-# release event: release.yml
-# publishes the release with its GITHUB_TOKEN, and GitHub starts no workflow
-# for events that token causes. Run this by hand (gh workflow run
-# installers.yml) to check the current latest release. It also runs on pull
-# requests that change it.
+# release event: release.yml publishes the release with its GITHUB_TOKEN, and
+# GitHub starts no workflow for events that token causes. Run this by hand
+# (gh workflow run installers.yml) to check the current latest release. It
+# also runs on pull requests that change it.
 on:
   workflow_run:
     workflows: [Release]
