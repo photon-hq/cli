@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.3.0 (2026-11-24)
+
+
+### Features
+
+* **telegram:** manage the current project bot (ENG-5695)
+
+
+### Bug Fixes
+
+* **auth:** retry a transient token refresh with the same refresh token (ENG-6435)
+* **cli:** accept Project responses without creator fields (ENG-6351)
+* **network:** give the late-limit grace after a system sleep (ENG-6469)
+* **network:** read an answer that arrived while the CLI was stopped past the time limit (ENG-6434)
+
 ## 3.2.0 (2026-11-21)
 
 

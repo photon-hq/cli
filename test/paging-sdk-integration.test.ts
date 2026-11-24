@@ -31,14 +31,17 @@ const destination = (index: number) => ({
 })
 
 const invoice = (index: number) => ({
+  amountDueCents: 0,
   currency: 'USD',
   invoiceId: `invoice_${index.toString()}`,
   issuedAt: timestamp,
   kind: 'subscription',
   number: `INV-${index.toString()}`,
+  pageUrl: null,
   paymentActionRequired: false,
   paymentDueAt: null,
   paymentOverdue: false,
+  paymentProcessing: false,
   paymentStatus: 'paid',
   pdfUrl: null,
   status: 'finalized',
@@ -132,9 +135,6 @@ const fakeApi = async (total: number): Promise<FakeApi> => {
           lastName: null
         },
         createdAt: timestamp,
-        createdByAccountId: 'user_ada',
-        createdByActorId: 'user_ada',
-        createdByActorKind: 'account',
         deletedAt: null,
         flags: [],
         name: 'Alpha',

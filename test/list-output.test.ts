@@ -104,9 +104,6 @@ const project = (projectId: string, name = projectId) => ({
     lastName: null
   },
   createdAt: timestamp,
-  createdByAccountId: 'account_owner',
-  createdByActorId: 'account_owner',
-  createdByActorKind: 'account',
   deletedAt: null,
   flags: [],
   name,

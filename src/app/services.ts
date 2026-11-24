@@ -387,6 +387,7 @@ const createCredentialProvider = (
     repository,
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     tokenManager: new TokenManager({
+      ...(options.clock === undefined ? {} : { clock: options.clock }),
       device,
       repository,
       ...(options.now === undefined ? {} : { now: options.now }),

@@ -48,6 +48,7 @@ import {
   type Scenario
 } from '../scripts/production-test/runner.ts'
 import { scenarios } from '../scripts/production-test/scenarios.ts'
+import { BUILD_CONFIG } from '../src/build-config.ts'
 import {
   expectError,
   runs,
@@ -938,6 +939,185 @@ describe('production test of a published release', () => {
     expect(failureLines(withMainCommands)).toEqual([
       '- Not reached, because an earlier step failed: `thing buy`'
     ])
+  })
+})
+
+const API_ORIGIN = BUILD_CONFIG.apiOrigin
+const API_HOST = new URL(API_ORIGIN).host
+
+// The trace a command prints with --debug, as the CLI's HttpDebugRecorder
+// shapes it: a request's headers and bodies with every exchange's timing.
+const debugTrace = (
+  exchanges: readonly {
+    durationMs: number
+    requestId?: string
+    status?: number
+    url: string
+  }[]
+) => ({
+  droppedExchangeCount: 0,
+  exchanges: exchanges.map(({ durationMs, requestId, status, url }, index) => ({
+    durationMs,
+    request: {
+      body: { kind: 'json', value: { name: 'photon-cli-test-1-thing' } },
+      headers: {
+        authorization: `Bearer ${SERVICE_KEY}`,
+        'idempotency-key': 'key_1'
+      },
+      method: 'POST',
+      url
+    },
+    ...(status === undefined
+      ? {
+          transportError: {
+            code: 'TimeoutError',
+            message: `${API_HOST} didn't answer within 60 seconds.`,
+            name: 'NetworkError'
+          }
+        }
+      : {
+          response: {
+            body: { kind: 'json', value: { value: photonKey('cs', 'minted') } },
+            headers: { 'content-type': 'application/json' },
+            ...(requestId === undefined ? {} : { requestId }),
+            status
+          }
+        }),
+    sequence: index + 1,
+    startedAt: `2026-01-01T00:0${index.toString()}:00.000Z`
+  }))
+})
+
+describe('production test timings', () => {
+  it('keeps the --debug timings of a failed command, redacted, and drops those of a passing one', async () => {
+    const calls: (readonly string[])[] = []
+    const passing = {
+      stderr: `${JSON.stringify({ debug: { http: debugTrace([{ durationMs: 40, requestId: 'req_create', status: 201, url: `${API_ORIGIN}/v1/things` }]) } })}\n`
+    }
+    const invocations = await runFixture({
+      dryRun: false,
+      run: async (argv) => {
+        calls.push(argv)
+        const [, verb] = argv
+        if (verb === 'create') {
+          return await Promise.resolve({
+            ...ok({
+              thing: { id: 'thing_1', name: 'photon-cli-test-1-thing' }
+            }),
+            ...passing
+          })
+        }
+        if (verb === 'list') {
+          return await Promise.resolve(ok({ things: [{ id: 'thing_1' }] }))
+        }
+        if (verb === 'buy') {
+          return await Promise.resolve({
+            exitCode: 1,
+            stderr: '',
+            stdout: `${JSON.stringify({
+              error: {
+                code: 'OAUTH_SECRET_NOT_DELIVERED',
+                debug: {
+                  causes: [],
+                  http: debugTrace([
+                    {
+                      durationMs: 60_001,
+                      url: `${API_ORIGIN}/v1/things/buy?token=abc123`
+                    },
+                    {
+                      durationMs: 1861,
+                      requestId: 'req_retry',
+                      status: 200,
+                      url: `${API_ORIGIN}/v1/things/buy?token=abc123`
+                    }
+                  ])
+                },
+                message: 'Photon did not return the secret.'
+              }
+            })}\n`
+          })
+        }
+        return await Promise.resolve(ok({ deleted: true }))
+      }
+    })
+    const report = passReport('first', fixtureCommands, new Set(), invocations)
+    expect(calls.every((argv) => argv.includes('--debug'))).toBe(true)
+    expect(
+      report.commands.find(({ command }) => command === 'thing create')
+    ).toEqual({
+      command: 'thing create',
+      runs: 1,
+      status: 'passed',
+      test: 'run'
+    })
+    expect(
+      report.commands.find(({ command }) => command === 'thing buy')?.http
+    ).toEqual([
+      {
+        durationMs: 60_001,
+        method: 'POST',
+        sequence: 1,
+        startedAt: '2026-01-01T00:00:00.000Z',
+        transportError: `NetworkError [TimeoutError]: ${API_HOST} didn't answer within 60 seconds.`,
+        url: `${API_ORIGIN}/v1/things/buy?token=[REDACTED]`
+      },
+      {
+        durationMs: 1861,
+        method: 'POST',
+        requestId: 'req_retry',
+        sequence: 2,
+        startedAt: '2026-01-01T00:01:00.000Z',
+        status: 200,
+        url: `${API_ORIGIN}/v1/things/buy?token=[REDACTED]`
+      }
+    ])
+    expect(failureLines(report)).toEqual([
+      '- `thing buy`: ENTITLEMENT_REQUIRED (card_required) was expected; OAUTH_SECRET_NOT_DELIVERED; Photon did not return the secret.',
+      `  - #1 \`POST ${API_ORIGIN}/v1/things/buy?token=[REDACTED]\` at 2026-01-01T00:00:00.000Z: NetworkError [TimeoutError]: ${API_HOST} didn't answer within 60 seconds. after 60001 ms`,
+      `  - #2 \`POST ${API_ORIGIN}/v1/things/buy?token=[REDACTED]\` at 2026-01-01T00:01:00.000Z: 200 after 1861 ms, request req_retry`
+    ])
+    const text = JSON.stringify(report)
+    expect(text).not.toContain(SERVICE_KEY)
+    expect(text).not.toContain(photonKey('cs', 'minted'))
+    expect(text).not.toContain('abc123')
+    expect(text).not.toContain('idempotency-key')
+    expect(text).not.toContain('req_create')
+  })
+
+  it('keeps the timings of a command that exited 0 but whose output failed a check', async () => {
+    const invocations = await runFixture({
+      dryRun: false,
+      run: async (argv) => {
+        const [, verb] = argv
+        if (verb === 'create') {
+          return await Promise.resolve(ok({ thing: { id: 'thing_1' } }))
+        }
+        if (verb === 'list') {
+          return await Promise.resolve({
+            ...ok({ things: [] }),
+            stderr: `${JSON.stringify({ debug: { http: debugTrace([{ durationMs: 25, requestId: 'req_list', status: 200, url: `${API_ORIGIN}/v1/things` }]) } })}\n`
+          })
+        }
+        return await Promise.resolve(ok({ deleted: true }))
+      }
+    })
+    const report = passReport('first', fixtureCommands, new Set(), invocations)
+    expect(
+      report.commands.find(({ command }) => command === 'thing list')
+    ).toMatchObject({
+      http: [
+        {
+          durationMs: 25,
+          method: 'POST',
+          requestId: 'req_list',
+          sequence: 1,
+          status: 200,
+          url: `${API_ORIGIN}/v1/things`
+        }
+      ],
+      note: 'check failed: the thing is listed',
+      status: 'failed'
+    })
   })
 })
 

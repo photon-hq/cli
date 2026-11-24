@@ -272,7 +272,7 @@ describe('generated Telegram SDK integration', () => {
       resources: [bot]
     })
     expect(requestsTo('GET', RESOURCES_PATH).at(-1)?.search).toBe(
-      '?ability=telegram&pageSize=30'
+      '?state=unallocated%2Cactive&type=telegram_bot&pageSize=30'
     )
     expect(
       new URLSearchParams(requestsTo('GET', OPERATIONS_PATH).at(-1)?.search)
@@ -286,6 +286,33 @@ describe('generated Telegram SDK integration', () => {
 
     const viewed = await invoke(['view', bot.resourceId])
     expect(JSON.parse(viewed.stdout)).toEqual(bot)
+
+    const current = await invoke(['view'])
+    expect(JSON.parse(current.stdout)).toEqual(JSON.parse(viewed.stdout))
+    expect(requestsTo('GET', RESOURCES_PATH).at(-1)?.search).toBe(
+      '?pageSize=2&state=active&type=telegram_bot'
+    )
+    const paged = await invoke([
+      'list',
+      '--limit',
+      '1',
+      '--page-token',
+      'page-2'
+    ])
+    expect(JSON.parse(paged.stdout)).toEqual({
+      provisioning: [setup('pending')],
+      resources: [bot]
+    })
+    expect(
+      Object.fromEntries(
+        new URLSearchParams(requestsTo('GET', RESOURCES_PATH).at(-1)?.search)
+      )
+    ).toEqual({
+      pageSize: '1',
+      pageToken: 'page-2',
+      state: 'unallocated,active',
+      type: 'telegram_bot'
+    })
 
     const disconnected = await invoke(['disconnect', bot.resourceId, '--yes'])
     expect(disconnected.stderr).toBe('')

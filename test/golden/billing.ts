@@ -46,9 +46,6 @@ const project = {
   },
   billingInitialization: 'completed',
   createdAt,
-  createdByAccountId: 'pho_acc_00000000000000000000000002',
-  createdByActorId: 'pho_acc_00000000000000000000000002',
-  createdByActorKind: 'account',
   deletedAt: null,
   name: 'Acme Support',
   organizationId: ORGANIZATION_ID,
@@ -160,6 +157,7 @@ const freeOverview = {
 const subscriptionTerms = {
   cancelsAt: null,
   category: CATEGORY,
+  coupons: [],
   currentPeriodEnd: periodEnd,
   currentPeriodStart: periodStart,
   nextBillingAt: periodEnd,
@@ -189,14 +187,17 @@ const scheduledTerms = {
 const invoices = {
   invoices: [
     withNewField({
+      amountDueCents: 0,
       currency: 'USD',
       invoiceId: 'inv_01h455vb4pex5vsknk084sn02q',
       issuedAt: submittedAt,
       kind: 'subscription',
       number: 'INV-2026-0008',
+      pageUrl: null,
       paymentActionRequired: false,
       paymentDueAt: null,
       paymentOverdue: false,
+      paymentProcessing: false,
       paymentStatus: 'succeeded',
       pdfUrl: 'https://billing.example.test/invoices/INV-2026-0008.pdf',
       status: 'finalized',
@@ -204,14 +205,17 @@ const invoices = {
       totalCents: 26_250
     }),
     {
+      amountDueCents: 4900,
       currency: 'USD',
       invoiceId: 'inv_01h455vb4pex5vsknk084sn02r',
       issuedAt: null,
       kind: 'one_off',
       number: 'INV-2026-0009',
+      pageUrl: null,
       paymentActionRequired: true,
       paymentDueAt: periodEnd,
       paymentOverdue: false,
+      paymentProcessing: false,
       paymentStatus: 'pending',
       pdfUrl: null,
       status: 'pending',

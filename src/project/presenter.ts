@@ -19,13 +19,13 @@ import { selectTelegramBotDetail } from './telegram.ts'
 
 type ApiKeyResource =
   | CreateProjectApiKeyOutput['apiKey']
-  | ListProjectApiKeysOutput['apiKeys'][number]
+  | NonNullable<ListProjectApiKeysOutput>['apiKeys'][number]
   | RevokeProjectApiKeyOutput['apiKey']
 type WebhookDestinationResource =
   | CreateWebhookDestinationOutput['destination']
   | DeleteWebhookDestinationOutput
-  | GetWebhookDestinationOutput
-  | ListWebhookDestinationsOutput['destinations'][number]
+  | NonNullable<GetWebhookDestinationOutput>
+  | NonNullable<ListWebhookDestinationsOutput>['destinations'][number]
   | UpdateWebhookDestinationOutput
 
 const MAXIMUM_API_KEY_SECRET_LENGTH = 4096
@@ -195,7 +195,7 @@ export const WEBHOOK_SIGNING_SECRET_WARNING =
 
 const isWebhookDestination = (
   value: unknown
-): value is GetWebhookDestinationOutput =>
+): value is NonNullable<GetWebhookDestinationOutput> =>
   typeof value === 'object' &&
   value !== null &&
   'apiVersion' in value &&

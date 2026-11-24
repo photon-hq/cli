@@ -33,7 +33,7 @@ type ProjectClearParams = PhotonCommandParams
 
 const projectDetails = (
   output: ProjectViewParams['extensions']['photon']['output'],
-  project: GetProjectOutput,
+  project: NonNullable<GetProjectOutput>,
   heading = 'Project'
 ): string[] =>
   detail(output, heading, [

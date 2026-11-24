@@ -38,7 +38,9 @@ const outboundEditCommand = [
   'outbound',
   'edit'
 ]
-type SdkVoiceProfile = Awaited<ReturnType<VoiceScope['getVoiceProfile']>>
+type SdkVoiceProfile = NonNullable<
+  Awaited<ReturnType<VoiceScope['getVoiceProfile']>>
+>
 type SdkVoiceProfileOutbound = NonNullable<
   SdkVoiceProfile['configuration']['outbound']
 >

@@ -658,7 +658,7 @@ const occursAfterCursor = (
     record.operationId < cursor.operationId)
 
 export const billingRejection = (
-  operation: GetBillingOperationOutput,
+  operation: NonNullable<GetBillingOperationOutput>,
   message = 'The plan purchase failed.'
 ): CliError | undefined => {
   if (operation.status.toLowerCase() !== 'failed') {

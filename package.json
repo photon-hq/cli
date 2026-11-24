@@ -4,8 +4,8 @@
     "@clack/prompts": "1.7.0",
     "@gunshi/plugin-completion": "1.0.0-rc.5",
     "@gunshi/plugin-suggestion": "1.0.0-rc.5",
-    "@photon-ai/api": "npm:@photon-ai/api@0.6.0",
-    "@photon-ai/api-public": "npm:@photon-ai/api@0.6.0",
+    "@photon-ai/api": "npm:@photon-ai/api@0.8.0",
+    "@photon-ai/api-public": "npm:@photon-ai/api@0.8.0",
     "@types/node": "22.20.1",
     "bun": "1.4.4",
     "env-paths": "4.0.0",
@@ -68,7 +68,7 @@
     "test:release": "node --test scripts/build-config.production.node-test.mjs"
   },
   "type": "module",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Command-line client for Photon: sign in, manage organizations and projects, and call the Photon API from a terminal, a script or an agent.",
   "keywords": [
     "photon",

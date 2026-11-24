@@ -448,38 +448,53 @@ describe('Telegram bot connection', () => {
 })
 
 describe('Telegram bot resources', () => {
-  test('lists bots by ability with the setups in progress', async () => {
-    const listResources = vi.fn(() => Promise.resolve({ resources: [bot()] }))
-    const listOperations = vi.fn(() =>
-      Promise.resolve({
-        operations: [
-          operation('pending'),
-          operation('pending', {
-            operationId: OTHER_OPERATION_ID,
-            resourceType: 'voip_line'
-          })
-        ]
-      })
-    )
-    const { service } = createService({}, { listOperations, listResources })
-
-    await expect(
-      service.listPlatformResources(
-        'pho_prj_00000000000000000000000001',
-        'telegram',
-        { limit: 30 }
-      )
-    ).resolves.toEqual({
-      provisioning: [operation('pending')],
-      resources: [bot()]
+  test('reads the current active bot by type, including a disabled bot', async () => {
+    const current = bot({
+      abilities: [],
+      detail: { ...bot().detail, connectionIssue: 'management_access_lost' }
     })
-    expect(listResources).toHaveBeenCalledWith(
+    const listResources = vi.fn(() => Promise.resolve({ resources: [current] }))
+    const listOperations = vi.fn()
+    const { service } = createService({}, { listOperations, listResources })
+    await expect(
+      service.getCurrentTelegramBot(current.projectId)
+    ).resolves.toEqual(current)
+    expect(listResources).toHaveBeenCalledExactlyOnceWith(
       {
-        path: { id: 'pho_prj_00000000000000000000000001' },
-        query: { ability: 'telegram', pageSize: 30 }
+        path: { id: current.projectId },
+        query: { pageSize: 2, state: 'active', type: 'telegram_bot' }
       },
       undefined
     )
+    expect(listOperations).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    {
+      name: 'multiple current resources',
+      page: {
+        resources: [
+          bot(),
+          bot({ resourceId: 'pho_res_00000000000000000000000032' })
+        ]
+      }
+    },
+    {
+      name: 'an empty page with a continuation token',
+      page: { nextPageToken: 'next', resources: [] }
+    },
+    {
+      name: 'a retired resource',
+      page: { resources: [bot({ retiredAt: timestamp, state: 'retired' })] }
+    }
+  ])('rejects $name in the current-resource lookup', async ({ page }) => {
+    const { service } = createService(
+      {},
+      { listResources: vi.fn(() => Promise.resolve(page)) }
+    )
+    await expect(
+      service.getCurrentTelegramBot(bot().projectId)
+    ).rejects.toMatchObject({ code: 'PROJECT_PROTOCOL_ERROR' })
   })
 
   test('reads a bot and rejects a resource of another type', async () => {

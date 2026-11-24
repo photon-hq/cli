@@ -179,36 +179,6 @@ const waitForTelegramBot = async (
   )
 }
 
-interface TelegramProjectState {
-  connected: string[]
-  setupInProgress: boolean
-}
-
-const CONNECTED_BOTS_LIMIT = 30
-
-// `connect` always adds a bot. On a project that already has one it asks
-// before a setup is started, and `--yes` answers; a failure to read the bots
-// never stands in the way of connecting.
-const telegramProjectState = async (
-  photon: PhotonCommandServices,
-  projectId: string
-): Promise<TelegramProjectState> => {
-  try {
-    const { provisioning, resources } =
-      await photon.projects.listPlatformResources(projectId, 'telegram', {
-        limit: CONNECTED_BOTS_LIMIT
-      })
-    return {
-      connected: resources.map(
-        (bot) => platformResourceTelegramUsername(bot) ?? bot.resourceId
-      ),
-      setupInProgress: provisioning.length > 0
-    }
-  } catch {
-    return { connected: [], setupInProgress: false }
-  }
-}
-
 export const runTelegramList: CommandRunner<TelegramListParams> = async (
   context
 ) => {
@@ -236,35 +206,6 @@ export const runTelegramConnect: CommandRunner<TelegramConnectParams> = async (
 ) => {
   const { photon } = context.extensions
   const projectId = await resolveProjectId(photon)
-  const { connected, setupInProgress } = await telegramProjectState(
-    photon,
-    projectId
-  )
-  const alreadyConnected =
-    connected.length === 0
-      ? undefined
-      : `Project ${projectId} already has ${connected.join(', ')} connected.`
-  // The question is for a request that would start a setup. A setup already in
-  // progress is continued, and so is a request recorded under the supplied key;
-  // declining either would only hide the setup link. A key with no record
-  // starts a setup like no key at all.
-  const continued = await photon.operations.continuationIntent(
-    'telegram-bot.connect',
-    context.values.idempotencyKey,
-    (intent) => intent.projectId === projectId
-  )
-  const startsSetup = !setupInProgress && continued === undefined
-  if (alreadyConnected !== undefined && startsSetup) {
-    const confirmed = await confirmRiskyAction(context, {
-      action: `connect another Telegram bot to project ${projectId}`,
-      consequence: alreadyConnected,
-      scope: { project: projectId }
-    })
-    if (!confirmed) {
-      cancelled(photon)
-      return
-    }
-  }
   const connection = (
     await photon.operations.execute(
       { kind: 'telegram-bot.connect', projectId },
@@ -297,9 +238,6 @@ export const runTelegramConnect: CommandRunner<TelegramConnectParams> = async (
         : 'Started a Telegram bot setup.'
     ),
     ...telegramSetupTable(photon.output, operation),
-    ...(alreadyConnected === undefined
-      ? []
-      : ['', inert(`${alreadyConnected} This setup adds another bot.`)]),
     ...(connection.resumed
       ? [
           '',
@@ -330,10 +268,12 @@ export const runTelegramView: CommandRunner<TelegramViewParams> = async (
   context
 ) => {
   const { photon } = context.extensions
-  const resource = await photon.projects.getTelegramBot(
-    await resolveProjectId(photon),
-    context.values['resource-id']
-  )
+  const projectId = await resolveProjectId(photon)
+  const resourceId = context.values['resource-id']
+  const resource =
+    resourceId === undefined
+      ? await photon.projects.getCurrentTelegramBot(projectId)
+      : await photon.projects.getTelegramBot(projectId, resourceId)
   photon.output.success(resource, telegramBotDetails(photon.output, resource))
 }
 

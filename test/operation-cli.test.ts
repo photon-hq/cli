@@ -91,9 +91,6 @@ const projectFixture = {
     lastName: null
   },
   createdAt: timestamp,
-  createdByAccountId: 'pho_acc_00000000000000000000000001',
-  createdByActorId: 'pho_acc_00000000000000000000000001',
-  createdByActorKind: 'account',
   deletedAt: null,
   name: 'Alpha',
   organizationId: 'pho_org_00000000000000000000000001',

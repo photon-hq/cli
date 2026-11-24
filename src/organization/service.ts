@@ -20,14 +20,14 @@ import type {
 } from '@photon-ai/api'
 import type { AuthenticatedRequest } from '../auth/authenticated-request.ts'
 import { CliError } from '../core/errors.ts'
-import { normalizeSdkError } from '../core/sdk-error.ts'
+import { normalizeSdkError, responseBody } from '../core/sdk-error.ts'
 import type { KnownEnumValue } from '../core/validation.ts'
 import { CLI_NAME } from '../meta.ts'
 
 export type OrganizationScope = PhotonNamespaces['organizations']
 
 export type OrganizationMember =
-  ListOrganizationMembersOutput['members'][number]
+  NonNullable<ListOrganizationMembersOutput>['members'][number]
 export type OrganizationInvitationRole = KnownEnumValue<
   CreateOrganizationInvitationInput['body']['role']
 >
@@ -36,7 +36,7 @@ export type AssignableOrganizationRole = KnownEnumValue<
 >
 
 type RpcPaymentMethod = NonNullable<
-  GetOrganizationPaymentMethodOutput['paymentMethod']
+  NonNullable<GetOrganizationPaymentMethodOutput>['paymentMethod']
 >
 
 type PaymentMethodField = 'brand' | 'expiresMonth' | 'expiresYear' | 'last4'
@@ -48,7 +48,7 @@ export type OrganizationPaymentMethod = {
 export interface OrganizationPaymentStatus {
   cardOnFile: boolean
   paymentMethod: OrganizationPaymentMethod | null
-  response: GetOrganizationPaymentMethodOutput
+  response: NonNullable<GetOrganizationPaymentMethodOutput>
 }
 
 interface OrganizationServiceOptions {
@@ -100,7 +100,7 @@ const paymentProtocolError = (): CliError =>
   )
 
 const selectPaymentMethod = (
-  paymentMethod: GetOrganizationPaymentMethodOutput['paymentMethod']
+  paymentMethod: NonNullable<GetOrganizationPaymentMethodOutput>['paymentMethod']
 ): OrganizationPaymentMethod | null => {
   if (paymentMethod === null) {
     return null
@@ -135,7 +135,7 @@ const selectPaymentMethod = (
 }
 
 const selectPaymentStatus = (
-  result: GetOrganizationPaymentMethodOutput
+  result: NonNullable<GetOrganizationPaymentMethodOutput>
 ): OrganizationPaymentStatus => ({
   cardOnFile: result.cardOnFile,
   paymentMethod: result.cardOnFile
@@ -170,23 +170,34 @@ export class OrganizationService {
     this.#signal = options.signal
   }
 
-  async list(): Promise<ListOrganizationsOutput> {
-    return await this.#execute((options) =>
-      this.#scope.listOrganizations({}, options)
+  async list(): Promise<NonNullable<ListOrganizationsOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.listOrganizations({}, options)
+      )
     )
   }
 
-  async get(organizationId: string): Promise<GetOrganizationOutput> {
-    return await this.#execute((options) =>
-      this.#scope.getOrganization({ path: { organizationId } }, options)
+  async get(
+    organizationId: string
+  ): Promise<NonNullable<GetOrganizationOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.getOrganization({ path: { organizationId } }, options)
+      )
     )
   }
 
   async listMembers(
     organizationId: string
-  ): Promise<ListOrganizationMembersOutput> {
-    return await this.#execute((options) =>
-      this.#scope.listOrganizationMembers({ path: { organizationId } }, options)
+  ): Promise<NonNullable<ListOrganizationMembersOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.listOrganizationMembers(
+          { path: { organizationId } },
+          options
+        )
+      )
     )
   }
 
@@ -281,11 +292,13 @@ export class OrganizationService {
 
   async listInvitations(
     organizationId: string
-  ): Promise<ListOrganizationInvitationsOutput> {
-    return await this.#execute((options) =>
-      this.#scope.listOrganizationInvitations(
-        { path: { organizationId } },
-        options
+  ): Promise<NonNullable<ListOrganizationInvitationsOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.listOrganizationInvitations(
+          { path: { organizationId } },
+          options
+        )
       )
     )
   }
@@ -333,10 +346,12 @@ export class OrganizationService {
   async getPaymentStatus(
     organizationId: string
   ): Promise<OrganizationPaymentStatus> {
-    const result = await this.#execute((options) =>
-      this.#scope.billing.getOrganizationPaymentMethod(
-        { path: { organizationId } },
-        options
+    const result = responseBody(
+      await this.#execute((options) =>
+        this.#scope.billing.getOrganizationPaymentMethod(
+          { path: { organizationId } },
+          options
+        )
       )
     )
     return selectPaymentStatus(result)

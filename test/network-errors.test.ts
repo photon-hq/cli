@@ -14,7 +14,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { errors } from 'undici'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import { REFRESH_MAX_ATTEMPTS } from '../src/auth/constants.ts'
 import { transportCode } from '../src/core/api-problem.ts'
 import type { ReadableInput } from '../src/core/input.ts'
 import { NetworkError, withNetworkErrors } from '../src/core/network.ts'
@@ -252,6 +253,169 @@ describe('a connection that never finishes its TLS handshake', () => {
   })
 })
 
+describe('a time limit that fires late', () => {
+  const LIMIT_MS = 60_000
+  const timeout = () =>
+    new DOMException('The operation timed out.', 'TimeoutError')
+
+  // A fetch whose answer arrives when the test delivers it, as one does that
+  // came in while the CLI's process was stopped.
+  const heldAnswer = () => {
+    let deliver: (() => void) | undefined
+    const fetchImplementation: typeof globalThis.fetch = async (input, init) =>
+      await new Promise<Response>((resolve, reject) => {
+        const signal =
+          init?.signal ?? (input instanceof Request ? input.signal : undefined)
+        signal?.addEventListener(
+          'abort',
+          () => {
+            reject(signal.reason)
+          },
+          { once: true }
+        )
+        deliver = () => {
+          resolve(new Response('{"value":"answered"}', { status: 200 }))
+        }
+      })
+    return { deliver: () => deliver?.(), fetchImplementation }
+  }
+
+  // The SDK sends a Request that carries the signal, with no init.
+  const start = (
+    fetchImplementation: typeof globalThis.fetch,
+    sendAs: 'init' | 'request' = 'init'
+  ) => {
+    const controller = new AbortController()
+    const fetch = withNetworkErrors(fetchImplementation, {
+      timeoutMs: LIMIT_MS
+    })
+    const url = 'https://api.example.test/v1/rotate'
+    const pending = (
+      sendAs === 'request'
+        ? fetch(new Request(url, { method: 'POST', signal: controller.signal }))
+        : fetch(url, { signal: controller.signal })
+    ).catch((error: unknown) => error)
+    return { controller, pending }
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  test('reads an answer that arrived while the CLI was stopped past the limit', async () => {
+    vi.useFakeTimers({ toFake: ['clearTimeout', 'performance', 'setTimeout'] })
+    const { deliver, fetchImplementation } = heldAnswer()
+    const { controller, pending } = start(fetchImplementation)
+
+    // The limit's timer runs only when the process resumes, 95 s late.
+    vi.advanceTimersByTime(155_000)
+    controller.abort(timeout())
+    deliver()
+
+    const response = await pending
+    expect(response).toBeInstanceOf(Response)
+    expect(await (response as Response).text()).toBe('{"value":"answered"}')
+  })
+
+  test('reads a late answer to a Request that carries the signal, as the SDK sends it', async () => {
+    vi.useFakeTimers({ toFake: ['clearTimeout', 'performance', 'setTimeout'] })
+    const { deliver, fetchImplementation } = heldAnswer()
+    const { controller, pending } = start(fetchImplementation, 'request')
+
+    vi.advanceTimersByTime(155_000)
+    controller.abort(timeout())
+    deliver()
+
+    const response = await pending
+    expect(response).toBeInstanceOf(Response)
+    expect(await (response as Response).text()).toBe('{"value":"answered"}')
+  })
+
+  test('reads an answer that arrived as the system woke from a sleep past the limit', async () => {
+    vi.useFakeTimers({
+      toFake: ['clearTimeout', 'Date', 'performance', 'setTimeout']
+    })
+    const { deliver, fetchImplementation } = heldAnswer()
+    const { controller, pending } = start(fetchImplementation)
+
+    // Awake for 30 s, then asleep for 125 s. Bun on macOS runs the limit's
+    // timer on a clock that counts the sleep, and performance.now() on one
+    // that doesn't, so only the wall clock moves while the system sleeps.
+    vi.advanceTimersByTime(30_000)
+    vi.setSystemTime(Date.now() + 125_000)
+    expect(performance.now()).toBe(30_000)
+    controller.abort(timeout())
+    deliver()
+
+    const response = await pending
+    expect(response).toBeInstanceOf(Response)
+    expect(await (response as Response).text()).toBe('{"value":"answered"}')
+  })
+
+  test('ends the attempt at once when the limit fires on time after a sleep', async () => {
+    vi.useFakeTimers({
+      toFake: ['clearTimeout', 'Date', 'performance', 'setTimeout']
+    })
+    const { deliver, fetchImplementation } = heldAnswer()
+    const { controller, pending } = start(fetchImplementation)
+
+    // Awake for 10 s, asleep for 20 s, then awake for the last 30 s.
+    vi.advanceTimersByTime(10_000)
+    vi.setSystemTime(Date.now() + 20_000)
+    vi.advanceTimersByTime(30_000)
+    controller.abort(timeout())
+    deliver()
+
+    const error = await pending
+    expect(error).toBeInstanceOf(NetworkError)
+    expect(error).toMatchObject({ code: 'TimeoutError' })
+  })
+
+  test('still ends the attempt one second later when no answer arrived', async () => {
+    vi.useFakeTimers({ toFake: ['clearTimeout', 'performance', 'setTimeout'] })
+    const { fetchImplementation } = heldAnswer()
+    const { controller, pending } = start(fetchImplementation)
+
+    vi.advanceTimersByTime(155_000)
+    controller.abort(timeout())
+    vi.advanceTimersByTime(1000)
+
+    expect(await pending).toMatchObject({
+      code: 'TimeoutError',
+      message: "api.example.test didn't answer within 60 seconds."
+    })
+  })
+
+  test('ends the attempt at once when the limit fires on time', async () => {
+    vi.useFakeTimers({ toFake: ['clearTimeout', 'performance', 'setTimeout'] })
+    const { deliver, fetchImplementation } = heldAnswer()
+    const { controller, pending } = start(fetchImplementation)
+
+    vi.advanceTimersByTime(LIMIT_MS)
+    controller.abort(timeout())
+    deliver()
+
+    const error = await pending
+    expect(error).toBeInstanceOf(NetworkError)
+    expect(error).toMatchObject({ code: 'TimeoutError' })
+  })
+
+  test('ends the attempt at once when the caller cancels late', async () => {
+    vi.useFakeTimers({ toFake: ['clearTimeout', 'performance', 'setTimeout'] })
+    const { deliver, fetchImplementation } = heldAnswer()
+    const { controller, pending } = start(fetchImplementation)
+
+    vi.advanceTimersByTime(155_000)
+    controller.abort(new DOMException('Command interrupted.', 'AbortError'))
+    deliver()
+
+    expect(await pending).toMatchObject({
+      message: 'Command interrupted.',
+      name: 'AbortError'
+    })
+  })
+})
+
 describe('a request the caller cancels', () => {
   test('fails with the cancellation, not a NetworkError', async () => {
     const controller = new AbortController()
@@ -349,7 +513,12 @@ describe('a sign-in request that times out', () => {
         timeoutMs
       })
 
-      expect(api.requests).toHaveLength(1)
+      expect(api.requests).toEqual(
+        Array.from(
+          { length: REFRESH_MAX_ATTEMPTS },
+          () => 'POST /v1/auth/device/token'
+        )
+      )
       expect(JSON.parse(result.stdout)).toMatchObject({
         error: {
           code: 'AUTH_TEMPORARILY_UNAVAILABLE',

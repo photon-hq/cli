@@ -200,9 +200,6 @@ describe('commands', () => {
       lastName: null
     },
     createdAt: timestamp,
-    createdByAccountId: 'pho_acc_00000000000000000000000002',
-    createdByActorId: 'pho_acc_00000000000000000000000002',
-    createdByActorKind: 'account',
     deletedAt: null,
     name: PLANTED,
     organizationId: TEST_ORGANIZATION_ID,
