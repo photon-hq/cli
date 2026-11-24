@@ -59,9 +59,6 @@ beforeAll(async () => {
             lastName: null
           },
           createdAt: '2026-07-31T18:00:00.000Z',
-          createdByAccountId: 'user_ada',
-          createdByActorId: 'user_ada',
-          createdByActorKind: 'account',
           deletedAt: null,
           flags: [],
           name: PROJECT_NAME,

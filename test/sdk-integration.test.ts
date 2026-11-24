@@ -144,9 +144,6 @@ describe('generated Photon SDK integration', () => {
             lastName: null
           },
           createdAt: '2026-08-08T18:00:00.000Z',
-          createdByAccountId: 'account_owner',
-          createdByActorId: 'account_owner',
-          createdByActorKind: 'account',
           deletedAt: null,
           flags: [],
           name: 'Redirected Project',

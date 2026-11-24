@@ -11,7 +11,9 @@ const projectId = 'pho_prj_01h455vb4pex5vsknk084sn02q'
 const profileId = 'pho_vpf_01h455vb4pex5vsknk084sn02q'
 const resourceId = 'pho_res_01h455vb4pex5vsknk084sn02q'
 const timestamp = '2026-08-21T18:00:00.000Z'
-type SdkVoiceProfile = Awaited<ReturnType<VoiceScope['getVoiceProfile']>>
+type SdkVoiceProfile = NonNullable<
+  Awaited<ReturnType<VoiceScope['getVoiceProfile']>>
+>
 type SdkVoiceProfileOutbound = NonNullable<
   SdkVoiceProfile['configuration']['outbound']
 >

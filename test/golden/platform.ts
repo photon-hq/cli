@@ -18,6 +18,7 @@ import {
   type ReleaseSharedLineAssignmentOutput,
   ReleaseSharedLineAssignmentOutputSchema
 } from '@photon-ai/api-public'
+import { z } from 'zod'
 import { selectEmailDomainOperationDetail } from '../../src/project/email-domain.ts'
 import {
   type Declared,
@@ -55,13 +56,29 @@ const platforms = {
   ]
 } satisfies Declared<ListProjectPlatformsOutput>
 
+const CancelledOperationSchema = CancelOperationOutputSchema.extend({
+  error: z.looseObject({
+    code: z.literal('CHARGE_REFUSED'),
+    detail: z.string(),
+    title: z.literal('Charge Refused'),
+    type: z.literal('https://photon.codes/docs/problems/charge-refused')
+  })
+})
+
 const cancelledOperation = {
   cancellable: false,
   createdAt,
   endedAt: updatedAt,
   error: withNewField({
     code: 'CHARGE_REFUSED',
-    detail: 'The payment method was declined.'
+    detail: 'The payment method was declined.',
+    remediation: {
+      action:
+        'Check the payment method in Billing, then request the purchase again.'
+    },
+    status: 402,
+    title: 'Charge Refused',
+    type: 'https://photon.codes/docs/problems/charge-refused'
   }),
   operationId: CANCELLED_OPERATION_ID,
   projectId: PROJECT_ID,
@@ -167,6 +184,7 @@ const assignment = {
   firstName: 'Ada',
   handle: '+14155550123',
   lastName: 'Lovelace',
+  optIn: { state: 'pending' },
   platform: 'imessage',
   projectId: PROJECT_ID,
   updatedAt: createdAt
@@ -180,6 +198,7 @@ const assignments = {
       assignmentId: 'pho_asg_01h455vb4pex5vsknk084sn02r',
       createdAt,
       handle: '+14155550125',
+      optIn: { state: 'pending' },
       platform: 'imessage',
       projectId: PROJECT_ID,
       updatedAt: createdAt
@@ -236,7 +255,7 @@ export const PLATFORM_GOLDENS: readonly GoldenCase[] = [
       method: 'POST',
       path: `${PLATFORMS}/operations/${CANCELLED_OPERATION_ID}/cancel`
     },
-    schema: CancelOperationOutputSchema,
+    schema: CancelledOperationSchema,
     shows: 'cosmos_line'
   }),
   printsResponse({

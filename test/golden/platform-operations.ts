@@ -215,7 +215,10 @@ const listCase = ({
       resources: [withNewField(resource)]
     }) satisfies Declared<ListResourcesOutput>,
     method: 'GET',
-    path: `${RESOURCES}?ability=${ability}&pageSize=1`
+    path:
+      ability === 'telegram'
+        ? `${RESOURCES}?state=unallocated%2Cactive&type=telegram_bot&pageSize=1`
+        : `${RESOURCES}?ability=${ability}&pageSize=1`
   } as const satisfies FakeRoute
   const provisioningRoute = {
     body: {
@@ -491,21 +494,6 @@ const telegramReleased = operationRoute(TELEGRAM_RELEASE_ID, {
   )
 })
 
-// telegram connect reads the project's bots and setups at once first, to say
-// which bots it already has. Text shows only their checked usernames.
-const telegramStateRoutes = (resources: Resource[]): readonly FakeRoute[] => [
-  {
-    body: { resources } satisfies Declared<ListResourcesOutput>,
-    method: 'GET',
-    path: `${RESOURCES}?ability=telegram&pageSize=30`
-  },
-  {
-    body: { operations: [] } satisfies Declared<ListOperationsOutput>,
-    method: 'GET',
-    path: PROVISIONING_QUERY
-  }
-]
-
 /** Golden tests for the project platform commands that start and wait. */
 export const PLATFORM_OPERATION_GOLDENS: readonly GoldenCase[] = [
   listCase({
@@ -584,6 +572,7 @@ export const PLATFORM_OPERATION_GOLDENS: readonly GoldenCase[] = [
         body: operation(IMESSAGE_PURCHASE_ID, 'cosmos_line', 'pending'),
         method: 'POST',
         path: `${PLATFORMS}/imessage/dedicated`,
+        requestBody: {},
         status: 202
       },
       imessagePurchased
@@ -756,16 +745,9 @@ export const PLATFORM_OPERATION_GOLDENS: readonly GoldenCase[] = [
       '--yes'
     ],
     command: 'project platform telegram connect',
-    concurrent: 2,
     document: { operation: telegramNoWaitAnswer.body },
     embeds: 'operation',
-    routes: [
-      ...telegramStateRoutes([]).map((route) => ({
-        ...route,
-        unshown: true as const
-      })),
-      telegramNoWaitAnswer
-    ],
+    routes: [telegramNoWaitAnswer],
     schema: TelegramSetupAnswerSchema,
     shows: SETUP_URL,
     showsNoApiText: true
@@ -781,10 +763,8 @@ export const PLATFORM_OPERATION_GOLDENS: readonly GoldenCase[] = [
       '--yes'
     ],
     command: 'project platform telegram connect',
-    concurrent: 2,
     document: telegramConnected.body,
     routes: [
-      ...telegramStateRoutes([telegramBot]),
       {
         ...telegramSetupAnswerRoute({ displayName: 'Alex Support' }),
         planted: telegramSetupAnswer({

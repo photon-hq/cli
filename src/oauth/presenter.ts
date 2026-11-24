@@ -13,7 +13,7 @@ import { CLI_NAME } from '../meta.ts'
 type OauthClientResource =
   | CreateOrganizationOauthClientOutput
   | GetOrganizationOauthClientOutput
-  | ListOrganizationOauthClientsOutput['oauthClients'][number]
+  | NonNullable<ListOrganizationOauthClientsOutput>['oauthClients'][number]
   | UpdateOrganizationOauthClientOutput
 
 const MAXIMUM_SECRET_LENGTH = 4096
@@ -87,7 +87,7 @@ export const oauthClientDetails = (
 
 export const oauthClientSecretDetails = (
   output: CliOutput,
-  clientSecret: GetOrganizationOauthClientSecretOutput
+  clientSecret: NonNullable<GetOrganizationOauthClientSecretOutput>
 ): string[] => [
   ...detail(output, 'Current secret', [
     { label: 'Hint', value: clientSecret.current?.hint },

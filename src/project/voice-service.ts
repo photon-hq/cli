@@ -5,7 +5,11 @@ import {
 } from '@photon-ai/api'
 import type { AuthenticatedRequest } from '../auth/authenticated-request.ts'
 import { CliError } from '../core/errors.ts'
-import { normalizeSdkError, type SdkErrorOptions } from '../core/sdk-error.ts'
+import {
+  normalizeSdkError,
+  responseBody,
+  type SdkErrorOptions
+} from '../core/sdk-error.ts'
 import type { KnownEnumValue } from '../core/validation.ts'
 import type { PaginationOptions } from './service.ts'
 import {
@@ -38,9 +42,11 @@ export type VoiceScope = Pick<
   | 'updateVoiceProfileOutboundAuthentication'
 >
 
-export type VoiceProfile = Awaited<ReturnType<VoiceScope['getVoiceProfile']>>
-export type VoiceProfileList = Awaited<
-  ReturnType<VoiceScope['listVoiceProfiles']>
+export type VoiceProfile = NonNullable<
+  Awaited<ReturnType<VoiceScope['getVoiceProfile']>>
+>
+export type VoiceProfileList = NonNullable<
+  Awaited<ReturnType<VoiceScope['listVoiceProfiles']>>
 >
 type VoiceProfileOutbound = NonNullable<
   VoiceProfile['configuration']['outbound']
@@ -61,8 +67,8 @@ export type VoiceProfileOutboundRevocationResult = Awaited<
   ReturnType<VoiceScope['deleteVoiceProfileOutbound']>
 >
 export type VoiceProfileReference = 'default' | string
-export type VoiceLineProfileAssignment = Awaited<
-  ReturnType<VoiceScope['getVoiceLineProfileAssignment']>
+export type VoiceLineProfileAssignment = NonNullable<
+  Awaited<ReturnType<VoiceScope['getVoiceLineProfileAssignment']>>
 >
 
 type CreateVoiceProfileBody = Parameters<
@@ -370,20 +376,24 @@ export class VoiceService {
     projectId: string,
     resourceId: string
   ): Promise<VoiceLineProfileAssignment> {
-    return await this.#execute((scope, options) =>
-      scope.getVoiceLineProfileAssignment(
-        { path: { id: projectId, resourceId } },
-        options
+    return responseBody(
+      await this.#execute((scope, options) =>
+        scope.getVoiceLineProfileAssignment(
+          { path: { id: projectId, resourceId } },
+          options
+        )
       )
     )
   }
 
   async getDefaultProfile(projectId: string): Promise<VoiceProfile> {
     return checkedProfile(
-      await this.#execute(
-        (scope, options) =>
-          scope.getDefaultVoiceProfile({ path: { id: projectId } }, options),
-        true
+      responseBody(
+        await this.#execute(
+          (scope, options) =>
+            scope.getDefaultVoiceProfile({ path: { id: projectId } }, options),
+          true
+        )
       )
     )
   }
@@ -393,13 +403,15 @@ export class VoiceService {
     profileId: string
   ): Promise<VoiceProfile> {
     return checkedProfile(
-      await this.#execute(
-        (scope, options) =>
-          scope.getVoiceProfile(
-            { path: { id: projectId, profileId } },
-            options
-          ),
-        true
+      responseBody(
+        await this.#execute(
+          (scope, options) =>
+            scope.getVoiceProfile(
+              { path: { id: projectId, profileId } },
+              options
+            ),
+          true
+        )
       )
     )
   }
@@ -414,22 +426,24 @@ export class VoiceService {
       ...pagination,
       maximumPageSize: VOICE_PROFILE_PAGE_SIZE_LIMIT,
       request: async (pageSize, pageToken) => {
-        lastPage = await this.#execute(
-          (scope, options) =>
-            scope.listVoiceProfiles(
-              {
-                path: { id: projectId },
-                query: {
-                  ...(isDefault === undefined
-                    ? {}
-                    : { default: isDefault ? 'true' : 'false' }),
-                  pageSize,
-                  ...(pageToken === undefined ? {} : { pageToken })
-                }
-              },
-              options
-            ),
-          true
+        lastPage = responseBody(
+          await this.#execute(
+            (scope, options) =>
+              scope.listVoiceProfiles(
+                {
+                  path: { id: projectId },
+                  query: {
+                    ...(isDefault === undefined
+                      ? {}
+                      : { default: isDefault ? 'true' : 'false' }),
+                    pageSize,
+                    ...(pageToken === undefined ? {} : { pageToken })
+                  }
+                },
+                options
+              ),
+            true
+          )
         )
         for (const profile of lastPage.profiles) {
           assertSupportedOutboundAlgorithm(profile.configuration.outbound)

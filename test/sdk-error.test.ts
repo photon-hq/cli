@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import { CliError, copyCliError, type NextStep } from '../src/core/errors.ts'
 import { CliOutput } from '../src/core/output.ts'
 import { CLI_ERROR_REFERENCE_URL } from '../src/core/output-basics.ts'
-import { normalizeSdkError } from '../src/core/sdk-error.ts'
+import { normalizeSdkError, responseBody } from '../src/core/sdk-error.ts'
 import { CLI_NAME } from '../src/meta.ts'
 import { photonKey } from './key-support.ts'
 import { collector } from './project-test-support.ts'
@@ -453,5 +453,23 @@ describe('SDK error normalization', () => {
       code: 'WHATSAPP_VERIFICATION_CODE_NOT_FOUND',
       retryable: true
     })
+  })
+})
+
+describe('response bodies', () => {
+  test('a body passes through unchanged', () => {
+    const body = { projectId: 'pho_prj_00000000000000000000000001' }
+
+    expect(responseBody(body)).toBe(body)
+  })
+
+  test('a success without a body is a protocol error', () => {
+    expect(() => responseBody(undefined)).toThrow(CliError)
+    expect(() => responseBody(undefined)).toThrow(
+      expect.objectContaining({
+        code: 'API_PROTOCOL_ERROR',
+        detail: 'The response had no body.'
+      })
+    )
   })
 })

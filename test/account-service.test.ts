@@ -4,7 +4,10 @@ import { join } from 'node:path'
 import { ApiError, type GetAccountOutput, TransportError } from '@photon-ai/api'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { type AccountScope, AccountService } from '../src/account/service.ts'
-import { ACCESS_TOKEN_REFRESH_SKEW_MS } from '../src/auth/constants.ts'
+import {
+  ACCESS_TOKEN_REFRESH_SKEW_MS,
+  REFRESH_MAX_ATTEMPTS
+} from '../src/auth/constants.ts'
 import { AuthRepository } from '../src/auth/storage/repository.ts'
 import { TokenManager } from '../src/auth/token-manager.ts'
 import type { DeviceAuthScope } from '../src/auth/types.ts'
@@ -135,6 +138,7 @@ describe('authenticated account requests', () => {
     })
     const get = vi.fn<AccountScope['get']>().mockRejectedValue(unauthorized)
     const tokenManager = new TokenManager({
+      clock: { now: () => 0, sleep: () => Promise.resolve() },
       device: deviceScope(refresh),
       now: () => now,
       repository
@@ -149,7 +153,7 @@ describe('authenticated account requests', () => {
       code: 'AUTH_TEMPORARILY_UNAVAILABLE'
     })
     expect(get).toHaveBeenCalledTimes(1)
-    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(refresh).toHaveBeenCalledTimes(REFRESH_MAX_ATTEMPTS)
     await expect(repository.loadSession()).resolves.toBeDefined()
   })
 

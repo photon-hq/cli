@@ -29,8 +29,8 @@ const signingSecret = `whsec_${Buffer.alloc(32, 7).toString('base64')}`
 const rotatedSigningSecret = `whsec_${Buffer.alloc(32, 9).toString('base64')}`
 
 const webhookDestination = (
-  overrides: Partial<GetWebhookDestinationOutput> = {}
-): GetWebhookDestinationOutput => ({
+  overrides: Partial<NonNullable<GetWebhookDestinationOutput>> = {}
+): NonNullable<GetWebhookDestinationOutput> => ({
   apiVersion: '2026-07-01',
   createdAt: timestamp,
   deletedAt: null,

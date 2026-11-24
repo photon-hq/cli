@@ -6,12 +6,22 @@ import {
 } from '@photon-ai/api'
 import { apiErrorOptions, transportCode } from '../core/api-problem.ts'
 import { CliError, SIGN_IN_EXIT_CODE } from '../core/errors.ts'
+import { NetworkError } from '../core/network.ts'
 import { networkErrorMessage } from '../core/sdk-error.ts'
 import { CLI_NAME } from '../meta.ts'
 import {
   ACCESS_TOKEN_REFRESH_SKEW_MS,
-  REFRESH_GRANT_TYPE
+  REFRESH_ATTEMPT_TIMEOUT_MS,
+  REFRESH_BACKOFF_BASE_MS,
+  REFRESH_GRANT_TYPE,
+  REFRESH_MAX_ATTEMPTS,
+  REFRESH_RETRY_BUDGET_MS
 } from './constants.ts'
+import {
+  type PollClock,
+  retryAfterMilliseconds,
+  systemPollClock
+} from './device-flow.ts'
 import { oauthErrorCode, validateDeviceToken } from './device-token.ts'
 import { notSignedInError } from './errors.ts'
 import {
@@ -28,6 +38,7 @@ import type {
 } from './types.ts'
 
 interface TokenManagerOptions {
+  clock?: Pick<PollClock, 'now' | 'sleep'>
   device: DeviceAuthScope
   now?: () => number
   repository: AuthRepository
@@ -68,6 +79,22 @@ const accessTokenStillValid = (
 const isTransientRefreshError = (error: unknown): boolean =>
   error instanceof TransportError ||
   (error instanceof ApiError && (error.status === 429 || error.status >= 500))
+
+const isInvalidGrant = (error: unknown): error is ApiError =>
+  error instanceof ApiError && oauthErrorCode(error) === 'invalid_grant'
+
+const retryDelayMs = (
+  error: unknown,
+  attempt: number,
+  wallNow: number
+): number => {
+  const backoffMs = Math.random() * REFRESH_BACKOFF_BASE_MS * 2 ** (attempt - 1)
+  const retryAfterMs =
+    error instanceof ApiError
+      ? retryAfterMilliseconds(error, wallNow)
+      : undefined
+  return Math.max(backoffMs, retryAfterMs ?? 0)
+}
 
 const expiredSessionError = (error: ApiError): CliError =>
   new CliError(
@@ -136,6 +163,7 @@ const refreshPersistenceError = (cause: unknown): CliError =>
   )
 
 export class TokenManager {
+  readonly #clock: Pick<PollClock, 'now' | 'sleep'>
   readonly #device: DeviceAuthScope
   readonly #now: () => number
   readonly #repository: AuthRepository
@@ -150,6 +178,7 @@ export class TokenManager {
   #lastAccessToken: string | undefined
 
   constructor(options: TokenManagerOptions) {
+    this.#clock = options.clock ?? systemPollClock
     this.#device = options.device
     this.#now = options.now ?? Date.now
     this.#repository = options.repository
@@ -268,22 +297,10 @@ export class TokenManager {
   ): Promise<DeviceTokenOutput | undefined> {
     this.#ambiguousRefresh = undefined
     try {
-      const grant = await this.#device.token(
-        {
-          body: {
-            grant_type: REFRESH_GRANT_TYPE,
-            refresh_token: session.credentials.refreshToken
-          }
-        },
-        this.#signal === undefined ? undefined : { signal: this.#signal }
-      )
-      validateDeviceToken(grant)
-      return grant
+      return await this.#exchangeRefreshToken(session)
     } catch (error) {
       this.#signal?.throwIfAborted()
-      const invalidGrant =
-        error instanceof ApiError && oauthErrorCode(error) === 'invalid_grant'
-      if (invalidGrant) {
+      if (isInvalidGrant(error)) {
         await this.#repository.removeSessionLocked(false, this.#signal)
         throw expiredSessionError(error)
       }
@@ -305,6 +322,71 @@ export class TokenManager {
         return
       }
       throw refreshUnavailableError(error)
+    }
+  }
+
+  async #exchangeRefreshToken(
+    session: DeviceStoredSession
+  ): Promise<DeviceTokenOutput> {
+    const firstAttemptStartedAt = this.#clock.now()
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        // biome-ignore lint/performance/noAwaitInLoops: each attempt replays the same refresh token only after the one before it failed.
+        return await this.#attemptRefresh(session)
+      } catch (error) {
+        this.#signal?.throwIfAborted()
+        const retryable =
+          isTransientRefreshError(error) && !isInvalidGrant(error)
+        if (!retryable || attempt >= REFRESH_MAX_ATTEMPTS) {
+          throw error
+        }
+        const delayMs = retryDelayMs(error, attempt, this.#now())
+        const nextStartMs = this.#clock.now() + delayMs - firstAttemptStartedAt
+        if (nextStartMs > REFRESH_RETRY_BUDGET_MS) {
+          throw error
+        }
+        await this.#clock.sleep(delayMs, this.#signal)
+        if (
+          this.#clock.now() - firstAttemptStartedAt >
+          REFRESH_RETRY_BUDGET_MS
+        ) {
+          throw error
+        }
+      }
+    }
+  }
+
+  async #attemptRefresh(
+    session: DeviceStoredSession
+  ): Promise<DeviceTokenOutput> {
+    const attemptTimeout = new AbortController()
+    const timer = setTimeout(() => {
+      attemptTimeout.abort(
+        new NetworkError({
+          cause: undefined,
+          host: new URL(session.metadata.apiOrigin).host,
+          timeoutMs: REFRESH_ATTEMPT_TIMEOUT_MS
+        })
+      )
+    }, REFRESH_ATTEMPT_TIMEOUT_MS)
+    const signal =
+      this.#signal === undefined
+        ? attemptTimeout.signal
+        : AbortSignal.any([this.#signal, attemptTimeout.signal])
+    try {
+      const grant = await this.#device.token(
+        {
+          body: {
+            grant_type: REFRESH_GRANT_TYPE,
+            refresh_token: session.credentials.refreshToken
+          }
+        },
+        { signal }
+      )
+      validateDeviceToken(grant)
+      return grant
+    } finally {
+      clearTimeout(timer)
     }
   }
 

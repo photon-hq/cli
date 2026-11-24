@@ -99,9 +99,6 @@ const projectFixture = (projectId: string) => ({
     lastName: null
   },
   createdAt: timestamp,
-  createdByAccountId: 'pho_acc_00000000000000000000000002',
-  createdByActorId: 'pho_acc_00000000000000000000000002',
-  createdByActorKind: 'account',
   deletedAt: null,
   name: projectId,
   organizationId: 'pho_org_00000000000000000000000001',
@@ -261,13 +258,15 @@ const paymentMocks = () => {
     OrganizationScope['billing']['getOrganizationPaymentMethod']
   >(() =>
     Promise.resolve({
+      agreement: { kind: 'self_serve' },
       cardOnFile: true,
       paymentMethod: {
         brand: 'visa',
         expiresMonth: 12,
         expiresYear: 2028,
         last4: '4242'
-      }
+      },
+      purchaseRefusal: null
     })
   )
   const createOrganizationPaymentMethodCheckout = vi.fn<
@@ -591,14 +590,14 @@ describe('project billing organization', () => {
           { category: 'messaging', planCode: 'pro', planName: 'Pro' }
         ],
         usage: []
-      } as unknown as GetBillingOverviewOutput)
+      } as unknown as NonNullable<GetBillingOverviewOutput>)
     )
     const listBillingPlans = vi.fn(() =>
       Promise.resolve({
         plans: {
           messaging: [{ isDefault: true, name: 'Free', planCode: 'free' }]
         }
-      } as unknown as ListBillingPlansOutput)
+      } as unknown as NonNullable<ListBillingPlansOutput>)
     )
     const getEffectiveTerms = vi.fn(() =>
       Promise.resolve({
@@ -609,7 +608,7 @@ describe('project billing organization', () => {
           }
         ],
         timeZone: 'UTC'
-      } as unknown as GetEffectiveTermsOutput)
+      } as unknown as NonNullable<GetEffectiveTermsOutput>)
     )
     const changePlan = vi.fn(() =>
       Promise.resolve({
@@ -622,7 +621,7 @@ describe('project billing organization', () => {
         result: { effectiveAt: periodEnd, type: 'version', version: 'v2' },
         status: 'succeeded',
         submittedAt: timestamp
-      } as GetBillingOperationOutput)
+      } as NonNullable<GetBillingOperationOutput>)
     )
     const listInvoices = vi.fn(() =>
       Promise.resolve({ invoices: [], nextCursor: null })
@@ -1041,13 +1040,15 @@ describe('organization payment method', () => {
 
     const status = await invoke(['org', 'billing', 'payment-method', 'status'])
     expect(JSON.parse(status.stdout)).toEqual({
+      agreement: { kind: 'self_serve' },
       cardOnFile: true,
       paymentMethod: {
         brand: 'visa',
         expiresMonth: 12,
         expiresYear: 2028,
         last4: '4242'
-      }
+      },
+      purchaseRefusal: null
     })
 
     const setup = await invoke(['org', 'billing', 'payment-method', 'setup'])
@@ -1087,17 +1088,29 @@ describe('organization payment method', () => {
     const { configDirectory } = await createAuthenticatedConfig()
     const mocks = paymentMocks()
     const staleMethod = {
+      agreement: { kind: 'self_serve' as const },
       cardOnFile: false,
       paymentMethod: {
         brand: 'visa',
         expiresMonth: 12,
         expiresYear: 2028,
         last4: '4242'
-      }
+      },
+      purchaseRefusal: null
     }
     mocks.getOrganizationPaymentMethod
-      .mockResolvedValueOnce({ cardOnFile: true, paymentMethod: null })
-      .mockResolvedValueOnce({ cardOnFile: false, paymentMethod: null })
+      .mockResolvedValueOnce({
+        agreement: { kind: 'self_serve' },
+        cardOnFile: true,
+        paymentMethod: null,
+        purchaseRefusal: null
+      })
+      .mockResolvedValueOnce({
+        agreement: { kind: 'self_serve' },
+        cardOnFile: false,
+        paymentMethod: null,
+        purchaseRefusal: null
+      })
       .mockResolvedValueOnce(staleMethod)
       .mockResolvedValueOnce(staleMethod)
     const invoke = cliInvoker(configDirectory, asProjectScope({}), {
@@ -1111,14 +1124,18 @@ describe('organization payment method', () => {
       'status'
     ])
     expect(JSON.parse(unavailable.stdout)).toEqual({
+      agreement: { kind: 'self_serve' },
       cardOnFile: true,
-      paymentMethod: null
+      paymentMethod: null,
+      purchaseRefusal: null
     })
 
     const empty = await invoke(['org', 'billing', 'payment-method', 'status'])
     expect(JSON.parse(empty.stdout)).toEqual({
+      agreement: { kind: 'self_serve' },
       cardOnFile: false,
-      paymentMethod: null
+      paymentMethod: null,
+      purchaseRefusal: null
     })
 
     // Without a card on file, text output shows no card details, and JSON
@@ -1138,13 +1155,15 @@ describe('organization payment method', () => {
     const { configDirectory } = await createAuthenticatedConfig()
     const mocks = paymentMocks()
     mocks.getOrganizationPaymentMethod.mockResolvedValueOnce({
+      agreement: { kind: 'self_serve' },
       cardOnFile: true,
       paymentMethod: {
         brand: 'visa',
         expiresMonth: 13,
         expiresYear: 2028,
         last4: '4242'
-      }
+      },
+      purchaseRefusal: null
     })
     const invoke = cliInvoker(configDirectory, asProjectScope({}), {
       organizationScope: mocks.scope

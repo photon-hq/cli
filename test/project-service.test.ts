@@ -29,9 +29,6 @@ const project = (projectId: string) => ({
     lastName: null
   },
   createdAt: timestamp,
-  createdByAccountId: 'account_owner',
-  createdByActorId: 'account_owner',
-  createdByActorKind: 'account',
   deletedAt: null,
   flags: [],
   name: projectId,
@@ -1246,13 +1243,16 @@ describe('project service', () => {
 
   test.each([
     {
-      expectedCode: 'RESOURCE_PROVIDER_REJECTED',
+      expectedCode: 'NUMBER_ORDER_FAILED',
       operation: {
         ...resourceOperation('failed'),
         error: {
-          code: 'RESOURCE_PROVIDER_REJECTED',
-          detail: 'The provider rejected the resource request.'
-        }
+          code: 'NUMBER_ORDER_FAILED',
+          detail: 'The provider could not order the number.',
+          status: 502,
+          title: 'Number Order Failed',
+          type: 'https://photon.codes/docs/problems/number-order-failed'
+        } as const
       }
     },
     {

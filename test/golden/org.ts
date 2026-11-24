@@ -213,13 +213,15 @@ const acceptance = {
 } satisfies Declared<AcceptOrganizationInvitationOutput>
 
 const paymentStatus = {
+  agreement: { kind: 'self_serve' },
   cardOnFile: true,
   paymentMethod: withNewField({
     brand: 'visa',
     expiresMonth: 12,
     expiresYear: 2028,
     last4: '4242'
-  })
+  }),
+  purchaseRefusal: null
 } satisfies Declared<GetOrganizationPaymentMethodOutput>
 
 const checkout = withNewField({

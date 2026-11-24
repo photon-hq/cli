@@ -1,7 +1,7 @@
 import type { ProductionTest } from '../../src/commands/production-test.ts'
 import type { PublicCommand } from './commands.ts'
 import type { VerifiedFile } from './files.ts'
-import type { CommandError, Invocation, Pass } from './runner.ts'
+import type { CommandError, HttpTiming, Invocation, Pass } from './runner.ts'
 
 export type CommandStatus = 'expected error' | 'failed' | 'passed' | 'skipped'
 
@@ -15,6 +15,8 @@ export const STATUSES: readonly CommandStatus[] = [
 export interface CommandResult {
   command: string
   error?: CommandError
+  // The --debug timings of the run that failed.
+  http?: HttpTiming[]
   note?: string
   runs: number
   status: CommandStatus
@@ -52,10 +54,13 @@ const NOT_REACHED = 'not reached: an earlier step failed'
 const failure = (
   base: Omit<CommandResult, 'status'>,
   note: string | undefined,
-  error?: CommandError
+  failed?: Pick<Invocation, 'error' | 'http'>
 ): CommandResult => ({
   ...base,
-  ...(error === undefined ? {} : { error }),
+  ...(failed?.error === undefined ? {} : { error: failed.error }),
+  ...(failed?.http === undefined || failed.http.length === 0
+    ? {}
+    : { http: failed.http }),
   ...(note === undefined ? {} : { note }),
   status: 'failed'
 })
@@ -80,7 +85,7 @@ const resultOf = (
   }
   const failed = invocations.find(({ outcome }) => outcome === 'failed')
   if (failed !== undefined) {
-    return failure(base, failed.note, failed.error)
+    return failure(base, failed.note, failed)
   }
   if (invocations.length === 0) {
     return failure(base, NOT_REACHED)
@@ -163,8 +168,16 @@ const detailOf = (result: CommandResult): string => {
   return cell(parts.filter((part) => part !== undefined).join('; '))
 }
 
-// The commands that failed first, then the ones an earlier failure kept
-// from running, on one line.
+const timingLine = (timing: HttpTiming): string => {
+  const outcome =
+    timing.status?.toString() ?? timing.transportError ?? 'no response'
+  const request =
+    timing.requestId === undefined ? '' : `, request ${timing.requestId}`
+  return `  - #${timing.sequence.toString()} \`${timing.method} ${timing.url}\` at ${timing.startedAt}: ${cell(outcome)} after ${timing.durationMs.toString()} ms${request}`
+}
+
+// The commands that failed first, each with its HTTP timings, then the ones
+// an earlier failure kept from running, on one line.
 export const failureLines = (report: PassReport): string[] => {
   const failed = report.commands.filter(({ status }) => status === 'failed')
   const unreached = failed
@@ -173,7 +186,10 @@ export const failureLines = (report: PassReport): string[] => {
   return [
     ...failed
       .filter(({ note }) => note !== NOT_REACHED)
-      .map((result) => `- \`${result.command}\`: ${detailOf(result)}`),
+      .flatMap((result) => [
+        `- \`${result.command}\`: ${detailOf(result)}`,
+        ...(result.http ?? []).map(timingLine)
+      ]),
     ...report.problems.map((problem) => `- ${cell(problem)}`),
     ...(unreached.length === 0
       ? []

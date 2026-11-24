@@ -119,6 +119,23 @@ const sdkCliError = (
 }
 
 /**
+ * The body of a successful response. The SDK types the data of an operation
+ * that also declares 304 Not Modified as possibly undefined, but the CLI
+ * sends no conditional request, so a response without a body is a protocol
+ * error.
+ */
+export const responseBody = <Body>(body: Body): Exclude<Body, undefined> => {
+  if (body === undefined) {
+    throw new CliError(
+      'API_PROTOCOL_ERROR',
+      "Photon's response didn't match what this version of the CLI expects.",
+      { detail: 'The response had no body.' }
+    )
+  }
+  return body as Exclude<Body, undefined>
+}
+
+/**
  * The one mapper from SDK errors to the CLI's error. A CLI error found in the
  * cause chain is returned as it is; anything that isn't an SDK error is
  * returned unchanged.

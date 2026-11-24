@@ -37,9 +37,6 @@ const projectResource = (projectId: string) => ({
     lastName: null
   },
   createdAt: timestamp,
-  createdByAccountId: 'user_ada',
-  createdByActorId: 'user_ada',
-  createdByActorKind: 'account',
   deletedAt: null,
   flags: [],
   name: `Project ${projectId.slice(-1)}`,

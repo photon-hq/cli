@@ -626,7 +626,7 @@ COMMANDS:
   list                       List platforms available to the project
   operation                  Manage remote platform operations
   sms                        Inspect and manage project SMS resources
-  telegram                   Inspect and manage project Telegram bots
+  telegram                   Inspect and manage the project Telegram connection
   voice                      Inspect and manage project PSTN voice
   whatsapp-business          Inspect and manage WhatsApp Business
 
@@ -765,7 +765,7 @@ OPTIONS:
 Agents and scripts: add --json to any photon command for output a program can read.
 
 $ photon project platform telegram --help
-Inspect and manage project Telegram bots
+Inspect and manage the project Telegram connection
 
 USAGE:
   photon project platform telegram <COMMAND> [OPTIONS]
@@ -773,8 +773,8 @@ USAGE:
 COMMANDS:
   connect             Connect a Telegram bot to the project
   disconnect          Disconnect a Telegram bot from the project
-  list                List project Telegram bots and setups in progress
-  view                View a project Telegram bot
+  list                List the project Telegram bot and setups in progress
+  view                View the project Telegram connection
 
 OPTIONS:
   -h, --help                   Display this help message

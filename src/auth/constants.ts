@@ -14,6 +14,7 @@ export const DEVICE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code'
 export const REFRESH_GRANT_TYPE = 'refresh_token'
 
 export const ACCESS_TOKEN_REFRESH_SKEW_MS = 60_000
+export const AUTH_LOCK_ACQUISITION_TIMEOUT_MS = 60_000
 export const LOCK_ACQUISITION_TIMEOUT_MS = 10_000
 export const LOCK_HEARTBEAT_MS = 10_000
 export const LOCK_STALE_MS = 120_000
@@ -22,3 +23,7 @@ export const MAX_DEVICE_POLL_INTERVAL_SECONDS = 300
 export const MAX_POLL_BACKOFF_MS = 30_000
 export const MIN_POLL_INTERVAL_MS = 1000
 export const OAUTH_SLOW_DOWN_MS = 5000
+export const REFRESH_ATTEMPT_TIMEOUT_MS = 10_000
+export const REFRESH_BACKOFF_BASE_MS = 1000
+export const REFRESH_MAX_ATTEMPTS = 3
+export const REFRESH_RETRY_BUDGET_MS = 20_000

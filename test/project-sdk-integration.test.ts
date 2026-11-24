@@ -80,9 +80,6 @@ const project = (projectId: string, name = projectId) => ({
     lastName: null
   },
   createdAt: timestamp,
-  createdByAccountId: 'user_ada',
-  createdByActorId: 'user_ada',
-  createdByActorKind: 'account',
   deletedAt: null,
   flags: [],
   futureField: 'from-a-newer-api',
@@ -348,14 +345,17 @@ describe('generated project SDK integration', () => {
         writeJson(response, {
           invoices: [
             {
+              amountDueCents: 0,
               currency: 'USD',
               invoiceId: 'invoice_1',
               issuedAt: timestamp,
               kind: 'subscription',
               number: 'INV-1',
+              pageUrl: null,
               paymentActionRequired: false,
               paymentDueAt: null,
               paymentOverdue: false,
+              paymentProcessing: false,
               paymentStatus: 'paid',
               pdfUrl: null,
               status: 'finalized',
@@ -392,6 +392,7 @@ describe('generated project SDK integration', () => {
             {
               cancelsAt: null,
               category: 'platforms',
+              coupons: [],
               currentPeriodEnd: periodEnd,
               currentPeriodStart: timestamp,
               nextBillingAt: periodEnd,
@@ -688,7 +689,6 @@ describe('generated project SDK integration', () => {
     expect(listed).toMatchObject({
       projects: [
         {
-          createdByActorKind: 'account',
           futureField: 'from-a-newer-api',
           projectId: 'pho_prj_00000000000000000000000001'
         },

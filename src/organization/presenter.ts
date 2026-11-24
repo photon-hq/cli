@@ -27,7 +27,7 @@ const sourceLabel = (context: ResolvedOrganizationContext): string => {
 
 export const organizationDetails = (
   output: CliOutput,
-  organization: GetOrganizationOutput,
+  organization: NonNullable<GetOrganizationOutput>,
   context?: ResolvedOrganizationContext
 ): string[] =>
   detail(output, 'Organization', [

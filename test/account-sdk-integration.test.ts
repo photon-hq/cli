@@ -122,6 +122,7 @@ describe('generated account SDK integration', () => {
         ) {
           writeJson(response, {
             addedByNewerApi: 'from-a-newer-api',
+            agreement: { kind: 'self_serve' },
             cardOnFile: true,
             paymentMethod: {
               addedByNewerApi: 'from-a-newer-api',
@@ -129,7 +130,8 @@ describe('generated account SDK integration', () => {
               expiresMonth: 12,
               expiresYear: 2028,
               last4: '4242'
-            }
+            },
+            purchaseRefusal: null
           })
           return
         }
@@ -236,6 +238,7 @@ describe('generated account SDK integration', () => {
 
     expect(paymentStatus).toEqual({
       addedByNewerApi: 'from-a-newer-api',
+      agreement: { kind: 'self_serve' },
       cardOnFile: true,
       paymentMethod: {
         addedByNewerApi: 'from-a-newer-api',
@@ -243,7 +246,8 @@ describe('generated account SDK integration', () => {
         expiresMonth: 12,
         expiresYear: 2028,
         last4: '4242'
-      }
+      },
+      purchaseRefusal: null
     })
 
     expect(requests).toEqual([

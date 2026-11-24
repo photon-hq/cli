@@ -16,12 +16,27 @@ export interface CommandError {
   requestId?: string
 }
 
+// One HTTP exchange from the trace a command prints with --debug: when it
+// started, how long it took and how it ended. The report keeps them only for a
+// command that failed.
+export interface HttpTiming {
+  durationMs: number
+  method: string
+  requestId?: string
+  sequence: number
+  startedAt: string
+  status?: number
+  transportError?: string
+  url: string
+}
+
 export interface Invocation {
   argv: readonly string[]
   cleanup: boolean
   command: string
   error?: CommandError
   exitCode?: number
+  http?: HttpTiming[]
   note?: string
   outcome: 'expected error' | 'failed' | 'passed'
   scenario: string
@@ -175,6 +190,70 @@ export const parseError = (output: string): CommandError => {
     }
   }
   return { message: 'The command printed no JSON error.' }
+}
+
+const timingOf = (exchange: unknown): HttpTiming | undefined => {
+  if (!(isRecord(exchange) && isRecord(exchange.request))) {
+    return
+  }
+  const { durationMs, sequence, startedAt } = exchange
+  const method = optionalString(exchange.request.method)
+  const url = optionalString(exchange.request.url)
+  if (
+    typeof durationMs !== 'number' ||
+    typeof sequence !== 'number' ||
+    typeof startedAt !== 'string' ||
+    method === undefined ||
+    url === undefined
+  ) {
+    return
+  }
+  const response = isRecord(exchange.response) ? exchange.response : {}
+  const failure = isRecord(exchange.transportError)
+    ? exchange.transportError
+    : undefined
+  const requestId = optionalString(response.requestId)
+  const code = optionalString(failure?.code)
+  return {
+    durationMs,
+    method,
+    ...(requestId === undefined ? {} : { requestId }),
+    sequence,
+    startedAt,
+    ...(typeof response.status === 'number' ? { status: response.status } : {}),
+    ...(failure === undefined
+      ? {}
+      : {
+          transportError: redact(
+            `${String(failure.name)}${code === undefined ? '' : ` [${code}]`}: ${String(failure.message)}`
+          )
+        }),
+    url: redact(url)
+  }
+}
+
+// Reads the timings of the last HTTP trace in the output: --debug puts it in
+// the JSON error, or on its own line after a result. Like parseError, it keeps
+// nothing else, so no header or body the trace holds leaves the process.
+export const parseTimings = (output: string): HttpTiming[] | undefined => {
+  for (const line of output.split('\n').reverse()) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (!isRecord(parsed)) {
+      continue
+    }
+    const debug = isRecord(parsed.error) ? parsed.error.debug : parsed.debug
+    const trace = isRecord(debug) ? debug.http : undefined
+    if (isRecord(trace) && Array.isArray(trace.exchanges)) {
+      return trace.exchanges
+        .map(timingOf)
+        .filter((timing) => timing !== undefined)
+    }
+  }
 }
 
 const parseOutput = (stdout: string): unknown => {
@@ -574,6 +653,7 @@ export class ScenarioRun implements ScenarioContext {
       [
         ...argv,
         ...(options.json === false ? [] : ['--json']),
+        '--debug',
         ...(options.org === false
           ? []
           : ['--org', this.#options.organizationId])
@@ -581,6 +661,12 @@ export class ScenarioRun implements ScenarioContext {
       options.stdin
     )
     invocation.exitCode = result.exitCode
+    const http = parseTimings(
+      this.#withoutKey(`${result.stdout}\n${result.stderr}`)
+    )
+    if (http !== undefined) {
+      invocation.http = http
+    }
     if (result.exitCode !== 0) {
       invocation.outcome = 'failed'
       invocation.error = parseError(

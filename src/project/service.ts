@@ -61,7 +61,7 @@ import {
 import { ID_FORMATS } from '../core/photon-id.ts'
 import { pollUntilSettled } from '../core/poll.ts'
 import { DEFAULT_REQUEST_TIMEOUT_MS } from '../core/request.ts'
-import { normalizeSdkError } from '../core/sdk-error.ts'
+import { normalizeSdkError, responseBody } from '../core/sdk-error.ts'
 import { CLI_NAME } from '../meta.ts'
 import type { ApiKeyPermission, SmsPurchaseInput } from './api-contract.ts'
 import {
@@ -212,7 +212,7 @@ type PendingBillingOperation = Extract<
   { status: 'pending' }
 >
 const isPendingBillingOperation = (
-  operation: GetBillingOperationOutput
+  operation: NonNullable<GetBillingOperationOutput>
 ): operation is PendingBillingOperation =>
   isBillingOperationInProgress(operation.status)
 
@@ -238,7 +238,8 @@ export interface WhatsappBusinessNumber {
   updatedAt: string
 }
 
-export type WhatsappBusinessAccount = GetWhatsappBusinessAccountOutput
+export type WhatsappBusinessAccount =
+  NonNullable<GetWhatsappBusinessAccountOutput>
 
 export interface WhatsappBusinessAccountList {
   accounts: WhatsappBusinessAccount[]
@@ -255,7 +256,7 @@ export interface WhatsappBusinessSender {
 // Photon's page of active senders as it sends it, and the same senders
 // checked.
 export interface WhatsappBusinessNumberList {
-  response: ListResourcesOutput
+  response: NonNullable<ListResourcesOutput>
   senders: WhatsappBusinessSender[]
 }
 
@@ -281,15 +282,15 @@ export interface WhatsappSenderConnectionResult extends WhatsappBusinessSender {
 export interface EmailDomainConnection {
   automaticSetup?: EmailDomainAutomaticSetup
   dnsRecords: EmailDomainDnsRecord[]
-  response: GetOperationOutput
+  response: NonNullable<GetOperationOutput>
 }
 
-export type OperationWithResource = GetOperationOutput & {
+export type OperationWithResource = NonNullable<GetOperationOutput> & {
   resource: PlatformResource
 }
 
 export interface TelegramBotConnection {
-  response: GetOperationOutput
+  response: NonNullable<GetOperationOutput>
   // True when the project already had an unfinished setup and this call
   // continued it instead of starting another.
   resumed: boolean
@@ -299,7 +300,7 @@ export interface TelegramBotConnection {
 export interface EmailDomainDnsInspection {
   automaticSetup?: EmailDomainAutomaticSetup
   dnsRecords: EmailDomainDnsRecord[]
-  response: GetOperationOutput
+  response: NonNullable<GetOperationOutput>
   verification?: EmailDomainVerificationSnapshot
 }
 
@@ -315,11 +316,13 @@ export type PlatformAbility =
   | 'sms'
   | 'telegram'
   | 'whatsapp_business'
-export type PlatformResource = ListResourcesOutput['resources'][number]
-export type ProvisioningOperation = ListOperationsOutput['operations'][number]
-export type ResourceOperation = GetOperationOutput['operation']
+export type PlatformResource =
+  NonNullable<ListResourcesOutput>['resources'][number]
+export type ProvisioningOperation =
+  NonNullable<ListOperationsOutput>['operations'][number]
+export type ResourceOperation = NonNullable<GetOperationOutput>['operation']
 
-export type PlatformResourceList = ListResourcesOutput & {
+export type PlatformResourceList = NonNullable<ListResourcesOutput> & {
   provisioning: ProvisioningOperation[]
 }
 
@@ -337,7 +340,7 @@ export const isResourceOperationInProgress = (state: string): boolean =>
   RESOURCE_OPERATION_PENDING_STATES.has(state.toLowerCase())
 
 const telegramBotConnection = (
-  result: GetOperationOutput,
+  result: NonNullable<GetOperationOutput>,
   resumed: boolean
 ): TelegramBotConnection => {
   const setupUrl = isResourceOperationInProgress(result.operation.state)
@@ -351,7 +354,7 @@ const telegramBotConnection = (
 }
 
 const namesAnotherResource = (
-  { resource }: GetOperationOutput,
+  { resource }: NonNullable<GetOperationOutput>,
   projectId: string,
   resourceId: string
 ): boolean =>
@@ -359,7 +362,7 @@ const namesAnotherResource = (
   (resource.projectId !== projectId || resource.resourceId !== resourceId)
 
 const validateTelegramBotReleaseOperation = (
-  result: GetOperationOutput,
+  result: NonNullable<GetOperationOutput>,
   projectId: string,
   resourceId: string,
   expectedOperationId = result.operation.operationId
@@ -386,7 +389,7 @@ const validateTelegramBotReleaseOperation = (
 }
 
 const validateReleaseOperation = (
-  result: GetOperationOutput,
+  result: NonNullable<GetOperationOutput>,
   expected: {
     detail: string
     operationId?: string
@@ -628,7 +631,7 @@ const isRetiredWhatsappBusinessNumber = (
   resource.type === 'whatsapp_sender' && isRetiredResource(resource, projectId)
 
 const validateWhatsappBusinessReleaseOperation = (
-  result: GetOperationOutput,
+  result: NonNullable<GetOperationOutput>,
   projectId: string,
   resourceId: string,
   expectedOperationId = result.operation.operationId
@@ -801,7 +804,7 @@ const assertLimit = (limit: number): void => {
 export class ProjectService {
   readonly #clock: PollClock
   readonly #fetch: typeof globalThis.fetch
-  readonly #loaded = new Map<string, GetProjectOutput>()
+  readonly #loaded = new Map<string, NonNullable<GetProjectOutput>>()
   readonly #organizationScope: ProjectOrganizationScope
   readonly #rawScope: ProjectRawScope | undefined
   readonly #random: () => number
@@ -854,11 +857,16 @@ export class ProjectService {
   async count(
     organizationId: string,
     filters: ProjectFilters
-  ): Promise<CountProjectsOutput> {
-    return await this.#execute((options) =>
-      this.#organizationScope.projects.count(
-        { path: { organizationId }, query: this.#projectFilterQuery(filters) },
-        options
+  ): Promise<NonNullable<CountProjectsOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#organizationScope.projects.count(
+          {
+            path: { organizationId },
+            query: this.#projectFilterQuery(filters)
+          },
+          options
+        )
       )
     )
   }
@@ -1086,16 +1094,18 @@ export class ProjectService {
     )
   }
 
-  async get(projectId: string): Promise<GetProjectOutput> {
-    const project = await this.#execute((options) =>
-      this.#scope.get({ path: { projectId } }, options)
+  async get(projectId: string): Promise<NonNullable<GetProjectOutput>> {
+    const project = responseBody(
+      await this.#execute((options) =>
+        this.#scope.get({ path: { projectId } }, options)
+      )
     )
     this.#loaded.set(projectId, project)
     return project
   }
 
   // A project this command already read, so naming it costs no request.
-  loaded(projectId: string): GetProjectOutput | undefined {
+  loaded(projectId: string): NonNullable<GetProjectOutput> | undefined {
     return this.#loaded.get(projectId)
   }
 
@@ -1106,29 +1116,37 @@ export class ProjectService {
   async getWebhookDestination(
     projectId: string,
     destinationId: string
-  ): Promise<GetWebhookDestinationOutput> {
-    return await this.#execute((options) =>
-      this.#scope.getWebhookDestination(
-        { path: { destinationId, projectId } },
-        options
+  ): Promise<NonNullable<GetWebhookDestinationOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.getWebhookDestination(
+          { path: { destinationId, projectId } },
+          options
+        )
       )
     )
   }
 
-  async getAgentProfile(projectId: string): Promise<GetAgentProfileOutput> {
-    return await this.#execute((options) =>
-      this.#scope.agentProfile.get({ path: { projectId } }, options)
+  async getAgentProfile(
+    projectId: string
+  ): Promise<NonNullable<GetAgentProfileOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.agentProfile.get({ path: { projectId } }, options)
+      )
     )
   }
 
   async getBillingOperation(
     projectId: string,
     operationId: string
-  ): Promise<GetBillingOperationOutput> {
-    return await this.#execute((options) =>
-      this.#scope.billing.getOperation(
-        { path: { operationId, projectId } },
-        options
+  ): Promise<NonNullable<GetBillingOperationOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.billing.getOperation(
+          { path: { operationId, projectId } },
+          options
+        )
       )
     )
   }
@@ -1136,11 +1154,13 @@ export class ProjectService {
   async getOperation(
     projectId: string,
     operationId: string
-  ): Promise<GetOperationOutput> {
-    return await this.#execute((options) =>
-      this.#scope.platforms.getOperation(
-        { path: { id: projectId, operationId } },
-        options
+  ): Promise<NonNullable<GetOperationOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.platforms.getOperation(
+          { path: { id: projectId, operationId } },
+          options
+        )
       )
     )
   }
@@ -1184,11 +1204,13 @@ export class ProjectService {
   async getResource(
     projectId: string,
     resourceId: string
-  ): Promise<GetResourceOutput> {
-    return await this.#execute((options) =>
-      this.#scope.platforms.getResource(
-        { path: { id: projectId, resourceId } },
-        options
+  ): Promise<NonNullable<GetResourceOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.platforms.getResource(
+          { path: { id: projectId, resourceId } },
+          options
+        )
       )
     )
   }
@@ -1274,17 +1296,19 @@ export class ProjectService {
         limit: MAXIMUM_PAGINATION_LIMIT,
         maximumPageSize: RESOURCE_PAGE_SIZE_LIMIT,
         request: async (pageSize, pageToken) =>
-          await this.#execute((options) =>
-            this.#scope.platforms.listResources(
-              {
-                path: { id: projectId },
-                query: {
-                  ability: 'sms',
-                  pageSize,
-                  ...(pageToken === undefined ? {} : { pageToken })
-                }
-              },
-              options
+          responseBody(
+            await this.#execute((options) =>
+              this.#scope.platforms.listResources(
+                {
+                  path: { id: projectId },
+                  query: {
+                    ability: 'sms',
+                    pageSize,
+                    ...(pageToken === undefined ? {} : { pageToken })
+                  }
+                },
+                options
+              )
             )
           )
       }),
@@ -1456,13 +1480,15 @@ export class ProjectService {
     receivedAfter: string
   ): Promise<WhatsappBusinessVerificationCode> {
     try {
-      return await this.#request.run((options) =>
-        this.#scope.platforms.getWhatsappBusinessVerificationCode(
-          {
-            path: { id: projectId, resourceId },
-            query: { receivedAfter }
-          },
-          options
+      return responseBody(
+        await this.#request.run((options) =>
+          this.#scope.platforms.getWhatsappBusinessVerificationCode(
+            {
+              path: { id: projectId, resourceId },
+              query: { receivedAfter }
+            },
+            options
+          )
         )
       )
     } catch (error) {
@@ -1577,8 +1603,10 @@ export class ProjectService {
 
   async pollBillingOperation(
     projectId: string,
-    initial: GetBillingOperationOutput
-  ): Promise<Exclude<GetBillingOperationOutput, PendingBillingOperation>> {
+    initial: NonNullable<GetBillingOperationOutput>
+  ): Promise<
+    Exclude<NonNullable<GetBillingOperationOutput>, PendingBillingOperation>
+  > {
     return await pollUntilSettled({
       clock: this.#clock,
       initial,
@@ -1591,43 +1619,57 @@ export class ProjectService {
 
   async getBillingOverview(
     projectId: string
-  ): Promise<GetBillingOverviewOutput> {
-    return await this.#execute((options) =>
-      this.#scope.billing.getOverview({ path: { projectId } }, options)
-    )
-  }
-
-  async getEffectiveTerms(projectId: string): Promise<GetEffectiveTermsOutput> {
-    const organizationId = await this.organizationIdOf(projectId)
-    return await this.#execute((options) =>
-      this.#organizationScope.billing.getEffectiveTerms(
-        { path: { organizationId, projectId } },
-        options
+  ): Promise<NonNullable<GetBillingOverviewOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.billing.getOverview({ path: { projectId } }, options)
       )
     )
   }
 
-  async listBillingPlans(projectId: string): Promise<ListBillingPlansOutput> {
-    return await this.#execute((options) =>
-      this.#scope.billing.listBillingPlans({ path: { projectId } }, options)
+  async getEffectiveTerms(
+    projectId: string
+  ): Promise<NonNullable<GetEffectiveTermsOutput>> {
+    const organizationId = await this.organizationIdOf(projectId)
+    return responseBody(
+      await this.#execute((options) =>
+        this.#organizationScope.billing.getEffectiveTerms(
+          { path: { organizationId, projectId } },
+          options
+        )
+      )
+    )
+  }
+
+  async listBillingPlans(
+    projectId: string
+  ): Promise<NonNullable<ListBillingPlansOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.billing.listBillingPlans({ path: { projectId } }, options)
+      )
     )
   }
 
   async getImessagePlatform(
     projectId: string
-  ): Promise<GetProjectImessagePlatformOutput> {
-    return await this.#execute((options) =>
-      this.#scope.platforms.getImessage({ path: { id: projectId } }, options)
+  ): Promise<NonNullable<GetProjectImessagePlatformOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.platforms.getImessage({ path: { id: projectId } }, options)
+      )
     )
   }
 
   async listProjectPlatforms(
     projectId: string
-  ): Promise<ListProjectPlatformsOutput> {
-    return await this.#execute((options) =>
-      this.#scope.platforms.listProjectPlatforms(
-        { path: { id: projectId } },
-        options
+  ): Promise<NonNullable<ListProjectPlatformsOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.platforms.listProjectPlatforms(
+          { path: { id: projectId } },
+          options
+        )
       )
     )
   }
@@ -1635,11 +1677,13 @@ export class ProjectService {
   async getSharedLineAssignment(
     projectId: string,
     assignmentId: string
-  ): Promise<GetSharedLineAssignmentOutput> {
-    return await this.#execute((options) =>
-      this.#scope.platforms.imessage.assignments.get(
-        { path: { assignmentId, id: projectId } },
-        options
+  ): Promise<NonNullable<GetSharedLineAssignmentOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.platforms.imessage.assignments.get(
+          { path: { assignmentId, id: projectId } },
+          options
+        )
       )
     )
   }
@@ -1648,34 +1692,40 @@ export class ProjectService {
     organizationId: string,
     filters: ProjectFilters,
     pagination: PaginationOptions
-  ): Promise<ListProjectsOutput> {
+  ): Promise<NonNullable<ListProjectsOutput>> {
     return await this.#paginateEnvelope<
       'projects',
-      ListProjectsOutput['projects'][number]
+      NonNullable<ListProjectsOutput>['projects'][number]
     >({
       ...pagination,
       itemKey: 'projects',
       maximumPageSize: PROJECT_RESOURCE_PAGE_SIZE_LIMIT,
       request: async (pageSize, pageToken) =>
-        await this.#execute((options) =>
-          this.#organizationScope.projects.list(
-            {
-              path: { organizationId },
-              query: {
-                ...this.#projectFilterQuery(filters),
-                pageSize,
-                ...(pageToken === undefined ? {} : { pageToken })
-              }
-            },
-            options
+        responseBody(
+          await this.#execute((options) =>
+            this.#organizationScope.projects.list(
+              {
+                path: { organizationId },
+                query: {
+                  ...this.#projectFilterQuery(filters),
+                  pageSize,
+                  ...(pageToken === undefined ? {} : { pageToken })
+                }
+              },
+              options
+            )
           )
         )
     })
   }
 
-  async listApiKeys(projectId: string): Promise<ListProjectApiKeysOutput> {
-    return await this.#execute((options) =>
-      this.#scope.listProjectApiKeys({ path: { projectId } }, options)
+  async listApiKeys(
+    projectId: string
+  ): Promise<NonNullable<ListProjectApiKeysOutput>> {
+    return responseBody(
+      await this.#execute((options) =>
+        this.#scope.listProjectApiKeys({ path: { projectId } }, options)
+      )
     )
   }
 
@@ -1692,25 +1742,27 @@ export class ProjectService {
   async listWebhookDestinations(
     projectId: string,
     pagination: PaginationOptions
-  ): Promise<ListWebhookDestinationsOutput> {
+  ): Promise<NonNullable<ListWebhookDestinationsOutput>> {
     return await this.#paginateEnvelope<
       'destinations',
-      ListWebhookDestinationsOutput['destinations'][number]
+      NonNullable<ListWebhookDestinationsOutput>['destinations'][number]
     >({
       ...pagination,
       itemKey: 'destinations',
       maximumPageSize: PROJECT_RESOURCE_PAGE_SIZE_LIMIT,
       request: async (pageSize, pageToken) =>
-        await this.#execute((options) =>
-          this.#scope.listWebhookDestinations(
-            {
-              path: { projectId },
-              query: {
-                pageSize,
-                ...(pageToken === undefined ? {} : { pageToken })
-              }
-            },
-            options
+        responseBody(
+          await this.#execute((options) =>
+            this.#scope.listWebhookDestinations(
+              {
+                path: { projectId },
+                query: {
+                  pageSize,
+                  ...(pageToken === undefined ? {} : { pageToken })
+                }
+              },
+              options
+            )
           )
         )
     })
@@ -1736,23 +1788,28 @@ export class ProjectService {
   async listInvoices(
     projectId: string,
     pagination: PaginationOptions
-  ): Promise<ListInvoicesOutput> {
+  ): Promise<NonNullable<ListInvoicesOutput>> {
     const organizationId = await this.organizationIdOf(projectId)
-    let lastPage: ListInvoicesOutput = { invoices: [], nextCursor: null }
+    let lastPage: NonNullable<ListInvoicesOutput> = {
+      invoices: [],
+      nextCursor: null
+    }
     const result = await this.#paginate({
       ...pagination,
       maximumPageSize: INVOICE_PAGE_SIZE_LIMIT,
       request: async (pageSize, pageToken) => {
-        const page = await this.#execute((options) =>
-          this.#organizationScope.billing.listInvoices(
-            {
-              path: { organizationId },
-              query: {
-                limit: pageSize,
-                ...(pageToken === undefined ? {} : { cursor: pageToken })
-              }
-            },
-            options
+        const page = responseBody(
+          await this.#execute((options) =>
+            this.#organizationScope.billing.listInvoices(
+              {
+                path: { organizationId },
+                query: {
+                  limit: pageSize,
+                  ...(pageToken === undefined ? {} : { cursor: pageToken })
+                }
+              },
+              options
+            )
           )
         )
         lastPage = page
@@ -1775,26 +1832,28 @@ export class ProjectService {
     projectId: string,
     pagination: PaginationOptions,
     includeReleased: boolean
-  ): Promise<ListSharedLineAssignmentsOutput> {
+  ): Promise<NonNullable<ListSharedLineAssignmentsOutput>> {
     return await this.#paginateEnvelope<
       'assignments',
-      ListSharedLineAssignmentsOutput['assignments'][number]
+      NonNullable<ListSharedLineAssignmentsOutput>['assignments'][number]
     >({
       ...pagination,
       itemKey: 'assignments',
       maximumPageSize: SHARED_LINE_ASSIGNMENT_PAGE_SIZE_LIMIT,
       request: async (pageSize, pageToken) =>
-        await this.#execute((options) =>
-          this.#scope.platforms.imessage.assignments.list(
-            {
-              path: { id: projectId },
-              query: {
-                pageSize,
-                ...(includeReleased ? { includeReleased: 'true' } : {}),
-                ...(pageToken === undefined ? {} : { pageToken })
-              }
-            },
-            options
+        responseBody(
+          await this.#execute((options) =>
+            this.#scope.platforms.imessage.assignments.list(
+              {
+                path: { id: projectId },
+                query: {
+                  pageSize,
+                  ...(includeReleased ? { includeReleased: 'true' } : {}),
+                  ...(pageToken === undefined ? {} : { pageToken })
+                }
+              },
+              options
+            )
           )
         )
     })
@@ -1811,10 +1870,12 @@ export class ProjectService {
       )
     }
     try {
-      const account = await this.#execute((options) =>
-        this.#scope.platforms.getWhatsappBusinessAccount(
-          { path: { id: projectId } },
-          options
+      const account = responseBody(
+        await this.#execute((options) =>
+          this.#scope.platforms.getWhatsappBusinessAccount(
+            { path: { id: projectId } },
+            options
+          )
         )
       )
       return { accounts: [account] }
@@ -1838,18 +1899,20 @@ export class ProjectService {
       itemKey: 'resources',
       maximumPageSize: RESOURCE_PAGE_SIZE_LIMIT,
       request: async (pageSize, pageToken) =>
-        await this.#execute((options) =>
-          this.#scope.platforms.listResources(
-            {
-              path: { id: projectId },
-              query: {
-                ability: 'whatsapp_business',
-                pageSize,
-                state: 'active',
-                ...(pageToken === undefined ? {} : { pageToken })
-              }
-            },
-            options
+        responseBody(
+          await this.#execute((options) =>
+            this.#scope.platforms.listResources(
+              {
+                path: { id: projectId },
+                query: {
+                  ability: 'whatsapp_business',
+                  pageSize,
+                  state: 'active',
+                  ...(pageToken === undefined ? {} : { pageToken })
+                }
+              },
+              options
+            )
           )
         )
     })
@@ -1878,23 +1941,30 @@ export class ProjectService {
     projectId: string,
     ability: PlatformAbility,
     pagination: PaginationOptions
-  ): Promise<ListResourcesOutput> {
+  ): Promise<NonNullable<ListResourcesOutput>> {
     return await this.#paginateEnvelope<'resources', PlatformResource>({
       ...pagination,
       itemKey: 'resources',
       maximumPageSize: RESOURCE_PAGE_SIZE_LIMIT,
       request: async (pageSize, pageToken) =>
-        await this.#execute((options) =>
-          this.#scope.platforms.listResources(
-            {
-              path: { id: projectId },
-              query: {
-                ability,
-                pageSize,
-                ...(pageToken === undefined ? {} : { pageToken })
-              }
-            },
-            options
+        responseBody(
+          await this.#execute((options) =>
+            this.#scope.platforms.listResources(
+              {
+                path: { id: projectId },
+                query: {
+                  ...(ability === 'telegram'
+                    ? {
+                        state: 'unallocated,active',
+                        type: TELEGRAM_BOT_RESOURCE_TYPE
+                      }
+                    : { ability }),
+                  pageSize,
+                  ...(pageToken === undefined ? {} : { pageToken })
+                }
+              },
+              options
+            )
           )
         )
     })
@@ -1915,6 +1985,12 @@ export class ProjectService {
       resourcesPromise,
       provisioningPromise
     ])
+    if (ability === 'telegram' && resourcePage.resources.length > 1) {
+      throw new CliError(
+        'PROJECT_PROTOCOL_ERROR',
+        'Photon returned multiple current Telegram bots for this project.'
+      )
+    }
     return { ...resourcePage, provisioning }
   }
 
@@ -1964,6 +2040,7 @@ export class ProjectService {
       (options) =>
         this.#resourceRawScope().platforms.provisionImessageDedicatedLine(
           {
+            body: {},
             headers: { idempotencyKey },
             path: { id: projectId }
           },
@@ -2059,7 +2136,7 @@ export class ProjectService {
     projectId: string,
     resourceId: string,
     accepted?: AcceptedOperationCallback
-  ): Promise<GetOperationOutput> {
+  ): Promise<NonNullable<GetOperationOutput>> {
     const resource = await this.getResource(projectId, resourceId)
     if (resource.type !== 'email_domain') {
       throw new CliError(
@@ -2104,7 +2181,7 @@ export class ProjectService {
     projectId: string,
     resourceId: string,
     operationId: string
-  ): Promise<GetOperationOutput> {
+  ): Promise<NonNullable<GetOperationOutput>> {
     return await this.#waitForRelease(
       projectId,
       await this.getOperation(projectId, operationId),
@@ -2116,6 +2193,58 @@ export class ProjectService {
         resourceType: 'email_domain'
       }
     )
+  }
+
+  async getCurrentTelegramBot(projectId: string): Promise<PlatformResource> {
+    const page = responseBody(
+      await this.#execute((options) =>
+        this.#scope.platforms.listResources(
+          {
+            path: { id: projectId },
+            query: {
+              pageSize: 2,
+              state: 'active',
+              type: TELEGRAM_BOT_RESOURCE_TYPE
+            }
+          },
+          options
+        )
+      )
+    )
+    const [resource] = page.resources
+    if (
+      page.resources.length > 1 ||
+      page.nextPageToken !== undefined ||
+      (resource !== undefined &&
+        (resource.type !== TELEGRAM_BOT_RESOURCE_TYPE ||
+          resource.projectId !== projectId ||
+          resource.state !== 'active' ||
+          resource.retiredAt !== undefined))
+    ) {
+      throw new CliError(
+        'PROJECT_PROTOCOL_ERROR',
+        'Photon returned an invalid current Telegram bot.'
+      )
+    }
+    if (resource === undefined) {
+      throw new CliError(
+        'TELEGRAM_BOT_NOT_CONNECTED',
+        'This project has no connected Telegram bot.',
+        {
+          next: [
+            {
+              description: 'Connect a bot or continue a setup',
+              run: `${CLI_NAME} project platform telegram connect --project ${projectId}`
+            },
+            {
+              description: 'List the bot and setups in progress',
+              run: `${CLI_NAME} project platform telegram list --project ${projectId}`
+            }
+          ]
+        }
+      )
+    }
+    return resource
   }
 
   async getTelegramBot(
@@ -2141,7 +2270,7 @@ export class ProjectService {
     projectId: string,
     resourceId: string,
     accepted?: AcceptedOperationCallback
-  ): Promise<GetOperationOutput> {
+  ): Promise<NonNullable<GetOperationOutput>> {
     await this.getTelegramBot(projectId, resourceId)
     const initial = await this.#acceptResourceOperation(
       (options) =>
@@ -2165,7 +2294,7 @@ export class ProjectService {
     projectId: string,
     resourceId: string,
     operationId: string
-  ): Promise<GetOperationOutput> {
+  ): Promise<NonNullable<GetOperationOutput>> {
     return await this.#waitForTelegramBotRelease(
       projectId,
       resourceId,
@@ -2181,11 +2310,11 @@ export class ProjectService {
   async #waitForTelegramBotRelease(
     projectId: string,
     resourceId: string,
-    initial: GetOperationOutput,
+    initial: NonNullable<GetOperationOutput>,
     operationRetryAfterSeconds: number,
     operationId = initial.operation.operationId
-  ): Promise<GetOperationOutput> {
-    const check = (result: GetOperationOutput) =>
+  ): Promise<NonNullable<GetOperationOutput>> {
+    const check = (result: NonNullable<GetOperationOutput>) =>
       validateTelegramBotReleaseOperation(
         result,
         projectId,
@@ -2206,7 +2335,7 @@ export class ProjectService {
     resourceId: string,
     accepted?: AcceptedOperationCallback,
     knownResource?: PlatformResource
-  ): Promise<GetOperationOutput> {
+  ): Promise<NonNullable<GetOperationOutput>> {
     const resource =
       knownResource ?? (await this.getResource(projectId, resourceId))
     if (!resource.abilities.includes('sms')) {
@@ -2254,7 +2383,7 @@ export class ProjectService {
     projectId: string,
     resourceId: string,
     accepted?: AcceptedOperationCallback
-  ): Promise<GetOperationOutput | { resource: PlatformResource }> {
+  ): Promise<NonNullable<GetOperationOutput> | { resource: PlatformResource }> {
     const resource = await this.getResource(projectId, resourceId)
     if (isRetiredResource(resource, projectId)) {
       return { resource }
@@ -2271,7 +2400,7 @@ export class ProjectService {
     projectId: string,
     resourceId: string,
     operationId: string
-  ): Promise<GetOperationOutput> {
+  ): Promise<NonNullable<GetOperationOutput>> {
     return await this.#waitForRelease(
       projectId,
       await this.getOperation(projectId, operationId),
@@ -2285,7 +2414,7 @@ export class ProjectService {
     resourceId: string,
     accepted?: AcceptedOperationCallback,
     validatedResource?: WhatsappBusinessNumber
-  ): Promise<GetOperationOutput> {
+  ): Promise<NonNullable<GetOperationOutput>> {
     const resource = validateWhatsappBusinessNumberResource(
       validatedResource ?? (await this.getResource(projectId, resourceId)),
       projectId,
@@ -2317,7 +2446,7 @@ export class ProjectService {
     projectId: string,
     resourceId: string,
     accepted?: AcceptedOperationCallback
-  ): Promise<GetOperationOutput | { resource: PlatformResource }> {
+  ): Promise<NonNullable<GetOperationOutput> | { resource: PlatformResource }> {
     const resource = await this.getResource(projectId, resourceId)
     if (isRetiredWhatsappBusinessNumber(resource, projectId)) {
       return { resource }
@@ -2338,8 +2467,8 @@ export class ProjectService {
     projectId: string,
     resourceId: string,
     operationId: string
-  ): Promise<GetOperationOutput> {
-    const check = (result: GetOperationOutput) =>
+  ): Promise<NonNullable<GetOperationOutput>> {
+    const check = (result: NonNullable<GetOperationOutput>) =>
       validateWhatsappBusinessReleaseOperation(
         result,
         projectId,
@@ -2526,7 +2655,7 @@ export class ProjectService {
     projectId: string,
     resourceId: string,
     accepted: AcceptedOperationCallback | undefined
-  ): Promise<GetOperationOutput> {
+  ): Promise<NonNullable<GetOperationOutput>> {
     const initial = await this.#acceptResourceOperation(
       (options) =>
         this.#resourceRawScope().platforms.releaseResource(
@@ -2605,7 +2734,7 @@ export class ProjectService {
       options?: RequestOptions
     ) => Promise<RawResponse<ResourceOperation>>,
     accepted: AcceptedOperationCallback | undefined,
-    check?: (result: GetOperationOutput) => void
+    check?: (result: NonNullable<GetOperationOutput>) => void
   ): Promise<AcceptedOperation> {
     const response = await this.#execute(request)
     check?.({ operation: response.data })
@@ -2653,19 +2782,21 @@ export class ProjectService {
         }
         seenTokens.add(pageToken)
       }
-      // biome-ignore lint/performance/noAwaitInLoops: pagination requests are sequential by protocol.
-      const page = await this.#execute((options) =>
-        this.#scope.platforms.listOperations(
-          {
-            path: { id: projectId },
-            query: {
-              pageSize: RESOURCE_OPERATION_PAGE_SIZE_LIMIT,
-              ...(pageToken === undefined ? {} : { pageToken }),
-              state: 'pending,running',
-              type: 'resource.provision'
-            }
-          },
-          options
+      const page = responseBody(
+        // biome-ignore lint/performance/noAwaitInLoops: pagination requests are sequential by protocol.
+        await this.#execute((options) =>
+          this.#scope.platforms.listOperations(
+            {
+              path: { id: projectId },
+              query: {
+                pageSize: RESOURCE_OPERATION_PAGE_SIZE_LIMIT,
+                ...(pageToken === undefined ? {} : { pageToken }),
+                state: 'pending,running',
+                type: 'resource.provision'
+              }
+            },
+            options
+          )
         )
       )
       pagesFetched += 1
@@ -2692,7 +2823,7 @@ export class ProjectService {
 
   async #waitForProvisionedResource(
     projectId: string,
-    initial: GetOperationOutput,
+    initial: NonNullable<GetOperationOutput>,
     ability: Extract<PlatformAbility, 'imessage' | 'sms' | 'whatsapp_business'>,
     operationRetryAfterSeconds: number
   ): Promise<OperationWithResource> {
@@ -2738,7 +2869,7 @@ export class ProjectService {
 
   async #waitForEmailDomainConnection(
     projectId: string,
-    initial: GetOperationOutput,
+    initial: NonNullable<GetOperationOutput>,
     operationRetryAfterSeconds: number,
     returnWhenDnsRecordsReady = true
   ): Promise<EmailDomainConnection> {
@@ -2933,7 +3064,7 @@ export class ProjectService {
 
   async #waitForRelease(
     projectId: string,
-    initial: GetOperationOutput,
+    initial: NonNullable<GetOperationOutput>,
     operationRetryAfterSeconds: number,
     release: {
       detail: string
@@ -2941,9 +3072,9 @@ export class ProjectService {
       resourceId: string
       resourceType?: string
     }
-  ): Promise<GetOperationOutput> {
+  ): Promise<NonNullable<GetOperationOutput>> {
     const expected = { ...release, projectId }
-    const check = (result: GetOperationOutput) =>
+    const check = (result: NonNullable<GetOperationOutput>) =>
       validateReleaseOperation(result, expected)
     check(initial)
     return await this.#waitForResourceOperation(
@@ -2957,7 +3088,7 @@ export class ProjectService {
   async #refreshOperation(
     projectId: string,
     operationId: string
-  ): Promise<GetOperationOutput> {
+  ): Promise<NonNullable<GetOperationOutput>> {
     const refreshed = await this.getOperation(projectId, operationId)
     if (refreshed.operation.operationId !== operationId) {
       throw new CliError(
@@ -2976,10 +3107,10 @@ export class ProjectService {
   // operation read, or a mutation's answer wrapped as { operation }.
   async #waitForResourceOperation(
     projectId: string,
-    initial: GetOperationOutput,
+    initial: NonNullable<GetOperationOutput>,
     operationRetryAfterSeconds: number,
-    check?: (result: GetOperationOutput) => void
-  ): Promise<GetOperationOutput> {
+    check?: (result: NonNullable<GetOperationOutput>) => void
+  ): Promise<NonNullable<GetOperationOutput>> {
     let result = initial
     try {
       while (isResourceOperationInProgress(result.operation.state)) {

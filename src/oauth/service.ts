@@ -20,7 +20,7 @@ import type {
 } from '@photon-ai/api'
 import type { AuthenticatedRequest } from '../auth/authenticated-request.ts'
 import { CliError, copyCliError } from '../core/errors.ts'
-import { normalizeSdkError } from '../core/sdk-error.ts'
+import { normalizeSdkError, responseBody } from '../core/sdk-error.ts'
 import { CLI_NAME } from '../meta.ts'
 import {
   discoverOauthAuthorizationServer,
@@ -144,11 +144,13 @@ export class OauthService {
 
   async listClients(
     organizationId: string
-  ): Promise<ListOrganizationOauthClientsOutput> {
-    return await this.#run((options) =>
-      this.#scope.listOrganizationOauthClients(
-        { path: { organizationId } },
-        options
+  ): Promise<NonNullable<ListOrganizationOauthClientsOutput>> {
+    return responseBody(
+      await this.#run((options) =>
+        this.#scope.listOrganizationOauthClients(
+          { path: { organizationId } },
+          options
+        )
       )
     )
   }
@@ -239,11 +241,13 @@ export class OauthService {
   async getClientSecret(
     organizationId: string,
     clientId: string
-  ): Promise<GetOrganizationOauthClientSecretOutput> {
-    return await this.#run((options) =>
-      this.#scope.getOrganizationOauthClientSecret(
-        { path: { clientId, organizationId } },
-        options
+  ): Promise<NonNullable<GetOrganizationOauthClientSecretOutput>> {
+    return responseBody(
+      await this.#run((options) =>
+        this.#scope.getOrganizationOauthClientSecret(
+          { path: { clientId, organizationId } },
+          options
+        )
       )
     )
   }

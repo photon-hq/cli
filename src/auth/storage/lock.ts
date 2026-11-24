@@ -4,7 +4,7 @@ import { lstat, mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CliError } from '../../core/errors.ts'
 import {
-  LOCK_ACQUISITION_TIMEOUT_MS,
+  AUTH_LOCK_ACQUISITION_TIMEOUT_MS,
   LOCK_HEARTBEAT_MS,
   LOCK_STALE_MS
 } from '../constants.ts'
@@ -111,7 +111,7 @@ const acquireLock = async (
   const lockDirectory = join(configDirectory, 'auth.lock')
   const startedAt = Date.now()
 
-  while (Date.now() - startedAt < LOCK_ACQUISITION_TIMEOUT_MS) {
+  while (Date.now() - startedAt < AUTH_LOCK_ACQUISITION_TIMEOUT_MS) {
     if (signal?.aborted) {
       throw signal.reason
     }

@@ -204,17 +204,13 @@ describe(`${CLI_NAME} project platform telegram connect`, () => {
       )
     const names = text.calls.map(([name]) => name)
     expect(byName(json.calls)).toEqual(byName(text.calls))
-    expect(names.slice(0, 2).sort()).toEqual([
-      'platforms.listOperations',
-      'platforms.listResources'
-    ])
-    expect(names.slice(2)).toEqual([
+    expect(names).toEqual([
       'raw.connectTelegramBot',
       'browser',
       'platforms.getOperation',
       'platforms.getOperation'
     ])
-    expect(byName(noWait.calls)).toEqual(byName(text.calls.slice(0, 4)))
+    expect(byName(noWait.calls)).toEqual(byName(text.calls.slice(0, 2)))
     expect([text.exitCodes, json.exitCodes, noWait.exitCodes]).toEqual([
       [],
       [],
@@ -343,27 +339,25 @@ describe(`${CLI_NAME} project platform telegram connect`, () => {
     expect(scope.platforms.getOperation).not.toHaveBeenCalled()
   })
 
-  test('asks a person before adding a bot to a project that has one', async () => {
+  test('reports the occupied-project refusal even with --yes', async () => {
     const scope = createScope()
-    const confirm = vi.fn(() => Promise.resolve(true))
-
-    const result = await invoke(['connect', '--no-wait'], scope, {
-      confirm,
-      interactive: true
+    scope.raw.connectTelegramBot.mockRejectedValue(
+      new ApiError('occupied', {
+        body: {
+          code: 'TELEGRAM_BOT_ALREADY_CONNECTED',
+          detail: 'Disconnect the current bot before connecting another.'
+        },
+        headers: new Headers(),
+        operationId: 'connectTelegramBot',
+        status: 409
+      })
+    )
+    const result = await invoke(['connect', '--yes', '--json'], scope)
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      error: { code: 'TELEGRAM_BOT_ALREADY_CONNECTED' }
     })
-
-    expect(confirm).toHaveBeenCalledExactlyOnceWith(
-      'Connect another Telegram bot to project pho_prj_00000000000000000000000001? Project pho_prj_00000000000000000000000001 already has @AlexSupportBot connected.'
-    )
-    expect(scope.platforms.listResources).toHaveBeenCalledWith(
-      {
-        path: { id: 'pho_prj_00000000000000000000000001' },
-        query: { ability: 'telegram', pageSize: 30 }
-      },
-      undefined
-    )
-    expect(scope.raw.connectTelegramBot).toHaveBeenCalledOnce()
-    expect(result.stdout).toContain('This setup adds another bot.')
+    expect(scope.platforms.listResources).not.toHaveBeenCalled()
+    expect(result.browserLauncher).not.toHaveBeenCalled()
   })
 
   test('does not ask when the connect continues a setup in progress', async () => {
@@ -382,45 +376,6 @@ describe(`${CLI_NAME} project platform telegram connect`, () => {
     expect(confirm).not.toHaveBeenCalled()
     expect(scope.raw.connectTelegramBot).toHaveBeenCalledOnce()
     expect(result.stdout).toContain(SETUP_URL)
-  })
-
-  test('starts nothing when the person declines to add a bot', async () => {
-    const scope = createScope()
-
-    const result = await invoke(['connect'], scope, {
-      confirm: () => Promise.resolve(false),
-      interactive: true
-    })
-
-    expect(result.stdout).toBe('')
-    expect(result.stderr).toContain('Cancelled.')
-    expect(result.exitCodes).toEqual([1])
-    expect(scope.raw.connectTelegramBot).not.toHaveBeenCalled()
-    expect(result.browserLauncher).not.toHaveBeenCalled()
-  })
-
-  test('needs --yes to add a bot to a project that has one when nobody can answer', async () => {
-    const scope = createScope()
-
-    const refused = await invoke(['connect', '--no-wait'], scope)
-
-    expect(refused.exitCodes).toEqual([2])
-    expect(refused.stdout).toBe('')
-    expect(refused.stderr).toContain(
-      'Error: This would connect another Telegram bot to project pho_prj_00000000000000000000000001. Confirm it with --yes. (CONFIRMATION_REQUIRED)'
-    )
-    expect(refused.stderr).toContain(
-      `Next: Run it again with --yes: ${CLI_NAME} project platform telegram connect --no-color --no-wait --project pho_prj_00000000000000000000000001 --yes`
-    )
-    expect(scope.raw.connectTelegramBot).not.toHaveBeenCalled()
-
-    const result = await invoke(['connect', '--no-wait', '-y'], scope)
-
-    expect(result.exitCodes).toEqual([])
-    expect(result.stdout).toContain(
-      'Project pho_prj_00000000000000000000000001 already has @AlexSupportBot connected. This setup adds another bot.'
-    )
-    expect(scope.raw.connectTelegramBot).toHaveBeenCalledOnce()
   })
 
   test('does not ask again when an idempotency key continues a request', async () => {
@@ -447,29 +402,7 @@ describe(`${CLI_NAME} project platform telegram connect`, () => {
     await authenticated.remove()
   })
 
-  test('asks before a new idempotency key adds another bot', async () => {
-    const scope = createScope()
-    const confirm = vi.fn(() => Promise.resolve(false))
-    const args = [
-      'connect',
-      '--idempotency-key',
-      'telegram-new-key',
-      '--no-wait'
-    ]
-
-    const declined = await invoke(args, scope, { confirm, interactive: true })
-    const refused = await invoke([...args, '--json'], scope)
-
-    expect(confirm).toHaveBeenCalledOnce()
-    expect(declined.exitCodes).toEqual([1])
-    expect(refused.exitCodes).toEqual([2])
-    expect(JSON.parse(refused.stdout)).toMatchObject({
-      error: { code: 'CONFIRMATION_REQUIRED' }
-    })
-    expect(scope.raw.connectTelegramBot).not.toHaveBeenCalled()
-  })
-
-  test('connects all the same when the bots cannot be read', async () => {
+  test('connect has no advisory read or confirmation before server admission', async () => {
     const scope = createScope()
     scope.platforms.listResources.mockRejectedValueOnce(
       new Error('unavailable')
@@ -618,9 +551,105 @@ describe(`${CLI_NAME} project platform telegram connect`, () => {
   })
 })
 
-describe(`${CLI_NAME} project platform telegram list, view and disconnect`, () => {
-  test('lists bots and setups in progress', async () => {
+describe(`${CLI_NAME} project platform telegram view and disconnect`, () => {
+  test.each([['view'], ['disconnect', bot().resourceId, '--yes']])(
+    'does not change a connection after a failed read: %j',
+    async (...args) => {
+      const scope = createScope()
+      scope.platforms.listResources.mockRejectedValue(
+        new Error('connection unavailable')
+      )
+      scope.platforms.getResource.mockRejectedValue(
+        new Error('connection unavailable')
+      )
+      const result = await invoke(args, scope)
+      expect(result.exitCodes).toEqual([1])
+      expect(scope.raw.releaseResource).not.toHaveBeenCalled()
+      expect(scope.raw.connectTelegramBot).not.toHaveBeenCalled()
+    }
+  )
+
+  test.each([
+    ['no setup', []],
+    ['a setup in progress', [operation('pending')]],
+    [
+      'an unfinished disconnect after retirement',
+      [
+        operation('running', {
+          resourceId: bot().resourceId,
+          type: 'resource.release'
+        })
+      ]
+    ]
+  ])('fails current view with %s and no bot', async (_name, operations) => {
     const scope = createScope()
+    scope.platforms.listResources.mockResolvedValue({ resources: [] })
+    scope.platforms.listOperations.mockResolvedValue({ operations })
+    const result = await invoke(['view', '--json'], scope)
+    expect(result.exitCodes).toEqual([1])
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      error: {
+        code: 'TELEGRAM_BOT_NOT_CONNECTED',
+        next: [
+          {
+            run: `${CLI_NAME} project platform telegram connect --project ${bot().projectId}`
+          },
+          {
+            run: `${CLI_NAME} project platform telegram list --project ${bot().projectId}`
+          }
+        ]
+      }
+    })
+    expect(scope.platforms.listOperations).not.toHaveBeenCalled()
+  })
+
+  test.each(['resource.provision', 'resource.release'])(
+    'prints the same bare resource during %s as an explicit-ID view',
+    async (type) => {
+      const scope = createScope()
+      scope.platforms.listOperations.mockResolvedValue({
+        operations: [
+          operation('running', { resourceId: bot().resourceId, type })
+        ]
+      })
+      const current = await invoke(['view', '--json'], scope)
+      const explicit = await invoke(['view', bot().resourceId, '--json'], scope)
+      expect(current.exitCodes).toEqual([])
+      expect(explicit.exitCodes).toEqual([])
+      expect(JSON.parse(current.stdout)).toEqual(JSON.parse(explicit.stdout))
+      expect(JSON.parse(current.stdout)).toEqual(bot())
+      expect(scope.platforms.listOperations).not.toHaveBeenCalled()
+      expect(scope.platforms.listResources).toHaveBeenCalledWith(
+        {
+          path: { id: bot().projectId },
+          query: { pageSize: 2, state: 'active', type: 'telegram_bot' }
+        },
+        undefined
+      )
+    }
+  )
+
+  test('rejects a list with two current bots', async () => {
+    const scope = createScope()
+    scope.platforms.listResources.mockResolvedValue({
+      resources: [
+        bot(),
+        { ...bot(), resourceId: 'pho_res_00000000000000000000000032' }
+      ]
+    })
+    const result = await invoke(['list', '--json'], scope)
+    expect(result.exitCodes).toEqual([1])
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      error: { code: 'PROJECT_PROTOCOL_ERROR' }
+    })
+  })
+
+  test('lists the current disabled bot and setups with the existing JSON shape', async () => {
+    const scope = createScope()
+    const disabledBot = { ...bot(), abilities: [] }
+    scope.platforms.listResources.mockResolvedValue({
+      resources: [disabledBot]
+    })
     scope.platforms.listOperations.mockResolvedValue({
       operations: [operation('pending')]
     })
@@ -630,12 +659,16 @@ describe(`${CLI_NAME} project platform telegram list, view and disconnect`, () =
 
     expect(JSON.parse(json.stdout)).toEqual({
       provisioning: [operation('pending')],
-      resources: [bot()]
+      resources: [disabledBot]
     })
     expect(scope.platforms.listResources).toHaveBeenCalledWith(
       {
         path: { id: 'pho_prj_00000000000000000000000001' },
-        query: { ability: 'telegram', pageSize: 30 }
+        query: {
+          pageSize: 30,
+          state: 'unallocated,active',
+          type: 'telegram_bot'
+        }
       },
       undefined
     )
@@ -689,6 +722,22 @@ describe(`${CLI_NAME} project platform telegram list, view and disconnect`, () =
     expect(JSON.parse(json.stdout)).toEqual(resource)
   })
 
+  test('returns a stable JSON result with --yes', async () => {
+    const scope = createScope()
+
+    const result = await invoke(
+      ['disconnect', 'pho_res_00000000000000000000000031', '--yes', '--json'],
+      scope
+    )
+
+    expect(JSON.parse(result.stdout)).toEqual({
+      operation: operation('succeeded', {
+        resourceId: 'pho_res_00000000000000000000000031',
+        type: 'resource.release'
+      })
+    })
+  })
+
   test('disconnects a bot after confirmation', async () => {
     const scope = createScope()
     const confirm = vi.fn(() => Promise.resolve(true))
@@ -719,20 +768,33 @@ describe(`${CLI_NAME} project platform telegram list, view and disconnect`, () =
     expect(result.stdout).toContain('The bot still exists in Telegram')
   })
 
-  test('returns a stable JSON result with --yes', async () => {
+  test('requires a disconnect resource ID before reading or changing a bot', async () => {
     const scope = createScope()
+    const result = await invoke(['disconnect', '--yes', '--json'], scope)
+    expect(result.exitCodes).toEqual([2])
+    expect(scope.platforms.listResources).not.toHaveBeenCalled()
+    expect(scope.platforms.getResource).not.toHaveBeenCalled()
+    expect(scope.raw.releaseResource).not.toHaveBeenCalled()
+  })
 
+  test('confirmation-required retry names the original resource', async () => {
+    const scope = createScope()
     const result = await invoke(
-      ['disconnect', 'pho_res_00000000000000000000000031', '--yes', '--json'],
+      ['disconnect', bot().resourceId, '--json'],
       scope
     )
-
-    expect(JSON.parse(result.stdout)).toEqual({
-      operation: operation('succeeded', {
-        resourceId: 'pho_res_00000000000000000000000031',
-        type: 'resource.release'
-      })
+    expect(result.exitCodes).toEqual([2])
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      error: {
+        code: 'CONFIRMATION_REQUIRED',
+        next: [
+          {
+            run: `${CLI_NAME} project platform telegram disconnect ${bot().resourceId} --no-color --json --project ${bot().projectId} --yes`
+          }
+        ]
+      }
     })
+    expect(scope.raw.releaseResource).not.toHaveBeenCalled()
   })
 
   test('leaves the bot connected when the confirmation is declined', async () => {

@@ -211,7 +211,7 @@ const transientState = (
   }
 }
 
-const retryAfterMilliseconds = (
+export const retryAfterMilliseconds = (
   error: ApiError,
   now: number
 ): number | undefined => {

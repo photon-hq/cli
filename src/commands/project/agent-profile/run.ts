@@ -16,7 +16,7 @@ type AgentProfileViewParams = PhotonCommandParams
 
 const profileDetails = (
   output: AgentProfileViewParams['extensions']['photon']['output'],
-  profile: GetAgentProfileOutput
+  profile: NonNullable<GetAgentProfileOutput>
 ): string[] =>
   detail(output, 'Agent profile', [
     { label: 'First name', value: profile.firstName },

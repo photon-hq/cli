@@ -42,9 +42,6 @@ const projectFixture = (projectId: string, name: string) => ({
     lastName: 'Agent'
   },
   createdAt: timestamp,
-  createdByAccountId: 'account_owner',
-  createdByActorId: 'account_owner',
-  createdByActorKind: 'account',
   deletedAt: null,
   flags: ['beta'],
   name,
@@ -62,6 +59,7 @@ const assignmentFixture = {
   firstName: 'Ada',
   handle: '+14155550123',
   lastName: 'Lovelace',
+  optIn: { state: 'pending' },
   platform: 'imessage',
   projectId: 'pho_prj_00000000000000000000000001',
   updatedAt: timestamp
@@ -228,6 +226,7 @@ const subscriptionTermsFixture = (
 ) => ({
   cancelsAt: null,
   category: 'platforms',
+  coupons: [],
   currentPeriodEnd: PERIOD_END,
   currentPeriodStart: '2026-08-01T00:00:00.000Z',
   nextBillingAt: PERIOD_END,
@@ -297,7 +296,7 @@ const billingOperationFixture = (
         : null,
     status,
     submittedAt: timestamp
-  } as unknown as GetBillingOperationOutput
+  } as unknown as NonNullable<GetBillingOperationOutput>
 }
 
 const createScope = () => {
@@ -531,14 +530,17 @@ const createScope = () => {
         Promise.resolve({
           invoices: [
             {
+              amountDueCents: 0,
               currency: 'USD',
               invoiceId: 'invoice_1',
               issuedAt: timestamp,
               kind: 'subscription',
               number: 'INV-1',
+              pageUrl: null,
               paymentActionRequired: false,
               paymentDueAt: null,
               paymentOverdue: false,
+              paymentProcessing: false,
               paymentStatus: 'paid',
               pdfUrl: null,
               status: 'finalized',
@@ -690,8 +692,8 @@ const leafPaths = [
   ['platform', 'sms', 'list'],
   ['platform', 'sms', 'purchase'],
   ['platform', 'sms', 'delete'],
-  ['platform', 'telegram', 'list'],
   ['platform', 'telegram', 'connect'],
+  ['platform', 'telegram', 'list'],
   ['platform', 'telegram', 'view'],
   ['platform', 'telegram', 'disconnect'],
   ['platform', 'voice', 'list'],
@@ -2953,7 +2955,7 @@ describe('project CLI command tree', () => {
     const succeeded = {
       ...billingOperationFixture(PURCHASE_BILLING_OPERATION_ID, 'SUCCEEDED'),
       result: { effectiveAt: PERIOD_END, type: 'version', version: 'v2' }
-    } as GetBillingOperationOutput
+    } as NonNullable<GetBillingOperationOutput>
     spies.billing.changePlan.mockResolvedValue(succeeded)
     const invoke = async (args: string[]) => {
       const stdout = collector()

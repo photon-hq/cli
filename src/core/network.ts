@@ -17,6 +17,21 @@ interface NetworkErrorOptions {
  */
 const CONNECT_TIMEOUT_MS = 10_000
 
+/**
+ * How late a request's time limit can fire before the CLI counts the delay as
+ * time it wasn't running, for example because its process was stopped or the
+ * system slept.
+ */
+const LATE_LIMIT_MS = 1000
+
+/**
+ * How long a request whose time limit fired that late has to deliver the
+ * answer that arrived while the CLI wasn't running. When the process resumes,
+ * Bun, and Node on Linux, run the overdue limit before they read that answer,
+ * so without this the CLI drops an answer Photon already sent and retries.
+ */
+const LATE_ANSWER_GRACE_MS = 1000
+
 /** An error and its causes, each once, outermost first. */
 export const causeChain = (error: unknown): object[] => {
   const chain: object[] = []
@@ -122,6 +137,47 @@ const connectTimedOut = (error: unknown): boolean => {
   return false
 }
 
+// The signal the request runs with in place of the caller's: it follows the
+// caller's, except that a time limit that fires late gives the request
+// LATE_ANSWER_GRACE_MS to finish first. undefined when there is nothing to
+// follow. Lateness is the later of performance.now() and the wall clock: Bun
+// on macOS runs the limit's timer on a clock that counts system sleep, and
+// performance.now() on one that doesn't.
+const attemptSignal = (
+  signal: AbortSignal | undefined,
+  timeoutMs: number
+): { dispose: () => void; signal: AbortSignal } | undefined => {
+  if (signal === undefined || signal.aborted) {
+    return
+  }
+  const startedAt = performance.now()
+  const wallStartedAt = Date.now()
+  const controller = new AbortController()
+  let grace: ReturnType<typeof setTimeout> | undefined
+  const abort = () => {
+    const elapsedMs = Math.max(
+      performance.now() - startedAt,
+      Date.now() - wallStartedAt
+    )
+    const lateMs = elapsedMs - timeoutMs
+    if (timedOut(signal) && lateMs > LATE_LIMIT_MS) {
+      grace = setTimeout(() => {
+        controller.abort(signal.reason)
+      }, LATE_ANSWER_GRACE_MS)
+      return
+    }
+    controller.abort(signal.reason)
+  }
+  signal.addEventListener('abort', abort, { once: true })
+  return {
+    dispose: () => {
+      clearTimeout(grace)
+      signal.removeEventListener('abort', abort)
+    },
+    signal: controller.signal
+  }
+}
+
 const timeLimit = (
   error: unknown,
   signal: AbortSignal | undefined,
@@ -136,7 +192,8 @@ const timeLimit = (
 /**
  * A fetch whose requests fail with a NetworkError when they get no response,
  * except when the caller cancels them. The body is read within the request, so
- * a timeout while it arrives is reported the same way.
+ * a timeout while it arrives is reported the same way. A time limit that fires
+ * more than LATE_LIMIT_MS late still lets an answer that has arrived finish.
  */
 export const withNetworkErrors =
   (
@@ -145,10 +202,14 @@ export const withNetworkErrors =
   ): typeof globalThis.fetch =>
   async (input, init) => {
     const { signal, url } = requestTarget(input, init)
+    const attempt = attemptSignal(signal, options.timeoutMs)
     let response: Response
     let body: ArrayBuffer | null
     try {
-      response = await fetchImplementation(input, init)
+      response = await fetchImplementation(
+        input,
+        attempt === undefined ? init : { ...init, signal: attempt.signal }
+      )
       body = NULL_BODY_STATUSES.has(response.status)
         ? null
         : await response.arrayBuffer()
@@ -163,6 +224,8 @@ export const withNetworkErrors =
         host: url.host,
         ...(timeoutMs === undefined ? {} : { timeoutMs })
       })
+    } finally {
+      attempt?.dispose()
     }
     return new Response(body, {
       headers: response.headers,

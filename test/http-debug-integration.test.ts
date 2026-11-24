@@ -311,9 +311,17 @@ describe('CLI HTTP debug integration', () => {
         )
         return
       }
-      writeJson(response, { cardOnFile: false, paymentMethod: null }, 200, {
-        'x-request-id': 'request_retry_3'
-      })
+      writeJson(
+        response,
+        {
+          agreement: { kind: 'self_serve' },
+          cardOnFile: false,
+          paymentMethod: null,
+          purchaseRefusal: 'payment_method_required'
+        },
+        200,
+        { 'x-request-id': 'request_retry_3' }
+      )
     })
     const { configDirectory } = await createAuthenticatedConfig(
       'user_ada',
@@ -345,8 +353,10 @@ describe('CLI HTTP debug integration', () => {
     )
 
     expect(JSON.parse(stdout.value())).toEqual({
+      agreement: { kind: 'self_serve' },
       cardOnFile: false,
-      paymentMethod: null
+      paymentMethod: null,
+      purchaseRefusal: 'payment_method_required'
     })
     const debug = JSON.parse(stderr.value()) as {
       debug: {

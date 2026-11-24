@@ -23,9 +23,6 @@ const project = {
     lastName: null
   },
   createdAt: timestamp,
-  createdByAccountId: 'user_ada',
-  createdByActorId: 'user_ada',
-  createdByActorKind: 'account',
   deletedAt: null,
   flags: [],
   name: 'Support line',

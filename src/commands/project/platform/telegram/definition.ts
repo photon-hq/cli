@@ -22,17 +22,22 @@ const telegramConnectArgs = {
     negatable: true,
     type: 'boolean'
   },
-  yes: yesArg
+  yes: { ...yesArg, hidden: true }
 } as const
 const telegramBotArgs = {
   'resource-id': {
-    description: 'Telegram bot resource ID',
+    description: 'Telegram bot resource ID (defaults to the current bot)',
     parse: idArgument('resource', 'Telegram bot resource ID'),
+    required: false,
     type: 'positional'
   }
 } as const
 const telegramDisconnectArgs = {
-  ...telegramBotArgs,
+  'resource-id': {
+    description: 'Telegram bot resource ID',
+    parse: idArgument('resource', 'Telegram bot resource ID'),
+    type: 'positional'
+  },
   yes: yesArg
 } as const
 
@@ -47,7 +52,7 @@ export type TelegramDisconnectParams = PhotonCommandParams<
 
 const telegramListDefinition = defineWithTypes<TelegramListParams>()({
   args: telegramListArgs,
-  description: 'List project Telegram bots and setups in progress',
+  description: 'List the project Telegram bot and setups in progress',
   name: 'list',
   toKebab: true
 })
@@ -58,7 +63,7 @@ const telegramConnectDefinition = defineWithTypes<TelegramConnectParams>()({
 })
 const telegramViewDefinition = defineWithTypes<TelegramViewParams>()({
   args: telegramBotArgs,
-  description: 'View a project Telegram bot',
+  description: 'View the project Telegram connection',
   name: 'view'
 })
 const telegramDisconnectDefinition =
@@ -69,7 +74,7 @@ const telegramDisconnectDefinition =
   })
 
 export const telegramCommand = defineWithTypes<TelegramParams>()({
-  description: 'Inspect and manage project Telegram bots',
+  description: 'Inspect and manage the project Telegram connection',
   name: 'telegram',
   subCommands: {
     connect: tested(
