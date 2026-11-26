@@ -74,6 +74,21 @@ Where no one can approve a sign-in, as in CI, put a Photon key in
 `PHOTON_API_TOKEN` instead of running `photon login`. Add `--json` to any
 command for output a program can read, and `--help` to see its options.
 
+## Using a coding agent
+
+Install the Photon skill so your agent knows how Photon and this CLI work:
+
+```sh
+npx skills add photon-hq/skills --skill photon
+```
+
+To have the agent set up a project for you, paste this into it, with your
+project ID from the Photon dashboard:
+
+```text
+Set up Photon for me (project pho_prj_...). Fetch https://photon.codes/setup.md and follow it.
+```
+
 ## Documentation
 
 - [CLI guide](https://photon.codes/docs/cli): installation, sign-in, projects,
